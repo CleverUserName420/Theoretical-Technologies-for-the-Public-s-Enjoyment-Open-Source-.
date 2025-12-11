@@ -2,9 +2,16 @@ Open source theoretical research.
 - Quantum teleportation
 - Smartdust detection software leveraging built in hardware of conventional devices such as Macbook.
 - Some malware detection software stuff for cyber security.
+- Counter crime and corruption red teaming.
 
 
 
   RULES:
-  - Poisening the well is illegal.
+  - Poisening the well is illegal (If using this content)
   - No one financially profits from this. Any profits go towards the reduction of crime/corruption & uneccessary pain and suffering of human-beings.
+
+
+Concepts to note:
+- If so and but.
+- cause and effect.
+- Losing your pencil = death (Logic exercise) 
