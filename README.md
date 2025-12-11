@@ -1,0 +1,19 @@
+This will be updated from time to time. Take the information then upload your discoveries. Everyone has a unique perspective that is valued especially if it is logical, reasonable, sensible, rational,ethical, and doesn't employ psychological warfare like tricks etc. 
+
+Open source theoretical research.
+- Quantum teleportation
+- Smartdust detection software leveraging built in hardware of conventional devices such as Macbook.
+- Some malware detection software stuff for cyber security.
+- Counter crime and corruption red teaming.
+
+
+
+  RULES:
+  - Poisening the well is illegal (If using this content)
+  - No one financially profits from this. Any profits go towards the reduction of crime/corruption & uneccessary pain and suffering of human-beings.
+
+
+Concepts to note:
+- If so and but.
+- cause and effect.
+- Losing your pencil = death (Logic exercise) 
