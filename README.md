@@ -43,28 +43,54 @@ Concepts and notes:
 
 Innovation related quotes and phrases as words are like magic:-
 "Leveraging already existing"
+
 "If (Blank) then (Bank) but if (Blank) then (Blank)"
+
 "Finding a way to bypass"
+
 "Taking any emotion out of failures, failures are part of the overall success"
+
 "Taking into account"
+
 "Taking into consideration"
+
 "Catering for"
+
 "Catering for the fact that"
+
 "Cause and effect"
+
 "Overall cause and effect"
+
 "Cause and effect tracing"
+
 "Overall outcome"
+
 "What are we not asking?"
+
 "What would we need in order to make it work?"
+
 "If the idea was already operational, what would all the parts, math, hardware, software etc needed?"
-"0-days in all areas of society, not just cyber. Red teaming is for all areas of society, not just cyber."
+
+"There are 0-days in all areas of society, not just cyber. Red teaming is for all areas of society, not just cyber."
+
 "If money and access wasn't an issue, then would it be possible?"
+
 "If yes, then yes/no but if yes/no then yes/no but if yes/no then yes/no..."
+
 "Logically speaking, in scenario A."
+
+"Theoretically speaking, in scenario A."
+
 "If they react this way, it could indicate."
+
 "If there is a blockage in flow of information based upon a simple question/inquiry..."
+
 "Theoretically speaking it could work if.."
+
 "All we need to make it work is..."
+
 "What do I need to maximize this with available xyz in order to be at the forefront?"
+
 
 
