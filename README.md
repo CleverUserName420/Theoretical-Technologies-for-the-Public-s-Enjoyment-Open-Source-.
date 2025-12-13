@@ -108,5 +108,7 @@ Innovation related quotes and phrases as words are like magic:-
 
 "could be repurposed for.."
 
+"So long as it produces the desired result which can be verified/is verifiable.."
+
 
 
