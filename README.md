@@ -32,11 +32,39 @@ Open source theoretical research. (All are drafts)
   - Do not look into the darpa stuff pertaining to the (redacted) part of the "from here to there" I've already done all of that and have created IP with that and there is a reason why it is redacted. So please do not look into that. It was made for mitigation purposes.
 
 
-Concepts to note:
+Concepts and notes:
 - If so and but.
 - cause and effect.
 - Losing your pencil = death (Logic exercise)
 - "Theoretically speaking, if (Blank) did exist or was operational despite research and testing coming to an end on (Blank) date and there being a patnet, how could/would it be detected?"
 - I have an NDA which permits me to do this without needing to explain my research methods. Despite this being a hobby and it not being illegal, I know some may have some sort of weird obsessive problem with it so an NDA adds that extra layer of protection as I've been into R&D for a few years now. It is max security NDA.
 - Could pen testing the fabric of space/time be around the corner? https://claude.ai/share/76bd872c-234a-4a0c-bd0b-0b830a5d53af This is a public repo so the race is on. 
-- The "Here to there" stuff is pretty cool because no matter who you are, you could be the poorest or the wealthiest human-being alive and you will feel utterly powerless. ^
+- The "Here to there" stuff is pretty cool because no matter who you are, you could be the poorest or the wealthiest human-being alive and you will feel utterly powerless. 
+
+Innovation related quotes and phrases as words are like magic:-
+"Leveraging already existing"
+"If (Blank) then (Bank) but if (Blank) then (Blank)"
+"Finding a way to bypass"
+"Taking any emotion out of failures, failures are part of the overall success"
+"Taking into account"
+"Taking into consideration"
+"Catering for"
+"Catering for the fact that"
+"Cause and effect"
+"Overall cause and effect"
+"Cause and effect tracing"
+"Overall outcome"
+"What are we not asking?"
+"What would we need in order to make it work?"
+"If the idea was already operational, what would all the parts, math, hardware, software etc needed?"
+"0-days in all areas of society, not just cyber. Red teaming is for all areas of society, not just cyber."
+"If money and access wasn't an issue, then would it be possible?"
+"If yes, then yes/no but if yes/no then yes/no but if yes/no then yes/no..."
+"Logically speaking, in scenario A."
+"If they react this way, it could indicate."
+"If there is a blockage in flow of information based upon a simple question/inquiry..."
+"Theoretically speaking it could work if.."
+"All we need to make it work is..."
+"What do I need to maximize this with available xyz in order to be at the forefront?"
+
+
