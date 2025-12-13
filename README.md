@@ -22,6 +22,7 @@ Open source theoretical research. (All are drafts)
   - mobicom.99.pdf = Smartdust related.
   - Red-Teaming-System-Counter-Corruption.txt = Some stuff about how we should be also red teaming public systems, how they can be exploited for crime/corruption and how to best patch/mitigate that.
   - From here to there.txt = Some stuff about if quantum leaping/wormholing/teleportation was theoretically possible, what you would need etc.
+  - MaxCharZander.py = encryption software used to test decryption software on. Could have done it with more but intrinsic interests found something else to do instead.
 
 
 
