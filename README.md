@@ -6,6 +6,7 @@ Open source theoretical research. (All are drafts)
 - Some malware detection software stuff for cyber security.
 - Counter crime and corruption red teaming.
 - Signals
+- (Coming soon - Phrases and methods of manipulation/abuse/harassment/Psywarfare used in crime/corruption in order to identify them and to counter)
 
 
 
