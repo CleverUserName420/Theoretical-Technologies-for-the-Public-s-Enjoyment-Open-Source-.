@@ -1,10 +1,11 @@
 This will be updated from time to time. Take the information then upload your discoveries. Everyone has a unique perspective that is valued especially if it is logical, reasonable, sensible, rational,ethical, and doesn't employ psychological warfare like tricks etc. 
 
-Open source theoretical research.
+Open source theoretical research. (All are drafts)
 - Quantum teleportation
 - Smartdust detection software leveraging built in hardware of conventional devices such as Macbook.
 - Some malware detection software stuff for cyber security.
 - Counter crime and corruption red teaming.
+- Signals
 
 
 
