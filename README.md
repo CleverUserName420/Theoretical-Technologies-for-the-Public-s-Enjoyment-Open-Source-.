@@ -36,13 +36,13 @@ Concepts and notes:
 - If so and but.
 - cause and effect.
 - Losing your pencil = death (Logic exercise)
-- "Theoretically speaking, if (Blank) did exist or was operational despite research and testing coming to an end on (Blank) date and there being a patnet, how could/would it be detected?"
 - I have an NDA which permits me to do this without needing to explain my research methods. Despite this being a hobby and it not being illegal, I know some may have some sort of weird obsessive problem with it so an NDA adds that extra layer of protection as I've been into R&D for a few years now. It is max security NDA.
 - Could pen testing the fabric of space/time be around the corner? https://claude.ai/share/76bd872c-234a-4a0c-bd0b-0b830a5d53af This is a public repo so the race is on. 
 - The "Here to there" stuff is pretty cool because no matter who you are, you could be the poorest or the wealthiest human-being alive and you will feel utterly powerless. 
 
 Innovation related quotes and phrases as words are like magic:-
-"Leveraging already existing"
+
+"Leveraging already existing.."
 
 "If (Blank) then (Bank) but if (Blank) then (Blank)"
 
@@ -68,6 +68,10 @@ Innovation related quotes and phrases as words are like magic:-
 
 "What are we not asking?"
 
+"What else is there?"
+
+"What else could there be?"
+
 "What would we need in order to make it work?"
 
 "If the idea was already operational, what would all the parts, math, hardware, software etc needed?"
@@ -91,6 +95,8 @@ Innovation related quotes and phrases as words are like magic:-
 "All we need to make it work is..."
 
 "What do I need to maximize this with available xyz in order to be at the forefront?"
+
+"Theoretically speaking, if (Blank) did exist or was operational despite research and testing coming to an end on (Blank) date and there being a patnet, how could/would it be detected?"
 
 
 
