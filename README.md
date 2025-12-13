@@ -1,4 +1,4 @@
-This will be updated from time to time. Take the information then upload your discoveries. Everyone has a unique perspective that is valued especially if it is logical, reasonable, sensible, rational,ethical, and doesn't employ psychological warfare like tricks etc. 
+This will be updated from time to time. Take the information then upload your discoveries. Everyone has a unique perspective that is valued especially if it is logical, reasonable, sensible, rational, ethical, and doesn't employ psychological warfare like tricks etc. 
 
 Open source theoretical research. (All are drafts)
 - Quantum teleportation
@@ -37,6 +37,6 @@ Concepts to note:
 - cause and effect.
 - Losing your pencil = death (Logic exercise)
 - "Theoretically speaking, if (Blank) did exist or was operational despite research and testing coming to an end on (Blank) date and there being a patnet, how could/would it be detected?"
-- I have an NDA which permits me to do this without needing to explain my research methods. 
+- I have an NDA which permits me to do this without needing to explain my research methods. Despite this being a hobby and it not being illegal, I know some may have some sort of weird obsessive problem with it so an NDA adds that extra layer of protection as I've been into R&D for a few years now. It is max security NDA.
 - Could pen testing the fabric of space/time be around the corner? https://claude.ai/share/76bd872c-234a-4a0c-bd0b-0b830a5d53af This is a public repo so the race is on. 
 - The "Here to there" stuff is pretty cool because no matter who you are, you could be the poorest or the wealthiest human-being alive and you will feel utterly powerless. ^
