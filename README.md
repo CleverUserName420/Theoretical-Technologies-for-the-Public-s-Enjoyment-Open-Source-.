@@ -21,3 +21,4 @@ Concepts to note:
 - Losing your pencil = death (Logic exercise)
 - "Theoretically speaking, if (Blank) did exist or was operational despite research and testing coming to an end on (Blank) date and there being a patnet, how could/would it be detected?"
 - I have an NDA which permits me to do this without needing to explain my research methods. 
+- Could pen testing the fabric of space/time be around the corner? https://claude.ai/share/76bd872c-234a-4a0c-bd0b-0b830a5d53af This is a public repo so the race is on. 
