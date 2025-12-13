@@ -20,3 +20,4 @@ Concepts to note:
 - cause and effect.
 - Losing your pencil = death (Logic exercise)
 - "Theoretically speaking, if (Blank) did exist or was operational despite research and testing coming to an end on (Blank) date and there being a patnet, how could/would it be detected?"
+- I have an NDA which permits me to do this without needing to explain my research methods. 
