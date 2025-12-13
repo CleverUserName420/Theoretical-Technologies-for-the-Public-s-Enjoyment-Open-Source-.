@@ -98,5 +98,15 @@ Innovation related quotes and phrases as words are like magic:-
 
 "Theoretically speaking, if (Blank) did exist or was operational despite research and testing coming to an end on (Blank) date and there being a patnet, how could/would it be detected?"
 
+"In the context of"
+
+"relative to"
+
+"Absolute Macro"
+
+"Absolute Micro"
+
+"could be repurposed for.."
+
 
 
