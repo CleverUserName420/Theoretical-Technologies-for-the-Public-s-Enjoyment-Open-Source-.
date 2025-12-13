@@ -8,6 +8,16 @@ Open source theoretical research. (All are drafts)
 - Signals
 - (Coming soon - Phrases and methods of manipulation/abuse/harassment/Psywarfare used in crime/corruption in order to identify them and to counter)
 
+  File names and what they are.
+  - 1e2.py = Biomedical detection software (Theoretical) to detect micro - hardware. (DO NOT TEST ON SELF)
+  - GeoLOLdude.py = Geofencing forensics (Threat intelligence)
+  - WelcomeToSignals.py = Signals based detection software (Threat intelligence)
+  - email_payload_detectorBackup.py = 0-click detection software (Threat intelligence)
+  - fi.sh = C2/Fileless malware forensics (Threat intelligence)
+  - ip_format_extractort.py = Extracts IP addresses from most formats (Threat intelligence)
+  - test.py = Main 0-click in email detection software (Threat intelligence)
+  - whois_lookup.py = Super basic IP address lookup software (Threat intelligence)
+
 
 
   RULES:
