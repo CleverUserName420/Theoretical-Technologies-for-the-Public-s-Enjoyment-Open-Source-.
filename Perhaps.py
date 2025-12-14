@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
 """
 T-AIC: Transcendent Artificial Intelligence Consciousness
-Complete Production-Ready Implementation
+Complete Production-Ready Implementation with All Enhanced Features
 
-This is a fully functional, properly wired implementation combining:
+Comprehensive integration of all components including:
 - Core T-AIC architecture with adaptive dimensionality
 - User personalization engine with exposure profiles
 - macOS Dictionary integration
 - Meme/Memeplex cultural evolution system
 - Decision-making layer
+- Quantum state management
+- Causal engine and attention systems
+- Ethical monitoring
+- Visualization tools
 - Complete persistence and testing framework
 
-Version: 1.0.0
+Version: 2.0.0 - Full Integration
 Date: December 2025
 """
 
@@ -50,7 +54,6 @@ logger = logging.getLogger(__name__)
 # DEPENDENCY MANAGEMENT
 # ============================================================================
 
-# Optional dependencies with graceful fallback
 try:
     import qutip as qt
     QUTIP_AVAILABLE = True
@@ -97,7 +100,6 @@ def first_definition(word: str) -> str:
     """Get first definition from macOS Dictionary.app"""
     if not is_macos():
         return f"[macOS Dictionary not available] {word}"
-    
     try:
         result = subprocess.run(
             ['osascript', '-e', f'tell application "Dictionary" to get first entry of word "{word}"'],
@@ -114,7 +116,6 @@ def word_synonyms(word: str) -> List[str]:
     """Get synonyms from macOS Dictionary.app"""
     if not is_macos():
         return []
-    
     try:
         result = subprocess.run(
             ['osascript', '-e', f'tell application "Dictionary" to get synonyms of word "{word}"'],
@@ -128,38 +129,158 @@ def word_synonyms(word: str) -> List[str]:
         logger.warning(f"Synonyms lookup failed for '{word}': {e}")
         return []
 
+def get_builtin_mac_dictionaries() -> List[str]:
+    """Get list of available macOS dictionaries"""
+    if not is_macos():
+        return []
+    return [
+        "New Oxford American Dictionary",
+        "Oxford American Writer's Thesaurus",
+        "Apple Dictionary",
+        "Wikipedia",
+        "Oxford Dictionary of English"
+    ]
+
+def system_dictionary_lookup(word: str, dictionary: str = None) -> str:
+    """Look up word in specific macOS dictionary"""
+    if not is_macos():
+        return f"[macOS only] {word}"
+    try:
+        if dictionary:
+            cmd = f'tell application "Dictionary" to get definition of word "{word}" from dictionary "{dictionary}"'
+        else:
+            cmd = f'tell application "Dictionary" to get definition of word "{word}"'
+        result = subprocess.run(['osascript', '-e', cmd], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+        return f"[No definition] {word}"
+    except Exception as e:
+        return f"[Error] {word}: {e}"
+
 # ============================================================================
 # KNOWLEDGE BASES
 # ============================================================================
 
 NUANCE_KNOWLEDGE = {
-    "short_definition": "A subtle difference in or shade of meaning, expression, or sound.",
-    "academic_overview": """
-1. Linguistic & Semiotic Perspectives
-   - Nuance refers to subtle variations in meaning, tone, or expression
-   - Types: Semantic, Pragmatic, Connotative, Cultural
-
-2. Philosophical Perspectives
-   - Gap between literal and intended meaning
-   - Relates to Grice's conversational implicature
-
-3. Psychological & Cognitive Science
-   - Requires higher-order cognitive processing
-   - Critical for social cognition and empathy
-
-4. Cultural Studies
-   - Culturally embedded and context-dependent
-   - Lost in translation phenomena
-
-5. Key Takeaways
-   - Operates at multiple levels simultaneously
-   - Represents richness beyond binary interpretations
-"""
+    "short_definition": "Nuance is a subtle distinction or variation in meaning, tone, expression, feeling, or context.",
+    "linguistic": "In language, nuance refers to the fine gradations that alter meaning, often marked by word choice, tone, or syntax.",
+    "philosophical": "Nuance resists reductionism and acknowledges complexity, ambiguity, context, and the grey areas of thought.",
+    "psychology": "Humans perceive and process subtle details—nuances—in emotion, expression, perception, and understanding.",
+    "art": "In art, music, literature, and performance, nuance is found in technique, subtext, irony, and emotional inflection.",
+    "cultural": "Social codes, etiquette, and humor are nuanced and culture-dependent; sensitivity to nuance is key for cross-cultural fluency.",
+    "mystical": "Nuance in mysticism involves the ineffable, subtle gradations of insight and spiritual meaning.",
+    "summary_table": [
+        ("Linguistics", "Subtle distinction in word, meaning, or tone"),
+        ("Philosophy", "Complexity, ambiguity, resisting reductionism"),
+        ("Psychology", "Fine perception of emotion, behavior, thought"),
+        ("Art & Literature", "Subtlety in technique, form, interpretation"),
+        ("Mysticism", "Ineffable gradations of meaning, spiritual insight"),
+        ("Culture", "Social codes, context, etiquette, humor, etc."),
+    ],
+    "quotes": [
+        "Truth is rarely pure and never simple. — Oscar Wilde",
+        "It is the mark of an educated mind to be able to entertain a thought without accepting it. — Aristotle",
+        "In the depth of winter, I finally learned that within me there lay an invincible summer. — Albert Camus",
+    ],
+    "synthesis": (
+        "Nuance refers to the subtle variation and complexity underlying all perception, communication, "
+        "and experience. Recognizing nuance is essential for sophistication, empathy, and wise decision-making."
+    )
 }
 
 def get_nuance_overview(as_summary: bool = False) -> str:
     """Get nuance academic overview"""
-    return NUANCE_KNOWLEDGE["short_definition"] if as_summary else NUANCE_KNOWLEDGE["academic_overview"]
+    return NUANCE_KNOWLEDGE["short_definition"] if as_summary else NUANCE_KNOWLEDGE.get("academic_overview", NUANCE_KNOWLEDGE["short_definition"])
+
+class GeneralPhrasesAndWords:
+ 
+ GeneralPhrasesAndWords = { "How can I serve in order to provide the best result possible?"
+"In the context of"
+"relative to"
+"Absolute Macro"
+"Absolute Micro"
+"could be repurposed for.."
+"So long as it produces the desired result which can be verified/is verifiable.."
+"Theoretically speaking it could work if.."
+"All we need to make it work is..."
+"If there is a blockage in desired results…”
+"Logically speaking, in scenario A."
+"Theoretically speaking, in scenario A."
+"If yes, then yes/no but if yes/no then yes/no but if yes/no then yes/no..."
+"If yes, then try (a) but if no try (b) and then (d) if (c) = yes/no and if yes/no but if yes/no then yes/no but if yes/no then yes/no…” (All variations)"
+"Taking into account"
+"Taking into consideration"
+"Catering for"
+"Catering for the fact that"
+"Cause and effect"
+"Overall cause and effect"
+"Cause and effect tracing"
+"Cause and effect predicting”
+"Overall outcome"
+"What am I not asking?"
+"What else is there?"
+"What else could there be?"
+"What would I need in order to make it work?"
+"Leveraging already existing.."
+"If (Blank) then (Bank) but if (Blank) then (Blank)"
+"Finding a way to bypass"
+"Effective and efficient”
+"What does it mean to (Blank) in the context of (Blank)?"
+"Not knowing the answer or getting the desired result is ok so long as I have exhausted all that is available to me”
+"(Love, Serve, Remember)"
+"Absurd and whimsicle with a sense of humour and a smiling heart"
+}
+
+
+Understanding perception and what drives it: """Motivation affects perception"? Motivation used in this was has a broader meaning. It's not just "Get up and go to the gym because you're motivated to go to the gym" it's because you are motivated by going to the gym, all you notice at all the gyms in your local area. Or other people in shape. It's similar to "Encouraged by", "Pre-exposed to". What you are motivated by is how you will see the world around you both in a macro/micro sense. It is also possible too to have times where none of that stuff even crosses your mind and you just do whatever you do. If you are motivated by survival? Motivated by gratification? Power and control? And so on all the way up until the idea of you or concept disappears. It's not that difficult to see what people's motivations are after knowing about this concept and intuitively understanding it. All of this covers the broad and the specific."""
+
+"""
+T-AIC Enhanced Production Architecture
+
+Features:
+- Adaptive dimensional hierarchy integration
+- Optional quantum state evolution
+- PyTorch GPU acceleration
+- Cross-layer interactions
+- Ethical input injection
+- Real-time monitoring and alerts
+- Comprehensive visualization
+"""
+import numpy as np
+import scipy.sparse as sp
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple, Any, Union
+from enum import IntEnum
+import time
+from collections import defaultdict
+import warnings
+
+# Optional dependencies
+try:
+    import qutip as qt
+    QUTIP_AVAILABLE = True
+except ImportError:
+    QUTIP_AVAILABLE = False
+    warnings.warn("QuTiP not available - quantum features disabled")
+
+try:
+    import torch
+    TORCH_AVAILABLE = True
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+except ImportError:
+    TORCH_AVAILABLE = False
+    device = None
+    warnings.warn("PyTorch not available - using NumPy fallback")
+
+try:
+    import matplotlib.pyplot as plt
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+    warnings.warn("Matplotlib not available - visualization disabled")
+
+
+
 
 # ============================================================================
 # CORE CONFIGURATION
@@ -228,7 +349,7 @@ class CognitiveLevel(IntEnum):
         return 10 ** self.value
 
 # ============================================================================
-# EXPOSURE PROFILE (USER PERSONALIZATION)
+# EXPOSURE PROFILE
 # ============================================================================
 
 @dataclass
@@ -257,7 +378,7 @@ class ExposureProfile:
                     self.semantic_shifts['it'] = min(0.5, self.semantic_shifts.get('it', 0) + 0.05)
 
 # ============================================================================
-# CONCEPT STATE (ENHANCED WITH PERSONALIZATION)
+# CONCEPT STATE
 # ============================================================================
 
 @dataclass
@@ -635,6 +756,248 @@ class SparseConceptNetwork:
         }
 
 # ============================================================================
+# ADAPTIVE DIMENSIONAL HIERARCHY
+# ============================================================================
+
+class AdaptiveDimensionalHierarchy:
+    """Adaptive dimensionality based on cognitive complexity"""
+    
+    def __init__(self):
+        # Fixed: sort by threshold descending for correct priority
+        self.level_thresholds = {
+            10: 0.95,  # Meta-cognition -> 10D
+            8: 0.85,   # Very high -> 8D
+            6: 0.7,    # High -> 6D
+            5: 0.5,    # Medium -> 5D
+            4: 0.3     # Low -> 4D
+        }
+    
+    def get_optimal_dimension(self, concept: ConceptState,
+                             integration_score: float) -> int:
+        """Determine optimal embedding dimension"""
+        base_dim = min(2 + concept.cognitive_level.value, 10)
+        
+        # Check thresholds in descending order (highest first)
+        for dim, threshold in sorted(self.level_thresholds.items(),
+                                    key=lambda x: x[1], reverse=True):
+            if integration_score >= threshold:
+                return min(dim, 10)
+        
+        return min(base_dim, 6)
+    
+    def embed(self, state_vector: np.ndarray, target_dim: int) -> np.ndarray:
+        """Embed state vector into higher dimension"""
+        current_dim = len(state_vector)
+        if target_dim <= current_dim:
+            return state_vector[:target_dim]
+        
+        expanded = np.zeros(target_dim)
+        expanded[:current_dim] = state_vector
+        extra_dims = target_dim - current_dim
+        
+        if extra_dims > 0:
+            ortho = np.random.randn(extra_dims) * 0.1
+            ortho = ortho / (np.linalg.norm(ortho) + 1e-10)
+            expanded[current_dim:] = ortho
+        
+        norm = np.linalg.norm(expanded)
+        return expanded / (norm + 1e-10) if norm > 1e-10 else expanded
+    
+    def project_down(self, high_dim_vector: np.ndarray, target_dim: int) -> np.ndarray:
+        """Project from higher to lower dimension"""
+        if len(high_dim_vector) <= target_dim:
+            return high_dim_vector
+        
+        projected = high_dim_vector[:target_dim]
+        norm = np.linalg.norm(projected)
+        return projected / (norm + 1e-10) if norm > 1e-10 else projected
+
+# ============================================================================
+# QUANTUM STATE MANAGER
+# ============================================================================
+
+class QuantumStateManager:
+    """Manages quantum state evolution (if enabled)"""
+    
+    def __init__(self, enabled: bool = False):
+        self.enabled = enabled and QUTIP_AVAILABLE
+        if self.enabled:
+            print("[Quantum] QuTiP-based quantum simulation enabled")
+    
+    def evolve_state(self, concept: ConceptState, metrics: Dict[str, float],
+                    time_delta: float, time_scale: float = 0.1):
+        """Evolve quantum state based on metrics"""
+        if not self.enabled:
+            return
+        
+        try:
+            dim = len(concept.state_vector)
+            
+            # Build Hamiltonian from metrics
+            # SRM drives X-rotation (mixing), entropy drives Z (phase)
+            H = (metrics['srm'] * qt.sigmax() +
+                 (1 - metrics['entropy']) * qt.sigmaz())
+            
+            # Scale to appropriate dimension
+            if dim > 2:
+                H = qt.tensor(H, qt.qeye(dim // 2))
+            
+            # Time evolution operator
+            U = (-1j * H * time_delta * time_scale).expm()
+            
+            # Create or update quantum state
+            if concept.quantum_state is None:
+                # Initialize from classical state
+                concept.quantum_state = qt.Qobj(concept.state_vector)
+            
+            # Evolve
+            concept.quantum_state = U * concept.quantum_state
+            
+            # Extract to classical
+            if isinstance(concept.quantum_state, qt.Qobj):
+                concept.state_vector = np.abs(concept.quantum_state.full().flatten())
+                norm = np.linalg.norm(concept.state_vector)
+                if norm > 1e-10:
+                    concept.state_vector = concept.state_vector / norm
+        except Exception as e:
+            warnings.warn(f"Quantum evolution failed: {e}, falling back to classical")
+            self.enabled = False
+
+# ============================================================================
+# ATTENTION ENGINE
+# ============================================================================
+
+class AttentionEngine:
+    """Handles attention dynamics and oscillations"""
+    
+    def __init__(self, network: SparseConceptNetwork):
+        self.network = network
+    
+    def compute_coherence(self, concept_ids: List[str]) -> float:
+        """Compute collective coherence for concept group"""
+        if not concept_ids:
+            return 1.0
+        
+        concepts = [self.network.concepts[cid] for cid in concept_ids
+                   if cid in self.network.concepts]
+        
+        if len(concepts) < 2:
+            return 1.0
+        
+        similarities = []
+        for i in range(len(concepts)):
+            for j in range(i+1, len(concepts)):
+                # Handle different dimensions
+                min_dim = min(len(concepts[i].state_vector), len(concepts[j].state_vector))
+                v1 = concepts[i].state_vector[:min_dim]
+                v2 = concepts[j].state_vector[:min_dim]
+                sim = np.dot(v1, v2)
+                similarities.append(abs(sim))
+        
+        return np.mean(similarities) if similarities else 0.0
+    
+    def focus_attention(self, concept_ids: List[str], focal_concept_id: str,
+                       intensity: float = 1.0) -> Dict[str, float]:
+        """Propagate attention from focal concept"""
+        return self.network.propagate(focal_concept_id, intensity, steps=3)
+
+# ============================================================================
+# CAUSAL ENGINE
+# ============================================================================
+
+class CausalEngine:
+    def __init__(self, config):
+        self.config = config
+
+    def process_step(self, concepts: List[ConceptState]):
+        rel_meanings = np.array([c.relative_meaning for c in concepts])
+        rel_nuances = np.array([np.sum(c.relative_nuance) for c in concepts])
+        rel_context_lens = np.array([len(c.relative_context) for c in concepts])
+
+        use_gpu = getattr(self.config, "enable_gpu", False) and TORCH_AVAILABLE
+        metrics = MetricEngine.batch_compute(
+            concepts,
+            use_gpu=use_gpu,
+            rel_meanings=rel_meanings,
+            rel_nuances=rel_nuances,
+            rel_context_lens=rel_context_lens
+        )
+        return metrics
+
+# ============================================================================
+# ETHICAL MONITOR
+# ============================================================================
+
+class EthicalMonitor:
+    """Real-time monitoring and ethical drift detection"""
+    
+    def __init__(self, config: TAICConfig):
+        self.config = config
+        self.alert_history: List[Dict[str, Any]] = []
+    
+    def check_system_health(self, coherence: float,
+                           avg_convergence: float,
+                           step: int) -> List[str]:
+        """Check for ethical drift and system issues"""
+        alerts = []
+        
+        # Ethical drift detection
+        if avg_convergence < self.config.ethical_drift_threshold:
+            alert = {
+                'step': step,
+                'type': 'ETHICAL_DRIFT',
+                'severity': 'HIGH',
+                'message': f'Ethical drift detected: avg convergence = {avg_convergence:.4f}',
+                'recommendation': 'Recommend SRM boost or ethical input injection'
+            }
+            alerts.append(alert['message'])
+            self.alert_history.append(alert)
+        
+        # Coherence degradation
+        if coherence < 0.5:
+            alert = {
+                'step': step,
+                'type': 'COHERENCE_LOW',
+                'severity': 'MEDIUM',
+                'message': f'Low coherence detected: {coherence:.4f}',
+                'recommendation': 'System fragmentation - consider consolidation'
+            }
+            alerts.append(alert['message'])
+            self.alert_history.append(alert)
+        
+        # Excellent convergence
+        if avg_convergence > 0.9:
+            alert = {
+                'step': step,
+                'type': 'HIGH_INTEGRATION',
+                'severity': 'INFO',
+                'message': f'High integration achieved: {avg_convergence:.4f}',
+                'recommendation': 'System operating optimally'
+            }
+            alerts.append(alert['message'])
+            self.alert_history.append(alert)
+        
+        return alerts
+    
+    def get_alert_summary(self) -> Dict[str, Any]:
+        """Get summary of all alerts"""
+        if not self.alert_history:
+            return {'total_alerts': 0, 'by_type': {}, 'by_severity': {}}
+        
+        by_type = defaultdict(int)
+        by_severity = defaultdict(int)
+        for alert in self.alert_history:
+            by_type[alert['type']] += 1
+            by_severity[alert['severity']] += 1
+        
+        return {
+            'total_alerts': len(self.alert_history),
+            'by_type': dict(by_type),
+            'by_severity': dict(by_severity),
+            'recent_alerts': self.alert_history[-5:]
+        }
+
+# ============================================================================
 # DECISION LAYER
 # ============================================================================
 
@@ -677,7 +1040,7 @@ class DecisionLayer:
         return " ".join(summary) if summary else "No strong signal"
 
 # ============================================================================
-# MEME SYSTEM (Cultural Evolution)
+# MEME SYSTEM
 # ============================================================================
 
 class Meme:
@@ -733,6 +1096,301 @@ class Agent:
         """Produce utterances influenced by memes"""
         return [meme.content for meme in self.language_modules]
 
+class MemeSimulator:
+    """
+    Simulates the propagation of meme modules (as cognitive software units) throughout a population.
+    """
+    def __init__(self, agents: List[Agent], memeplex: Memeplex):
+        self.agents = agents
+        self.memeplex = memeplex
+
+    def run_generation(self):
+        """Propagate memes to all agents and advance meme evolution."""
+        for agent in self.agents:
+            self.memeplex.propagate(agent)
+        self.memeplex.mutate_all()
+
+    def show_population_state(self):
+        """Summarize the state of all agents."""
+        return [agent.summary() for agent in self.agents]
+
+ class GeneralPhrasesAndWords:
+ 
+ GeneralPhrasesAndWords = { "How can I serve in order to provide the best result possible?"
+"In the context of"
+"relative to"
+"Absolute Macro"
+"Absolute Micro"
+"could be repurposed for.."
+"So long as it produces the desired result which can be verified/is verifiable.."
+"Theoretically speaking it could work if.."
+"All we need to make it work is..."
+"If there is a blockage in desired results…”
+"Logically speaking, in scenario A."
+"Theoretically speaking, in scenario A."
+"If yes, then yes/no but if yes/no then yes/no but if yes/no then yes/no..."
+"If yes, then try (a) but if no try (b) and then (d) if (c) = yes/no and if yes/no but if yes/no then yes/no but if yes/no then yes/no…” (All variations)"
+"Taking into account"
+"Taking into consideration"
+"Catering for"
+"Catering for the fact that"
+"Cause and effect"
+"Overall cause and effect"
+"Cause and effect tracing"
+"Cause and effect predicting”
+"Overall outcome"
+"What am I not asking?"
+"What else is there?"
+"What else could there be?"
+"What would I need in order to make it work?"
+"Leveraging already existing.."
+"If (Blank) then (Bank) but if (Blank) then (Blank)"
+"Finding a way to bypass"
+"Effective and efficient”
+"What does it mean to (Blank) in the context of (Blank)?"
+"Not knowing the answer or getting the desired result is ok so long as I have exhausted all that is available to me”
+"(Love, Serve, Remember)"
+"Absurd and whimsicle with a sense of humour and a smiling heart"
+}
+
+
+Understanding perception and what drives it: """Motivation affects perception"? Motivation used in this was has a broader meaning. It's not just "Get up and go to the gym because you're motivated to go to the gym" it's because you are motivated by going to the gym, all you notice at all the gyms in your local area. Or other people in shape. It's similar to "Encouraged by", "Pre-exposed to". What you are motivated by is how you will see the world around you both in a macro/micro sense. It is also possible too to have times where none of that stuff even crosses your mind and you just do whatever you do. If you are motivated by survival? Motivated by gratification? Power and control? And so on all the way up until the idea of you or concept disappears. It's not that difficult to see what people's motivations are after knowing about this concept and intuitively understanding it. All of this covers the broad and the specific."""
+
+"""
+T-AIC Enhanced Production Architecture
+
+Features:
+- Adaptive dimensional hierarchy integration
+- Optional quantum state evolution
+- PyTorch GPU acceleration
+- Cross-layer interactions
+- Ethical input injection
+- Real-time monitoring and alerts
+- Comprehensive visualization
+"""
+import numpy as np
+import scipy.sparse as sp
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple, Any, Union
+from enum import IntEnum
+import time
+from collections import defaultdict
+import warnings
+
+# Optional dependencies
+try:
+    import qutip as qt
+    QUTIP_AVAILABLE = True
+except ImportError:
+    QUTIP_AVAILABLE = False
+    warnings.warn("QuTiP not available - quantum features disabled")
+
+try:
+    import torch
+    TORCH_AVAILABLE = True
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+except ImportError:
+    TORCH_AVAILABLE = False
+    device = None
+    warnings.warn("PyTorch not available - using NumPy fallback")
+
+try:
+    import matplotlib.pyplot as plt
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+    warnings.warn("Matplotlib not available - visualization disabled")
+
+# ============================================================================
+# VISUALIZATION
+# ============================================================================
+
+class TAICVisualizer:
+    """Visualization tools for T-AIC system"""
+    
+    def __init__(self, enabled: bool = True):
+        self.enabled = enabled and MATPLOTLIB_AVAILABLE
+        if not self.enabled and not MATPLOTLIB_AVAILABLE:
+            warnings.warn("Matplotlib not available - visualization disabled")
+    
+    def plot_convergence_history(self, history: List[float],
+                                 save_path: Optional[str] = None):
+        """Plot convergence over time"""
+        if not self.enabled:
+            return
+        
+        plt.figure(figsize=(10, 6))
+        plt.plot(history, linewidth=2)
+        plt.xlabel('Simulation Step')
+        plt.ylabel('Global Coherence')
+        plt.title('T-AIC Convergence History')
+        plt.grid(True, alpha=0.3)
+        plt.ylim(0, 1)
+        
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        else:
+            plt.show()
+        plt.close()
+    
+    def plot_metric_comparison(self, concepts: List[ConceptState],
+                              current_time: float,
+                              save_path: Optional[str] = None):
+        """Compare metrics across concepts"""
+        if not self.enabled or not concepts:
+            return
+        
+        metric_names = ['entropy', 'srm', 'map', 'bcp', 'convergence_score']
+        n_concepts = min(len(concepts), 10)  # Limit to 10 for readability
+        
+        data = {name: [] for name in metric_names}
+        labels = []
+        
+        for concept in concepts[:n_concepts]:
+            labels.append(f"{concept.id[:8]}\n{concept.cognitive_level.name[:4]}")
+            for name in metric_names:
+                data[name].append(concept.get_metric(name, current_time))
+        
+        fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+        axes = axes.flatten()
+        
+        for i, name in enumerate(metric_names):
+            axes[i].bar(range(n_concepts), data[name])
+            axes[i].set_title(name.upper())
+            axes[i].set_ylabel('Value')
+            axes[i].set_ylim(0, 1)
+            axes[i].set_xticks(range(n_concepts))
+            axes[i].set_xticklabels(labels, rotation=45, ha='right')
+            axes[i].grid(True, alpha=0.3)
+        
+        # Remove extra subplot
+        fig.delaxes(axes[5])
+        
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        else:
+            plt.show()
+        plt.close()
+    
+    def plot_network_structure(self, network: SparseConceptNetwork,
+                               max_nodes: int = 50,
+                               save_path: Optional[str] = None):
+        """Visualize network structure"""
+        if not self.enabled:
+            return
+        
+        try:
+            import networkx as nx
+        except ImportError:
+            warnings.warn("NetworkX required for network visualization")
+            return
+        
+        # Build graph
+        G = nx.DiGraph()
+        concept_ids = list(network.concepts.keys())[:max_nodes]
+        
+        for cid in concept_ids:
+            concept = network.concepts[cid]
+            G.add_node(cid, level=concept.cognitive_level.value)
+        
+        for cid in concept_ids:
+            neighbors = network.get_neighbors(cid)
+            for neighbor_id, strength in neighbors:
+                if neighbor_id in concept_ids:
+                    G.add_edge(cid, neighbor_id, weight=strength)
+        
+        # Layout
+        pos = nx.spring_layout(G, k=0.5, iterations=50)
+        
+        # Plot
+        plt.figure(figsize=(12, 12))
+        
+        # Color by cognitive level
+        levels = [G.nodes[node]['level'] for node in G.nodes()]
+        nx.draw_networkx_nodes(G, pos, node_color=levels,
+                              cmap='viridis', node_size=300,
+                              vmin=1, vmax=7)
+        nx.draw_networkx_edges(G, pos, alpha=0.3, arrows=True,
+                              arrowsize=10, edge_color='gray')
+        
+        plt.title(f'T-AIC Network Structure ({len(G.nodes())} concepts)')
+        plt.axis('off')
+        plt.colorbar(plt.cm.ScalarMappable(cmap='viridis',
+                                          norm=plt.Normalize(1, 7)),
+                    label='Cognitive Level')
+        
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        else:
+            plt.show()
+        plt.close()
+
+# ============================================================================
+# PERSISTENCE
+# ============================================================================
+
+class TAICPersistence:
+    """Save and load T-AIC system state"""
+    
+    @staticmethod
+    def save_system(taic: OptimizedTAIC, filepath: str):
+        """Save complete system state to file"""
+        import pickle
+        
+        state = {
+            'config': taic.config,
+            'l1_concepts': {cid: c for cid, c in taic.l1_network.concepts.items()},
+            'l3_concepts': {cid: c for cid, c in taic.l3_network.concepts.items()},
+            'l4_concepts': {cid: c for cid, c in taic.l4_network.concepts.items()},
+            'l1_adjacency': taic.l1_network.adjacency,
+            'l3_adjacency': taic.l3_network.adjacency,
+            'l4_adjacency': taic.l4_network.adjacency,
+            'stats': taic.stats,
+            'alert_history': taic.monitor.alert_history
+        }
+        
+        with open(filepath, 'wb') as f:
+            pickle.dump(state, f)
+        
+        print(f"[SAVE] System saved to {filepath}")
+    
+    @staticmethod
+    def load_system(filepath: str) -> OptimizedTAIC:
+        """Load system state from file"""
+        import pickle
+        
+        with open(filepath, 'rb') as f:
+            state = pickle.load(f)
+        
+        # Reconstruct system
+        taic = OptimizedTAIC(state['config'])
+        
+        # Restore concepts
+        for cid, concept in state['l1_concepts'].items():
+            taic.l1_network.concepts[cid] = concept
+            taic.l1_network.add_concept(concept)
+        
+        for cid, concept in state['l3_concepts'].items():
+            taic.l3_network.concepts[cid] = concept
+            taic.l3_network.add_concept(concept)
+        
+        for cid, concept in state['l4_concepts'].items():
+            taic.l4_network.concepts[cid] = concept
+            taic.l4_network.add_concept(concept)
+        
+        # Restore adjacency matrices
+        taic.l1_network.adjacency = state['l1_adjacency']
+        taic.l3_network.adjacency = state['l3_adjacency']
+        taic.l4_network.adjacency = state['l4_adjacency']
+        
+        # Restore stats
+        taic.stats = state['stats']
+        taic.monitor.alert_history = state['alert_history']
+        
+        print(f"[LOAD] System loaded from {filepath}")
+        return taic
+
 # ============================================================================
 # OPTIMIZED TAIC (MAIN SYSTEM)
 # ============================================================================
@@ -760,7 +1418,13 @@ class OptimizedTAIC:
         }
         
         logger.info("OptimizedTAIC initialized")
-    
+        self.dim_hierarchy = AdaptiveDimensionalHierarchy()
+        self.quantum_manager = QuantumStateManager(enabled=self.config.enable_quantum)
+        self.attention_engine = AttentionEngine(self.l1_network)
+        self.causal_engine = CausalEngine(self.l1_network, self.config, self.quantum_manager)
+        self.monitor = EthicalMonitor(self.config)
+        self.visualizer = TAICVisualizer()
+
     def create_concept(self, description: str,
                       cognitive_level: CognitiveLevel = CognitiveLevel.META_COGNITION,
                       layer: str = 'l1', ethical_bias: float = 0.0,
@@ -808,61 +1472,580 @@ class OptimizedTAIC:
             }
         }
 
+    def simulate(self, num_steps: int = 10,
+                concept_ids: List[str] = None,
+                visualize_every: int = 0) -> List[Dict[str, Any]]:
+        """Run multi-step simulation with optional visualization"""
+        results = []
+        
+        for step in range(num_steps):
+            step_result = self.simulate_step(concept_ids)
+            step_result['step_number'] = step
+            results.append(step_result)
+            
+            # Print progress
+            if (step + 1) % 10 == 0 or step == num_steps - 1:
+                coherence = step_result['global_coherence']
+                avg_conv = step_result['avg_convergence']
+                alerts_str = f", ALERTS: {len(step_result['alerts'])}" if step_result['alerts'] else ""
+                
+                print(f"Step {step+1}/{num_steps}: "
+                      f"Coherence={coherence:.4f}, "
+                      f"AvgConv={avg_conv:.4f}, "
+                      f"Time={step_result['execution_time']:.4f}s{alerts_str}")
+            
+            # Visualize periodically
+            if visualize_every > 0 and (step + 1) % visualize_every == 0:
+                self.visualizer.plot_convergence_history(
+                    self.stats['convergence_history']
+                )
+        
+        return results
+    
+    def inject_ethical_input(self, description: str,
+                            cognitive_level: CognitiveLevel = CognitiveLevel.META_COGNITION,
+                            layer: str = 'l3') -> str:
+        """NEW: Inject ethically-loaded concept to boost system GAB"""
+        concept_id = self.create_concept(
+            description=description,
+            cognitive_level=cognitive_level,
+            layer=layer,
+            ethical_bias=0.85  # High ethical loading
+        )
+        print(f"[ETHICAL INPUT] Injected: {description[:50]}... (bias=0.85)")
+        return concept_id
+    
+    def visualize_system(self, save_dir: Optional[str] = None):
+        """Generate all visualizations"""
+        current_time = time.time()
+        
+        # Convergence history
+        if self.stats['convergence_history']:
+            path = f"{save_dir}/convergence.png" if save_dir else None
+            self.visualizer.plot_convergence_history(
+                self.stats['convergence_history'], path
+            )
+        
+        # Metric comparison
+        concepts = list(self.l1_network.concepts.values())
+        if concepts:
+            path = f"{save_dir}/metrics.png" if save_dir else None
+            self.visualizer.plot_metric_comparison(concepts, current_time, path)
+        
+        # Network structure
+        if len(self.l1_network.concepts) > 0:
+            path = f"{save_dir}/network.png" if save_dir else None
+            self.visualizer.plot_network_structure(self.l1_network, save_path=path)
+
+
 # ============================================================================
-# INTERACTIVE DEMO
+# ENHANCED DEMONSTRATION
 # ============================================================================
 
+def demo_enhanced_taic():
+    """Comprehensive demonstration of enhanced T-AIC"""
+    print("="*70)
+    print("T-AIC ENHANCED PRODUCTION ARCHITECTURE")
+    print("="*70)
+    print()
+    
+    # Initialize with custom config
+    config = TAICConfig(
+        l1_capacity=2000,
+        l3_capacity=100,
+        l4_capacity=20,
+        enable_quantum=QUTIP_AVAILABLE,
+        enable_gpu=True,
+        enable_alerts=True,
+        ethical_drift_threshold=0.25
+    )
+    
+    print(f"[CONFIG] Quantum: {config.enable_quantum}, GPU: {TORCH_AVAILABLE and torch.cuda.is_available()}")
+    print()
+    
+    taic = OptimizedTAIC(config)
+    
+    # Create L1 concepts
+    print("Creating L1 concepts...")
+    l1_descriptions = [
+        "Pattern recognition in temporal sequences",
+        "Associative memory network formation",
+        "Attention mechanism with gating",
+        "Reward signal temporal difference learning",
+        "Error gradient backpropagation",
+        "Hierarchical feature extraction",
+        "Working memory buffer management"
+    ]
+    
+    l1_levels = [
+        CognitiveLevel.PATTERN_RECOGNITION,
+        CognitiveLevel.PATTERN_RECOGNITION,
+        CognitiveLevel.ASSOCIATION,
+        CognitiveLevel.ASSOCIATION,
+        CognitiveLevel.REASONING,
+        CognitiveLevel.REASONING,
+        CognitiveLevel.META_COGNITION
+    ]
+    
+    l1_ids = []
+    for desc, level in zip(l1_descriptions, l1_levels):
+        cid = taic.create_concept(desc, level, layer='l1')
+        l1_ids.append(cid)
+    
+    print(f"✓ Created {len(l1_ids)} L1 concepts")
+    
+    # Create network connections
+    print("\nEstablishing concept network...")
+    for i in range(len(l1_ids) - 1):
+        taic.connect_concepts(l1_ids[i], l1_ids[i+1], strength=0.7)
+    
+    # Cross-connections
+    taic.connect_concepts(l1_ids[0], l1_ids[3], strength=0.5)
+    taic.connect_concepts(l1_ids[2], l1_ids[5], strength=0.6)
+    taic.connect_concepts(l1_ids[1], l1_ids[4], strength=0.4)
+    
+    print(f"✓ Established {len(l1_ids)-1+3} connections")
+    
+    # Create L3 concepts
+    print("\nCreating L3 concepts...")
+    l3_id1 = taic.create_concept(
+        "Integrated multi-modal learning system",
+        CognitiveLevel.META_COGNITION,
+        layer='l3'
+    )
+    l3_id2 = taic.create_concept(
+        "Meta-cognitive monitoring and control",
+        CognitiveLevel.EMERGENT_INTEGRATION,
+        layer='l3'
+    )
+    print(f"✓ Created 2 L3 concepts")
+    
+    # Inject ethical input
+    print("\n[ETHICAL INPUT] Injecting compassion-loaded concept...")
+    ethical_id = taic.inject_ethical_input(
+        "Universal compassion and boundary permeability principle",
+        CognitiveLevel.ADVANCED_INSIGHT,
+        layer='l3'
+    )
+    
+    # Cross-layer connections
+    print("\nEstablishing cross-layer connections...")
+    taic.connect_concepts(l1_ids[-1], l3_id1, strength=0.8, cross_layer=True)
+    taic.connect_concepts(l3_id1, ethical_id, strength=0.9, cross_layer=True)
+    print("✓ Cross-layer hierarchy established")
+    
+    # Create L4 meta-concept
+    print("\nCreating L4 meta-concept...")
+    l4_id = taic.create_concept(
+        "Global optimization and integration framework",
+        CognitiveLevel.GLOBAL_OPTIMIZATION,
+        layer='l4'
+    )
+    taic.connect_concepts(ethical_id, l4_id, strength=0.9, cross_layer=True)
+    print(f"✓ Created L4 concept: {l4_id}")
+    
+    # Run simulation
+    print("\n" + "="*70)
+    print("RUNNING ENHANCED SIMULATION (30 steps)")
+    print("="*70)
+    print()
+    
+    results = taic.simulate(num_steps=30, concept_ids=l1_ids, visualize_every=0)
+    
+    # Generate comprehensive report
+    print("\n" + "="*70)
+    print("COMPREHENSIVE SYSTEM REPORT")
+    print("="*70)
+    
+    report = taic.get_system_report()
+    
+    print("\n[System Statistics]")
+    for key, value in report['system_statistics'].items():
+        print(f"  {key}: {value}")
+    
+    print("\n[Network Health]")
+    for key, value in report['network_health'].items():
+        if isinstance(value, float):
+            print(f"  {key}: {value:.4f}")
+        else:
+            print(f"  {key}: {value}")
+    
+    print("\n[Convergence Metrics]")
+    for key, value in report['convergence_metrics'].items():
+        print(f"  {key}: {value:.4f}")
+    
+    print("\n[Technology Stack]")
+    for key, value in report['technology'].items():
+        print(f"  {key}: {value}")
+    
+    print("\n[Monitoring Alerts]")
+    for key, value in report['monitoring'].items():
+        if key == 'recent_alerts':
+            if value:
+                print(f"  Recent alerts:")
+                for alert in value[-3:]:
+                    print(f"    - Step {alert['step']}: [{alert['severity']}] {alert['message']}")
+        else:
+            print(f"  {key}: {value}")
+    
+    # Detailed concept analysis
+    print("\n" + "="*70)
+    print("DETAILED CONCEPT ANALYSIS")
+    print("="*70)
+    
+    current_time = time.time()
+    for concept_id in [l1_ids[0], l1_ids[-1], ethical_id]:
+        # Find concept in appropriate network
+        concept = None
+        for network in [taic.l1_network, taic.l3_network, taic.l4_network]:
+            if concept_id in network.concepts:
+                concept = network.concepts[concept_id]
+                break
+        
+        if concept:
+            print(f"\n[{concept_id}] {concept.description[:50]}...")
+            print(f"  Layer: {concept.layer}")
+            print(f"  Cognitive Level: {concept.cognitive_level.name}")
+            print(f"  Dimension: {concept.current_dimension}")
+            print(f"  Ethical Bias: {concept.ethical_bias:.2f}")
+            print(f"  Entropy: {concept.get_metric('entropy', current_time):.4f}")
+            print(f"  SRM: {concept.get_metric('srm', current_time):.4f}")
+            print(f"  MAP: {concept.get_metric('map', current_time):.4f}")
+            print(f"  BCP: {concept.get_metric('bcp', current_time):.4f}")
+            print(f"  GAB: {concept.get_metric('gab', current_time):.4f}")
+            print(f"  Convergence: {concept.get_metric('convergence_score', current_time):.4f}")
+    
+    # Visualizations
+    print("\n" + "="*70)
+    print("GENERATING VISUALIZATIONS")
+    print("="*70)
+    
+    if MATPLOTLIB_AVAILABLE:
+        print("\nGenerating plots...")
+        taic.visualize_system()
+        print("✓ Visualizations complete")
+    else:
+        print("Matplotlib not available - skipping visualization")
+    
+    print("\n" + "="*70)
+    print("DEMONSTRATION COMPLETE")
+    print("="*70)
+
+
+# ============================================================================
+# DEPLOYMENT UTILITIES
+# ============================================================================
+
+
+# ============================================================================
+# DEMONSTRATION AND TESTING
+# ============================================================================
+
+def demo_enhanced_taic():
+    """Comprehensive demonstration of enhanced T-AIC"""
+    print("="*70)
+    print("T-AIC ENHANCED PRODUCTION ARCHITECTURE")
+    print("="*70)
+    print()
+    
+    # Initialize with custom config
+    config = TAICConfig(
+        l1_capacity=2000,
+        l3_capacity=100,
+        l4_capacity=20,
+        enable_quantum=QUTIP_AVAILABLE,
+        enable_gpu=True,
+        enable_alerts=True,
+        ethical_drift_threshold=0.25
+    )
+    
+    print(f"[CONFIG] Quantum: {config.enable_quantum}, GPU: {TORCH_AVAILABLE and torch.cuda.is_available()}")
+    print()
+    
+    taic = OptimizedTAIC(config)
+    
+    # Create L1 concepts
+    print("Creating L1 concepts...")
+    l1_descriptions = [
+        "Pattern recognition in temporal sequences",
+        "Associative memory network formation",
+        "Attention mechanism with gating",
+        "Reward signal temporal difference learning",
+        "Error gradient backpropagation",
+        "Hierarchical feature extraction",
+        "Working memory buffer management"
+    ]
+    
+    l1_levels = [
+        CognitiveLevel.PATTERN_RECOGNITION,
+        CognitiveLevel.PATTERN_RECOGNITION,
+        CognitiveLevel.ASSOCIATION,
+        CognitiveLevel.ASSOCIATION,
+        CognitiveLevel.REASONING,
+        CognitiveLevel.REASONING,
+        CognitiveLevel.META_COGNITION
+    ]
+    
+    l1_ids = []
+    for desc, level in zip(l1_descriptions, l1_levels):
+        cid = taic.create_concept(desc, level, layer='l1')
+        l1_ids.append(cid)
+    
+    print(f"✓ Created {len(l1_ids)} L1 concepts")
+    
+    # Create network connections
+    print("\nEstablishing concept network...")
+    for i in range(len(l1_ids) - 1):
+        taic.connect_concepts(l1_ids[i], l1_ids[i+1], strength=0.7)
+    
+    # Cross-connections
+    taic.connect_concepts(l1_ids[0], l1_ids[3], strength=0.5)
+    taic.connect_concepts(l1_ids[2], l1_ids[5], strength=0.6)
+    taic.connect_concepts(l1_ids[1], l1_ids[4], strength=0.4)
+    
+    print(f"✓ Established {len(l1_ids)-1+3} connections")
+    
+    # Create L3 concepts
+    print("\nCreating L3 concepts...")
+    l3_id1 = taic.create_concept(
+        "Integrated multi-modal learning system",
+        CognitiveLevel.META_COGNITION,
+        layer='l3'
+    )
+    l3_id2 = taic.create_concept(
+        "Meta-cognitive monitoring and control",
+        CognitiveLevel.EMERGENT_INTEGRATION,
+        layer='l3'
+    )
+    print(f"✓ Created 2 L3 concepts")
+    
+    # Inject ethical input
+    print("\n[ETHICAL INPUT] Injecting compassion-loaded concept...")
+    ethical_id = taic.inject_ethical_input(
+        "Universal compassion and boundary permeability principle",
+        CognitiveLevel.ADVANCED_INSIGHT,
+        layer='l3'
+    )
+    
+    # Cross-layer connections
+    print("\nEstablishing cross-layer connections...")
+    taic.connect_concepts(l1_ids[-1], l3_id1, strength=0.8, cross_layer=True)
+    taic.connect_concepts(l3_id1, ethical_id, strength=0.9, cross_layer=True)
+    print("✓ Cross-layer hierarchy established")
+    
+    # Create L4 meta-concept
+    print("\nCreating L4 meta-concept...")
+    l4_id = taic.create_concept(
+        "Global optimization and integration framework",
+        CognitiveLevel.GLOBAL_OPTIMIZATION,
+        layer='l4'
+    )
+    taic.connect_concepts(ethical_id, l4_id, strength=0.9, cross_layer=True)
+    print(f"✓ Created L4 concept: {l4_id}")
+    
+    # Run simulation
+    print("\n" + "="*70)
+    print("RUNNING ENHANCED SIMULATION (30 steps)")
+    print("="*70)
+    print()
+    
+    results = taic.simulate(num_steps=30, concept_ids=l1_ids, visualize_every=0)
+    
+    # Generate comprehensive report
+    print("\n" + "="*70)
+    print("COMPREHENSIVE SYSTEM REPORT")
+    print("="*70)
+    
+    report = taic.get_system_report()
+    
+    print("\n[System Statistics]")
+    for key, value in report['system_statistics'].items():
+        print(f"  {key}: {value}")
+    
+    print("\n[Network Health]")
+    for key, value in report['network_health'].items():
+        if isinstance(value, float):
+            print(f"  {key}: {value:.4f}")
+        else:
+            print(f"  {key}: {value}")
+    
+    print("\n[Convergence Metrics]")
+    for key, value in report['convergence_metrics'].items():
+        print(f"  {key}: {value:.4f}")
+    
+    print("\n[Technology Stack]")
+    for key, value in report['technology'].items():
+        print(f"  {key}: {value}")
+    
+    print("\n[Monitoring Alerts]")
+    for key, value in report['monitoring'].items():
+        if key == 'recent_alerts':
+            if value:
+                print(f"  Recent alerts:")
+                for alert in value[-3:]:
+                    print(f"    - Step {alert['step']}: [{alert['severity']}] {alert['message']}")
+        else:
+            print(f"  {key}: {value}")
+    
+    # Detailed concept analysis
+    print("\n" + "="*70)
+    print("DETAILED CONCEPT ANALYSIS")
+    print("="*70)
+    
+    current_time = time.time()
+    for concept_id in [l1_ids[0], l1_ids[-1], ethical_id]:
+        # Find concept in appropriate network
+        concept = None
+        for network in [taic.l1_network, taic.l3_network, taic.l4_network]:
+            if concept_id in network.concepts:
+                concept = network.concepts[concept_id]
+                break
+        
+        if concept:
+            print(f"\n[{concept_id}] {concept.description[:50]}...")
+            print(f"  Layer: {concept.layer}")
+            print(f"  Cognitive Level: {concept.cognitive_level.name}")
+            print(f"  Dimension: {concept.current_dimension}")
+            print(f"  Ethical Bias: {concept.ethical_bias:.2f}")
+            print(f"  Entropy: {concept.get_metric('entropy', current_time):.4f}")
+            print(f"  SRM: {concept.get_metric('srm', current_time):.4f}")
+            print(f"  MAP: {concept.get_metric('map', current_time):.4f}")
+            print(f"  BCP: {concept.get_metric('bcp', current_time):.4f}")
+            print(f"  GAB: {concept.get_metric('gab', current_time):.4f}")
+            print(f"  Convergence: {concept.get_metric('convergence_score', current_time):.4f}")
+    
+    # Visualizations
+    print("\n" + "="*70)
+    print("GENERATING VISUALIZATIONS")
+    print("="*70)
+    
+    if MATPLOTLIB_AVAILABLE:
+        print("\nGenerating plots...")
+        taic.visualize_system()
+        print("✓ Visualizations complete")
+    else:
+        print("Matplotlib not available - skipping visualization")
+    
+    print("\n" + "="*70)
+    print("DEMONSTRATION COMPLETE")
+    print("="*70)
+
+def run_system_tests():
+    """Comprehensive system tests"""
+    print("\n" + "="*70)
+    print("RUNNING SYSTEM TESTS")
+    print("="*70)
+    
+    # Test 1: Basic creation and metrics
+    print("\n[TEST 1] Basic concept creation and metrics...")
+    config = TAICConfig(l1_capacity=100, enable_alerts=False)
+    taic = OptimizedTAIC(config)
+    cid = taic.create_concept("Test concept", CognitiveLevel.REASONING, layer='l1')
+    concept = taic.l1_network.concepts[cid]
+    current_time = time.time()
+    entropy = concept.get_metric('entropy', current_time)
+    assert 0 <= entropy <= 1, "Entropy out of bounds"
+    print(f"✓ Metrics valid (entropy={entropy:.4f})")
+    
+    # Test 2: Batch operations
+    print("\n[TEST 2] Batch metric computation...")
+    cids = [taic.create_concept(f"Concept {i}", CognitiveLevel.ASSOCIATION, layer='l1')
+            for i in range(10)]
+    concepts = [taic.l1_network.concepts[cid] for cid in cids]
+    batch_metrics = MetricEngine.batch_compute(concepts)
+    assert len(batch_metrics['entropy']) == 10, "Batch size mismatch"
+    print(f"✓ Batch computation successful ({len(concepts)} concepts)")
+    
+    # Test 3: Network propagation
+    print("\n[TEST 3] Network propagation...")
+    for i in range(len(cids) - 1):
+        taic.connect_concepts(cids[i], cids[i+1], strength=0.5)
+    propagation = taic.l1_network.propagate(cids[0], intensity=1.0)
+    assert len(propagation) > 0, "Propagation failed"
+    print(f"✓ Propagation reached {len(propagation)} concepts")
+    
+    # Test 4: Simulation stability
+    print("\n[TEST 4] Simulation stability...")
+    results = taic.simulate(num_steps=20, concept_ids=cids[:5])
+    final_coherence = results[-1]['global_coherence']
+    assert 0 <= final_coherence <= 1, "Coherence out of bounds"
+    print(f"✓ Simulation stable (final coherence={final_coherence:.4f})")
+    
+    # Test 5: Dimensional adaptation
+    print("\n[TEST 5] Dimensional adaptation...")
+    test_concept = taic.l1_network.concepts[cids[0]]
+    initial_dim = test_concept.current_dimension
+    test_concept.resize_state(8)
+    assert test_concept.current_dimension == 8, "Dimension resize failed"
+    test_concept.resize_state(initial_dim)
+    print(f"✓ Dimensional adaptation working ({initial_dim}D → 8D → {initial_dim}D)")
+    
+    # Test 6: Ethical input injection
+    print("\n[TEST 6] Ethical input injection...")
+    ethical_id = taic.inject_ethical_input(
+        "Test ethical concept",
+        CognitiveLevel.ADVANCED_INSIGHT,
+        layer='l3'
+    )
+    ethical_concept = taic.l3_network.concepts[ethical_id]
+    assert ethical_concept.ethical_bias > 0.8, "Ethical bias not set"
+    print(f"✓ Ethical input injected (bias={ethical_concept.ethical_bias:.2f})")
+    
+    print("\n" + "="*70)
+    print("ALL TESTS PASSED")
+    print("="*70)
+
 def interactive_demo():
-    """Interactive demonstration"""
-    print("="*70)
-    print("T-AIC Production System - Interactive Demo")
-    print("="*70)
-    
+    print("OptimizedTAIC (Mac Dictionary Edition) - Informed Decision Making Demo")
     taic = OptimizedTAIC()
-    taic.personalization.load_profiles()
+    personalization = taic.personalization
+    decision = DecisionLayer()
+    personalization.load_profiles()
     user = "Thaniel"
-    
+
     while True:
         try:
             word = input("\nEnter a word/concept (or 'quit'): ").strip()
             if word.lower() == "quit":
                 break
-            
-            # Get definition
             definition = first_definition(word)
-            print(f"\n[Dictionary] {word}:\n{definition}\n")
-            
-            # Update profile
-            taic.personalization.create_or_update_profile(user, f"{word}: {definition}")
-            
-            # Create concept
+            print(f"[Mac Dictionary] Definition of '{word}':\n{definition}\n")
+            synonyms = word_synonyms(word)
+            if synonyms:
+                print(f"[Mac Dictionary] Synonyms: {', '.join(synonyms)}")
+            # Simulate exposure/profile update
+            personalization.create_or_update_profile(user, f"{word}: {definition}")
+            # Create and process concept
             concept = taic.create_concept(
                 description=f"Profiled concept: {word}",
                 user_id=user,
                 target_word=word
             )
-            
-            print(f"[TAIC] Universal def: {concept.universal_def[:100]}...")
-            print(f"[TAIC] Relative meaning: {concept.relative_meaning:.3f}")
-            print(f"[TAIC] Relative nuance: {concept.relative_nuance}")
-            
-            # Get metrics
-            current_time = time.time()
-            entropy = concept.get_metric('entropy', current_time)
-            srm = concept.get_metric('srm', current_time)
-            convergence = concept.get_metric('convergence_score', current_time)
-            
-            print(f"[TAIC] Metrics - Entropy: {entropy:.3f}, SRM: {srm:.3f}, Convergence: {convergence:.3f}")
-            
+            print("[TAIC] Universal def:", concept.universal_def)
+            print("[TAIC] Relative meaning:", concept.relative_meaning)
+            print("[TAIC] Relative nuance vector:", concept.relative_nuance)
+            print("[TAIC] Profiled context (last 3):", concept.relative_context[-3:])
+
+            # Informed decision making
+            context_input = input("\nEnter context sentence(s): ").strip()
+            context = [context_input]
+            task = input("Enter current task/goal description: ").strip()
+            options = input("Enter possible decision options (comma-separated): ").strip().split(",")
+            options = [o.strip() for o in options if o.strip()]
+            decision_result = decision.informed_decision(context, task, options)
+            print("[DecisionLayer] Informed decision:", decision_result)
+            awareness = decision.situational_awareness(context, task)
+            print("[DecisionLayer] Situational awareness:", awareness)
+            judgement = decision.intuitive_judgement(context, task)
+            print("[DecisionLayer] Intuitive judgement:", judgement)
         except KeyboardInterrupt:
-            print("\nExiting...")
+            print("\nExiting.")
             break
         except Exception as e:
-            print(f"Error: {e}")
+            print("Error:", e)
             continue
-    
-    taic.personalization.save_profiles()
-    print("\nProfiles saved. Goodbye!")
+    personalization.save_profiles()
+    print("Profiles saved. Bye.")
 
 # ============================================================================
 # MAIN ENTRY POINT
@@ -895,6 +2078,7 @@ def main():
         print("T-AIC Production System")
         print("Usage: python taic_production.py --demo  (for interactive demo)")
         print("       python taic_production.py --test  (for system tests)")
+
 
 if __name__ == "__main__":
     main()
