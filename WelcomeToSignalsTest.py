@@ -17121,7 +17121,19 @@ class SatelliteThreatDetectionEngine:
         return bursts
 
     def _decode_iridium(self, iq, center_freq, sr):
-        # Modern: FFT-based slicing, gr-iridium toolkit, advanced IQ fingerprinting
+        # Dummy: Always detects one burst if IQ is present
+        if iq is not None and iq.size > 0:
+            return [SatelliteBurst(
+                burst_id="IRIDIUM123",
+                timestamp=time.time(),
+                center_freq_hz=center_freq,
+                bandwidth_hz=200e3,
+                modulation="QPSK",
+                satellite="Iridium",
+                symbol_rate=25e3,
+                snr_db=18.2,
+                protocol="iridium",
+            )]
         return []
 
     def _decode_inmarsat(self, iq, center_freq, sr):
@@ -21920,6 +21932,14 @@ class StubMultiSensorInterface:
     def capture_em_sample(self): return None
     def capture_audio_sample(self): return None
     
+class DemoSDRBackend:
+    """Demo SDR backend that returns random IQ for any requested frequency."""
+    def capture_iq(self, center_freq, sample_rate, dwell_time):
+        # Simulate IQ: 1 second of data at sample_rate = N samples
+        N = int(sample_rate)
+        # Simulated complex noise burst
+        return (np.random.normal(0, 1, N) + 1j*np.random.normal(0,1,N)).astype(np.complex64)
+    
 class StubSDRInterface:
     """Stub interface for SDR systems"""
     def capture_iq_samples(self, freq, rate, count): return None
@@ -22695,7 +22715,8 @@ def main():
     # Global shutdown flag
     shutdown_requested = threading.Event()
     force_shutdown = threading.Event()
-    
+    demo_sdr = DemoSDRBackend()
+
     def signal_handler(signum, frame):
         """Handle shutdown signals gracefully with guaranteed output"""
         if shutdown_requested.is_set():
@@ -22879,6 +22900,15 @@ def main():
         except Exception as e:
             print(f"❌ BLE monitor failed: {e}")
             logging.error(f"BLE monitor error: {e}", exc_info=True)
+            
+        # ===== ADD SATELLITE ENGINE SETUP HERE =====
+    from WelcomeToSignalsTest import SatelliteThreatDetectionEngine  # skip if all-in-one
+    global satellite_engine
+    satellite_engine = SatelliteThreatDetectionEngine(demo_sdr, ioc_registry)
+    satellite_engine.start()
+    INITIALIZED_ENGINES["satellite"] = satellite_engine
+    print("✅ Satellite ThreatDetectionEngine started")
+    # ===========================================
     
     print("\n" + "=" * 80)
     print("📡 MONITORING ACTIVE - Press Ctrl+C to stop")
@@ -23039,6 +23069,13 @@ def main():
                 logging.error(f"Error printing network summary: {e}")
             
             last_network_summary = current_time
+            
+            # --- Satellite Threat Engine Results ---
+            if hasattr(satellite_engine, "last_bursts") and satellite_engine.last_bursts:
+                print("\n[SATELLITE THREAT DETECTION] Results:")
+                for burst in satellite_engine.last_bursts:
+                    print(f"  Burst: {burst.satellite}, ID: {burst.burst_id}, Freq: {burst.center_freq_hz/1e6:.2f} MHz, SNR: {burst.snr_db}")
+                satellite_engine.last_bursts.clear()  # Clear after displaying
     
     # ============================================================
     # ENHANCED SHUTDOWN SEQUENCE - GUARANTEED OUTPUT
