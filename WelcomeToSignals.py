@@ -5508,7 +5508,7 @@ class EddystoneUID:
             return None
         
         try:
-            tx_power = struct. unpack('b', data[1:2])[0]
+            tx_power = struct.unpack('b', data[1:2])[0]
             namespace = data[2:12].hex().upper()
             instance = data[12:18].hex().upper()
             
@@ -5543,7 +5543,7 @@ class EddystoneURL:
     }
     
     URL_EXPANSIONS = {
-        0x00: ". com/",
+        0x00: ".com/",
         0x01: ".org/",
         0x02: ".edu/",
         0x03: ".net/",
@@ -6863,7 +6863,7 @@ class CompanyIdentifier(IntEnum):
         """Get manufacturer name from ID with fallback"""
         for member in cls:
             if member.value == value:
-                return member. name.replace('_', ' ').title()
+                return member.name.replace('_', ' ').title()
         return f"Unknown Manufacturer (0x{value: 04X})"
     
     @classmethod
@@ -7404,7 +7404,7 @@ class AppleContinuityProtocol:
         extra_fields: Dict[str, Any] = field(default_factory=dict)
         
     @classmethod
-    def parse(cls, manufacturer_data: bytes) -> Optional['AppleContinuityProtocol. ParsedMessage']:
+    def parse(cls, manufacturer_data: bytes) -> Optional['AppleContinuityProtocol.ParsedMessage']:
         """
         Parse Apple manufacturer data into structured message. 
         
@@ -7552,7 +7552,7 @@ class AppleContinuityProtocol:
             message.device_type = cls.DEVICE_TYPES.get(device_byte, f"Unknown (0x{device_byte:02X})")
     
     @classmethod
-    def _parse_handoff(cls, message: 'AppleContinuityProtocol. ParsedMessage', payload: bytes):
+    def _parse_handoff(cls, message: 'AppleContinuityProtocol.ParsedMessage', payload: bytes):
         """Parse Handoff message"""
         if len(payload) < 2:
             return
@@ -7563,7 +7563,7 @@ class AppleContinuityProtocol:
         # Activity type
         if len(payload) >= 3:
             activity_hash = payload[1:3]
-            message.extra_fields['activity_hash'] = activity_hash. hex()
+            message.extra_fields['activity_hash'] = activity_hash.hex()
     
     @classmethod
     def _parse_airdrop(cls, message: 'AppleContinuityProtocol.ParsedMessage', payload: bytes):
@@ -9167,7 +9167,7 @@ class BLEFingerprint:
         timestamp: float
     
     def __init__(self):
-        self.fingerprints: Dict[str, 'BLEFingerprint. LocationFingerprint'] = {}
+        self.fingerprints: Dict[str, 'BLEFingerprint.LocationFingerprint'] = {}
         self.training_data: Dict[str, List[Dict[str, float]]] = defaultdict(list)
     
     def add_training_sample(
@@ -9784,7 +9784,7 @@ class AdvancedPathLossModel:
         Air absorption increases slightly with temperature deviation from 20°C.
         Effect is small for BLE frequencies but included for completeness. 
         
-        Reference: ITU-R P. 676
+        Reference: ITU-R P.676
         """
         if not self.temp_compensation:
             return base_pl
@@ -11102,7 +11102,7 @@ class MultiModalDistanceFusion:
         Add a new distance measurement from any sensor. 
         
         Args:
-            measurement:  DistanceMeasurement object
+            measurement: DistanceMeasurement object
         """
         source = measurement.source
         
@@ -20181,7 +20181,7 @@ class UnifiedEntropyEngine:
         # 9. Lempel-Ziv Complexity
         results['lempel_ziv_complexity'] = self._lempel_ziv_complexity()
         
-        # 10.Spectral Entropy
+        # 10. Spectral Entropy
         results['spectral_entropy'] = self._spectral_entropy()
         
         # 11. Fuzzy Entropy
@@ -21196,7 +21196,7 @@ def demonstrate_detection_capabilities():
         print(f"Available detection methods: {len(methods)}")
         for i, method in enumerate(sorted(methods), 1):
             method_name = method.replace('detect_', '').replace('_', ' ').title()
-            print(f"  {i:2d}. {method_name}")
+            print(f"  {i:2d}.{method_name}")
     
     # 5. Show Hidden Camera Engine Capabilities
     print("\n\n📷 HIDDEN CAMERA DETECTION ENGINE:")
