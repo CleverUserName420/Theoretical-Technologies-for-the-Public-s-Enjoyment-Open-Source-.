@@ -6232,19 +6232,15 @@ class RSSIStatistics:
 
 
 # ============================================================
-# BLE IOC DATABASE & THREAT DETECTION
+# BLE IOC DATABASE & MULTI-DIMENSIONAL THREAT DETECTION SYSTEM
 # ============================================================
 
 # BLE Channel Frequency Mapping (2.4 GHz ISM band)
 BLE_CHANNEL_FREQUENCIES_MHZ = {
-    0: 2404, 1: 2406, 2: 2408, 3: 2410, 4: 2412,
-    5: 2414, 6: 2416, 7: 2418, 8: 2420, 9: 2422,
-    10: 2424, 11: 2428, 12: 2430, 13: 2432, 14: 2434,
-    15: 2436, 16: 2438, 17: 2440, 18: 2442, 19: 2444,
-    20: 2446, 21: 2448, 22: 2450, 23: 2452, 24: 2454,
-    25: 2456, 26: 2458, 27: 2460, 28: 2462, 29: 2464,
-    30: 2466, 31: 2468, 32: 2470, 33: 2472, 34: 2474,
-    35: 2476, 36: 2478,
+    0: 2404, 1: 2406, 2: 2408, 3: 2410, 4: 2412, 5: 2414, 6: 2416, 7: 2418, 8: 2420, 9: 2422,
+    10: 2424, 11: 2428, 12: 2430, 13: 2432, 14: 2434, 15: 2436, 16: 2438, 17: 2440, 18: 2442,
+    19: 2444, 20: 2446, 21: 2448, 22: 2450, 23: 2452, 24: 2454, 25: 2456, 26: 2458, 27: 2460,
+    28: 2462, 29: 2464, 30: 2466, 31: 2468, 32: 2470, 33: 2472, 34: 2474, 35: 2476, 36: 2478,
     37: 2402, 38: 2426, 39: 2480,
 }
 BLE_FREQ_MIN_HZ = 2.4e9
@@ -6265,9 +6261,10 @@ def is_ble_frequency(freq_hz: float) -> bool:
 BLE_IOC_DATABASE = []
 
 def init_ble_ioc_database():
-    """Initialize BLE IOC database with threat patterns"""
+    """Initialize BLE IOC database with threat patterns and advanced signatures"""
     global BLE_IOC_DATABASE
     BLE_IOC_DATABASE = [
+        # Name-based IOCs (tracking, surveillance, red team/pentest, covert)
         {
             'type': 'name_pattern',
             'pattern': r'.*[Tt]rack.*',
@@ -6298,27 +6295,163 @@ def init_ble_ioc_database():
         },
         {
             'type': 'name_pattern',
+            'pattern': r'.*[Ll]isten.*|.*[Rr]ecord.*',
+            'description': 'Device name potentially indicates eavesdropping',
+            'severity': 85,
+            'category': 'surveillance'
+        },
+        {
+            'type': 'name_pattern',
             'pattern': r'.*AirTag.*',
             'description': 'Apple AirTag tracking device',
-            'severity': 60,
+            'severity': 90,
             'category': 'tracking'
         },
         {
             'type': 'name_pattern',
             'pattern': r'.*Tile.*',
             'description': 'Tile tracking beacon',
-            'severity': 50,
+            'severity': 80,
+            'category': 'tracking'
+        },
+        {
+            'type': 'name_pattern',
+            'pattern': r'.*Find\s*My.*',
+            'description': 'Find My network compatible tracking device',
+            'severity': 70,
+            'category': 'tracking'
+        },
+        {
+            'type': 'name_pattern',
+            'pattern': r'.*SmartTag.*',
+            'description': 'Samsung SmartTag or similar tracker',
+            'severity': 80,
+            'category': 'tracking'
+        },
+        {
+            'type': 'name_pattern',
+            'pattern': r'.*Chipolo.*|.*Orbit.*|.*Cube.*|.*NutFind.*|.*Pebblebee.*',
+            'description': 'Popular key finder/tracker brand',
+            'severity': 75,
+            'category': 'tracking'
+        },
+        # BLE offensive tools/dev test gear (maximal signatures)
+        {
+            'type': 'name_pattern',
+            # All known red/blue team BLE hardware (expanded)
+            'pattern': r'.*Flipper.*|.*fz-.*|.*ubertooth.*|.*proxmark.*|.*hak5.*|.*blekey.*|.*btlejack.*|.*esp32.*|.*bluefruit.*|.*pandwarf.*|.*sniff.*|.*capture.*|.*fuzz.*|.*jammer.*|.*attack.*|.*devkit.*|.*hydra.*|.*replay.*|.*keysy.*|.*chameleon.*|.*testkit.*|.*rdv4.*|.*adafruit.*|.*nrf.*|.*proto.*|.*btle.*|.*espkey.*|.*smartnfc.*|.*proxdroid.*|.*proxgrind.*|.*hak5remote.*|.*usbkey.*|.*sharkjack.*|.*shark jack.*|.*omg cable.*|.*omg plug.*|.*omg-adapter.*|.*hak5.*|.*capture.*',
+            'description': 'BLE device may be offensive tool, devboard, fuzzing, jamming, or red team/test equipment',
+            'severity': 97,
+            'category': 'offensive'
+        },
+        # Manufacturer-based IOCs (expanded to more research/dev/pentest hardware)
+        {
+            'type': 'manufacturer',
+            'value': '0x004C',
+            'description': 'Apple device - check for unwanted AirTags or FindMy',
+            'severity': 80,
             'category': 'tracking'
         },
         {
             'type': 'manufacturer',
-            'value': '0x004C',
-            'description': 'Apple device - check for unwanted AirTags',
-            'severity': 40,
-            'category': 'tracking'
+            'value': '0x0822',
+            'description': 'Adafruit (potential dev/test board)',
+            'severity': 65,
+            'category': 'dev_board'
+        },
+        {
+            'type': 'manufacturer',
+            'value': '0x02E5',
+            'description': 'Espressif (ESP32, dev tools, security test gear, Flipper/esp projects)',
+            'severity': 68,
+            'category': 'dev_board'
+        },
+        {
+            'type': 'manufacturer',
+            'value': '0x0059',
+            'description': 'Nordic Semiconductor (nRF devkits, test/fuzzing radio modules)',
+            'severity': 67,
+            'category': 'dev_board'
+        },
+        {
+            'type': 'manufacturer',
+            'value': '0x0374',
+            'description': 'Seeed Studio (Grove devboards, fuzzing, sensor beacons)',
+            'severity': 61,
+            'category': 'dev_board'
+        },
+        # Service UUIDs (offensive, tracker, covert, beacon, relay)
+        {
+            "type": "service_uuid",
+            "pattern": r"6e400001b5a3f393e0a9e50e24dcca9e",  # Nordic UART
+            "description": "Nordic UART service (often devboard, security tool, DIY tracker)",
+            "severity": 55,
+            "category": "dev_board"
+        },
+        {
+            "type": "service_uuid",
+            "pattern": r"(fd6f|fdaf|fdcd|feed|faad|fff[0-4]|beef|dead|cafe|abad|abfe|a3c8|c19c|554b|1234|bead|c001d00d)",
+            "description": "Service UUID indicates tracking/fuzzing/pentest/C2/hidden comms",
+            "severity": 74,
+            "category": "tracking"
+        },
+        # MAC OUI for major tool/dev test vendors (extended for threat, dev, IoT, vendor/test labs)
+        {
+            "type": "oui_vendor",
+            "pattern": r"Adafruit|Espressif|Nordic Semiconductor|Bluegiga|Hak5|Laird|STMicroelectronics|Dialog Semiconductor|Seeed Technology|Particle|Texas Instruments|Pycom|Digi International|Murata Manufacturing|u-blox|Raspberry Pi|Meta|Plantronics|Fitbit|Tile Inc|Qingping",
+            "description": "Known offensive tool/dev/test or consumer tracker OUI",
+            "severity": 65,
+            "category": "dev_board"
+        },
+        # Behaviorally suspicious: ultra-short adv interval (aggressive beaconing = tracking/attack)
+        {
+            'type': 'adv_interval',
+            'min_ms': 5,       # BLE minimum is ~7.5ms; below 20ms is uncommon for consumer, suspicious for research/attack
+            'max_ms': 75,
+            'description': 'BLE device uses ultra-short advertisement interval (common for aggressive tracker, jamming, pentest, fuzzing, or relay attack modules)',
+            'severity': 93,
+            'category': 'active_threat'
+        },
+        # MAC Address type/rotation flags (random/rotating MAC = potential tracker/anti-forensics)
+        {
+            'type': 'address_type',
+            'value': 'random',
+            'description': 'BLE device using random MAC address (potential anti-tracking, but also in all trackers and offensive tools)',
+            'severity': 50,
+            'category': 'privacy'
+        },
+        # iBeacon and Eddystone detection (covert innocuous pings or aggressive beacons)
+        {
+            'type': 'beacon_type',
+            'value': 'ibeacon',
+            'description': 'iBeacon protocol detected (used in tracking, retail, covert/c2, relay/distance attacks)',
+            'severity': 70,
+            'category': 'beacon'
+        },
+        {
+            'type': 'beacon_type',
+            'value': 'eddystone',
+            'description': 'Eddystone beacon protocol detected (used in tracking, PT demos, sensor/IoT relay, C2)',
+            'severity': 69,
+            'category': 'beacon'
+        },
+        # GATT signatures (Device Information, HID-over-GATT, custom fuzz test)
+        {
+            'type': 'gatt_signature',
+            'pattern': r'0000180a', # Device Information Service
+            'description': 'Device Information Service present (used for profiling, fingerprinting, relabelling, sometimes spoofing)',
+            'severity': 30,
+            'category': 'profile'
+        },
+        {
+            'type': 'gatt_signature',
+            'pattern': r'00001812', # HID Service
+            'description': 'HID over GATT (used in keyboards, sometimes test/fuzz)',
+            'severity': 41,
+            'category': 'peripheral'
         },
     ]
-    print(f"[BLE-IOC-INIT] ✓ Loaded {len(BLE_IOC_DATABASE)} threat indicators")
+    print(f"[BLE-IOC-INIT] ✓ Loaded {len(BLE_IOC_DATABASE)} multi-layer BLE threat indicators")
     return len(BLE_IOC_DATABASE)
 
 def check_ble_iocs(device_info) -> list:
@@ -6326,52 +6459,81 @@ def check_ble_iocs(device_info) -> list:
     Check BLE device against IOC database
 
     Args:
-        device_info: BLE device information
+        device_info: BLE device information (object or dict)
 
     Returns:
-        List of (matched, description, severity) tuples
+        List of (matched, description, severity, category) tuples
     """
     import re
 
+    # Lazy database init
     if not BLE_IOC_DATABASE:
         init_ble_ioc_database()
 
     matches = []
 
+    # Defensive property extractor
+    def safeget(attr, alt=''):
+        v = getattr(device_info, attr, None)
+        if v is None and isinstance(device_info, dict):
+            v = device_info.get(attr, alt)
+        return v if v is not None else alt
+
+    device_name = safeget('name', '')
+    device_services = safeget('service_uuids', []) or []
+    manufacturer_data = safeget('manufacturer_data', None)
+    manid = safeget('manufacturer_id', None)
+    oui_vendor = safeget('oui_vendor', '')
+
+    # Appearance or aggressive interval detection (behavioral)
+    adv_interval = safeget('advertisement_interval_mean_ms', None)
+
     for ioc in BLE_IOC_DATABASE:
         matched = False
 
         # Name pattern matching
-        if ioc['type'] == 'name_pattern':
-            device_name = None
-            if hasattr(device_info, 'name'):
-                device_name = device_info.name
-            elif isinstance(device_info, dict) and 'name' in device_info:
-                device_name = device_info['name']
+        if ioc['type'] == 'name_pattern' and device_name:
+            if re.search(ioc['pattern'], str(device_name), re.IGNORECASE):
+                matched = True
 
-            if device_name:
-                if re.search(ioc['pattern'], device_name, re.IGNORECASE):
-                    matched = True
-
-        # Manufacturer matching
+        # Manufacturer matching (accommodate both int and hex string)
         elif ioc['type'] == 'manufacturer':
-            manufacturer_data = None
-            if hasattr(device_info, 'manufacturer_data'):
-                manufacturer_data = device_info.manufacturer_data
-            elif isinstance(device_info, dict) and 'manufacturer_data' in device_info:
-                manufacturer_data = device_info['manufacturer_data']
-
-            if manufacturer_data:
-                try:
-                    mfg_id = int(ioc['value'], 16)
+            try:
+                mfg_id = int(ioc['value'], 16)
+            except Exception:
+                mfg_id = None
+            if manid is not None and mfg_id is not None and int(manid) == mfg_id:
+                matched = True
+            # Some devs store manufacturer data as dict/bytes—optional check:
+            if not matched and manufacturer_data:
+                # If mfg_id is in raw manufacturer data or as a key in dict etc
+                if isinstance(manufacturer_data, dict):
                     if mfg_id in manufacturer_data:
                         matched = True
-                except (ValueError, KeyError):
-                    pass
+                elif isinstance(manufacturer_data, bytes) and manufacturer_data[:2] == mfg_id.to_bytes(2, 'little'):
+                    matched = True
+
+        # Service UUID matching (as substrings, case insens)
+        elif ioc['type'] == 'service_uuid':
+            for svc in device_services:
+                if re.search(ioc['pattern'], svc.replace('-', '').lower()):
+                    matched = True
+                    break
+
+        # OUI vendor (as vendor string or substring, case insens)
+        elif ioc['type'] == 'oui_vendor' and oui_vendor:
+            if re.search(ioc['pattern'].lower(), oui_vendor.lower()):
+                matched = True
+
+        # Aggressive interval detection
+        elif ioc['type'] == 'adv_interval':
+            if (adv_interval is not None and
+                    ioc.get('min_ms', 0) <= adv_interval <= ioc.get('max_ms', 10000)):
+                matched = True
 
         if matched:
-            matches.append((True, ioc['description'], ioc['severity']))
-            print(f"[BLE-IOC-MATCH] ⚠️  {ioc['description']} (severity: {ioc['severity']})")
+            matches.append((True, ioc['description'], ioc['severity'], ioc['category']))
+            print(f"[BLE-IOC-MATCH] ⚠️  {ioc['description']} (severity: {ioc['severity']}, category: {ioc.get('category')})")
 
     if not matches:
         print("[BLE-IOC-CHECK] No IOC matches found")
@@ -6701,6 +6863,221 @@ except ImportError:
 
 # Logging configuration
 log = logging.getLogger("BLEClassifier")
+
+# Expanded, robust and modernized signature/IOC list for BLE security/pentest hardware
+
+# Minimal OUI (MAC prefix) vendor lookup. Add BLE dev/test OUIs as desired:
+OUI_VENDOR_DB = {
+    "24:0A:C4": "Espressif",
+    "D8:A0:1D": "Adafruit",
+    "C0:98:E5": "Nordic Semiconductor",
+    "7C:DF:A1": "Bluegiga",
+    "E0:98:06": "Seeed Technology",
+    "30:AE:A4": "Particle",
+    "B4:E6:2D": "STMicroelectronics",
+    "B8:27:EB": "Raspberry Pi",
+    "D0:39:72": "Texas Instruments",
+    "A4:C1:38": "Laird",
+    "60:57:18": "Hak5",
+    "3C:71:BF": "Pycom",
+    # Add more as needed!
+}
+
+def get_oui_vendor(mac_addr):
+    """Return vendor name for IEEE MAC OUI, or None if not found or not public."""
+    if not isinstance(mac_addr, str) or len(mac_addr) < 8:
+        return None
+    # Recognize both colon and dash
+    parts = mac_addr.replace("-", ":").upper().split(":")
+    if len(parts) < 3:
+        return None
+    prefix = ":".join(parts[:3])
+    return OUI_VENDOR_DB.get(prefix, None)
+
+# Expanded, robust and modernized signature/IOC list for BLE security/pentest hardware
+SECURITY_TOOL_IOCS = [
+    # Device names (case-insensitive substrings and signature prefixes/patterns)
+    {"field": "name", "values": [
+        # Flipper family
+        "flipper", "flipper zero", "fz-", "bt-fz", "flipperzero", "btle-flipper",
+        # Ubertooth
+        "ubertooth",
+        # BLEKey and ESPKey/ESP boards
+        "blekey", "espkey", "esp32", "esp-test", "espble", "esp devkit", "esp prototyping", "esp hine", "esp-ble",
+        # Hak5
+        "hak5", "keycroc", "key croc", "sharkjack", "shark jack", "omg cable", "omg plug", "omg-adapter", "omg adapter",
+        # Revng offensive dongles/adapters
+        "crocs", "hak5remote", "usbkey", "usb-key",
+        # Proxmark and clones
+        "proxmark", "rdv4", "chameleonmini", "chameleon tiny", "chameleon ble",
+        # Bluefruit
+        "bluefruit", "adafruit", "bluefruit52", "bluefruit le", "ada-nrf",
+        # Nordic boards/devkits
+        "nrf-dk", "nrfdk", "nrf dongle", "nrf52840", "nrf52832", "nrf52",
+        # BTLEJack
+        "btlejack", "btle-jack",
+        # Hydra firmware
+        "hydra fw", "hydra-firmware", "hydra device", "hydra ble",
+        # Pwnagotchi-like or BLE fuzzing tools
+        "pwnagotchi", "fuzz", "jammer", "replay", "attackbox", "blebox",
+        # PandaKey, PandwaRF, Keysy, etc
+        "pandakey", "pandwarf", "keysy", "smartnfc", "proxdroid", "proxgrind",
+        # Testlimiter, Laird kits, generic dev
+        "testlimiter", "testkit", "devkit", "developer kit", "proto board", "sniffer", "sniff", "capture"
+    ]},
+    # OUI vendor substrings (for public MAC addresses)
+    {"field": "oui_vendor", "values": [
+        # Dev and security hardware usual OUIs
+        "Espressif", "Adafruit", "Nordic Semiconductor", "Hak5", "Laird", "STMicroelectronics",
+        "Silicon Labs", "Bluegiga", "Dialog Semiconductor", "Seeed Technology", "Particle",
+        "Murata Manufacturing", "Texas Instruments", "Raspberry Pi", "Pycom", "Digi International",
+        # Extra common dev/test labs
+        "u-blox", "Microchip", "Intel", "Atmel", "Cypress", "Dialog", "Insignal", "Harman", "Plantronics"
+    ]},
+    # Service UUID substrings (all lowercase/compact; includes popular prototyping, attack & logging)
+    {"field": "services", "values": [
+        # Nordic/UART
+        "6e400001b5a3f393e0a9e50e24dcca9e", # Nordic UART
+        "0000feab", # Some Flipper/related BLE
+        "nordic",
+        "adafruit",
+        "a3c875008ed34bdf8a39a01bebede295", # Bluefruit
+        "0000fff0", # Common for demo/dev boards
+        "0000fff1",
+        "0000fff2",
+        "0000fff3",
+        "0000fff4",
+        "554b0001fea94fa9808984c91e938f72", # BLEKey custom
+        "c19c0001c1b6a4b1bdeb8b0e9c8f7b8a", # BTLEJack
+        "fd6f",      # Apple Find My/netboot for testing
+        "fdcd",      # some TinyGo boards
+        "fdaf",      # Eddystone/experimental dev
+        "ffb0",      # Test manufacturer boards, various
+        # More common pentest/OSINT UUID hints (verbatim)
+        "12345678", "87654321", "deadbeef", "cafebabe", "f00dbabe", "abcdefab",
+        "0000feed", "0000faad", "beefdead", "c001d00d"
+    ]},
+    # Manufacturer IDs (int values): known to be used in dev/pen test hardware or left as default
+    {"field": "manid", "values": [
+        0xFFFF,       # No real manufacturer, catch misconfigured dev boards
+        0x02E5,       # Espressif Systems
+        0x0059,       # Nordic Semiconductor
+        0x0822,       # Adafruit Industries
+        0x0211,       # STMicroelectronics
+        0x0131,       # Laird
+        0x0171,       # Texas Instruments
+        0x01A6,       # Dialog Semiconductor
+        0x013F,       # Bluegiga Technologies
+        0x0374,       # Seeed Technology
+        0x02A9,       # Pycom
+        0x048F,       # Particle Industries
+        0x017F,       # Murata Manufacturing
+        0x0044,       # Digi International
+        0xC0DE,       # Sometimes used in PoC tools
+        0x4C54,       # LAIRD Technologies
+        # Extra R&D/pooled/pentest labs
+        0x0002,       # Intel
+        0x003F,       # Seiko Epson
+        0x0006,       # Microsoft
+        0x0009,       # Infineon
+        0x00A6,       # Harman
+        0x005C        # Belkin
+    ]}
+]
+
+# BEGIN: Minimal OUI lookup (add before check_security_tool_ioc—extend as needed for your environment)
+OUI_VENDOR_DB = {
+    # Known BLE security/pentest, dev, IoT and major consumer vendors
+    "A4:B1:C1": "Bose",
+    "D8:A0:1D": "Adafruit",
+    "24:0A:C4": "Espressif",
+    "C0:98:E5": "Nordic Semiconductor",
+    "D4:CA:6D": "Hak5",
+    "C8:2B:96": "Texas Instruments",
+    "00:0D:B5": "Bluegiga",
+    "DC:A6:32": "Apple",
+    "A8:1B:6A": "Samsung",
+    "40:4E:36": "Google",
+    "88:4A:EA": "Tile Inc",
+    "F4:CF:A2": "Fitbit",
+    "B0:B4:48": "Garmin",
+    "74:DF:BF": "Xiaomi",
+    "5C:31:3E": "Lenovo",
+    "AC:BC:32": "Huawei",
+    "40:D3:AE": "Sony",
+    "98:E7:43": "Withings",
+    "28:6C:07": "Tesla",
+    "54:60:09": "Nissan",
+    "60:38:E0": "General Motors",
+    "64:6E:69": "Nintendo",
+    "B8:27:EB": "Raspberry Pi Foundation",
+    "C0:28:8D": "Dialog Semiconductor",
+    "58:2D:34": "u-blox",
+    "FC:A1:3E": "Murata Manufacturing",
+    "0C:B8:15": "Laird",
+    "68:9E:19": "Plantronics",
+    "B0:49:5F": "Harman International",
+    "28:6A:BA": "STMicroelectronics",
+    "34:14:5E": "Seeed Studio",
+    "00:1B:DC": "Microchip Technology",
+    "A0:20:A6": "Pycom",
+    "90:9A:77": "Particle Industries",
+    "3C:A3:08": "Digi International",
+    "C4:7C:8D": "Dialog Semiconductor",
+    "18:93:D7": "Silicon Labs",
+    "C4:E9:84": "LIBELIUM",
+    "B0:7C:C6": "RivieraWaves",
+    "1C:BA:8C": "Marvell",
+    "20:CD:39": "Qingping (Apple Home/IOT OEM)",
+    "94:B7:E1": "Thundercomm",
+    # Common consumer device subvendors and labs
+    "18:CD:0F": "Meta/Facebook",
+    "6C:21:A2": "Beats Electronics",
+    "AC:FD:CE": "Fitbit Inc",
+    "30:AE:A4": "Amazon Technologies Inc",
+    "70:88:6B": "Honor Device",
+    "CC:50:E3": "Oura Health Oy",
+    "D0:52:A8": "Mobvoi Wearables",
+    "38:8C:50": "Oppo Mobile"
+}
+
+def get_oui_vendor(mac_addr):
+    """Returns vendor name for MAC OUI, or None if not found/random/private."""
+    try:
+        if not mac_addr or len(mac_addr) < 8:
+            return None
+        oui = mac_addr[:8].replace("-", ":").upper()
+        return OUI_VENDOR_DB.get(oui)
+    except Exception:
+        return None
+
+# END: Minimal OUI lookup
+
+def check_security_tool_ioc(device):
+    """Returns the first matched IOC or None. Highly expanded signatures."""
+    # Defensive: always pass a string to lower()
+    name = (getattr(device, 'name', '') or '').lower()
+    oui_vendor = (get_oui_vendor(getattr(device, 'address', '')) or '').lower()
+    services = [s.replace('-', '').lower() for s in (getattr(device, 'service_uuids', []) or [])]
+    manid = getattr(device, 'manufacturer_id', None)
+
+    # Name signatures
+    for value in SECURITY_TOOL_IOCS[0]["values"]:
+        if value in name:
+            return f"Security/Testing Tool IOC (name match: {value})"
+    # OUI vendor
+    for value in SECURITY_TOOL_IOCS[1]["values"]:
+        if value.lower() in oui_vendor:
+            return f"Security/Testing Tool IOC (OUI vendor: {value})"
+    # Service UUIDs
+    for ioc_value in SECURITY_TOOL_IOCS[2]["values"]:
+        for svc in services:
+            if ioc_value in svc:
+                return f"Security/Testing Tool IOC (service UUID: {ioc_value})"
+    # Manufacturer ID
+    if manid is not None and manid in SECURITY_TOOL_IOCS[3]["values"]:
+        return f"Security/Testing Tool IOC (manufacturer ID: 0x{manid:04X})"
+    return None
 
 
 # ============================================================
@@ -7090,111 +7467,6 @@ class CompanyIdentifier(IntEnum):
                 return category
         return "Unknown"
         
-    # Expanded, robust and modernized signature/IOC list for BLE security/pentest hardware
-    SECURITY_TOOL_IOCS = [
-        # Device names (case-insensitive substrings and signature prefixes/patterns)
-        {"field": "name", "values": [
-            # Flipper family
-            "flipper", "flipper zero", "fz-", "bt-fz", "flipperzero", "btle-flipper",
-            # Ubertooth
-            "ubertooth",
-            # BLEKey and ESPKey/ESP boards
-            "blekey", "espkey", "esp32", "esp-test", "espble", "esp devkit", "esp prototyping", "esp hine", "esp-ble",
-            # Hak5
-            "hak5", "keycroc", "key croc", "sharkjack", "shark jack", "omg cable", "omg plug", "omg-adapter", "omg adapter",
-            # Revng offensive dongles/adapters
-            "crocs", "hak5remote", "usbkey", "usb-key",
-            # Proxmark and clones
-            "proxmark", "rdv4", "chameleonmini", "chameleon tiny", "chameleon ble",
-            # Bluefruit
-            "bluefruit", "adafruit", "bluefruit52", "bluefruit le", "ada-nrf",
-            # Nordic boards/devkits
-            "nrf-dk", "nrfdk", "nrf dongle", "nrf52840", "nrf52832", "nrf52",
-            # BTLEJack
-            "btlejack", "btle-jack",
-            # Hydra firmware
-            "hydra fw", "hydra-firmware", "hydra device", "hydra ble",
-            # Pwnagotchi-like or BLE fuzzing tools
-            "pwnagotchi", "fuzz", "jammer", "replay", "attackbox", "blebox",
-            # PandaKey, PandwaRF, Keysy, etc
-            "pandakey", "pandwarf", "keysy", "smartnfc", "proxdroid", "proxgrind",
-            # Testlimiter, Laird kits, generic dev
-            "testlimiter", "testkit", "devkit", "developer kit", "proto board", "sniffer", "sniff", "capture"
-        ]},
-        # OUI vendor substrings (for public MAC addresses)
-        {"field": "oui_vendor", "values": [
-            # Dev and security hardware usual OUIs
-            "Espressif", "Adafruit", "Nordic Semiconductor", "Hak5", "Laird", "STMicroelectronics",
-            "Silicon Labs", "Bluegiga", "Dialog Semiconductor", "Seeed Technology", "Particle",
-            "Murata Manufacturing", "Texas Instruments", "Raspberry Pi", "Pycom", "Digi International"
-        ]},
-        # Service UUID substrings (all lowercase/compact; includes popular prototyping, attack & logging)
-        {"field": "services", "values": [
-            # Nordic/UART
-            "6e400001b5a3f393e0a9e50e24dcca9e", # Nordic UART
-            "0000feab", # Some Flipper/related BLE
-            "nordic",
-            "adafruit",
-            "a3c875008ed34bdf8a39a01bebede295", # Bluefruit
-            "0000fff0", # Common for demo/dev boards
-            "0000fff1",
-            "0000fff2",
-            "0000fff3",
-            "0000fff4",
-            "554b0001fea94fa9808984c91e938f72", # BLEKey custom
-            "c19c0001c1b6a4b1bdeb8b0e9c8f7b8a", # BTLEJack
-            "fd6f",      # Apple Find My/netboot for testing
-            "fd6f",      # Used in "Find My" clones, which attackers use for BLE fuzzing
-            "fdcd",      # some TinyGo boards
-            "fdaf",      # Eddystone/experimental dev
-            "ffb0"       # Test manufacturer boards, various
-        ]},
-        # Manufacturer IDs (int values): known to be used in dev/pen test hardware or left as default
-        {"field": "manid", "values": [
-            0xFFFF,       # No real manufacturer, catch misconfigured dev boards
-            0x02E5,       # Espressif Systems
-            0x0059,       # Nordic Semiconductor
-            0x0822,       # Adafruit Industries
-            0x0211,       # STMicroelectronics
-            0x0131,       # Laird
-            0x0171,       # Texas Instruments
-            0x01A6,       # Dialog Semiconductor
-            0x013F,       # Bluegiga Technologies
-            0x0374,       # Seeed Technology
-            0x02A9,       # Pycom
-            0x048F,       # Particle Industries
-            0x017F,       # Murata Manufacturing
-            0x0044,       # Digi International
-            0xC0DE,       # Sometimes used in PoC tools
-            0x4C54        # LAIRD Technologies
-        ]}
-    ]
-
-    def check_security_tool_ioc(device):
-        """Returns the first matched IOC or None. Highly expanded signatures."""
-        name = getattr(device, 'name', '').lower()
-        oui_vendor = (get_oui_vendor(getattr(device, 'address', '')) or '').lower()
-        services = [s.replace('-', '').lower() for s in getattr(device, 'service_uuids', [])]
-        manid = getattr(device, 'manufacturer_id', None)
-
-        # Name signatures
-        for value in SECURITY_TOOL_IOCS[0]["values"]:
-            if value in name:
-                return f"Security/Testing Tool IOC (name match: {value})"
-        # OUI vendor
-        for value in SECURITY_TOOL_IOCS[1]["values"]:
-            if value.lower() in oui_vendor:
-                return f"Security/Testing Tool IOC (OUI vendor: {value})"
-        # Service UUIDs
-        for ioc_value in SECURITY_TOOL_IOCS[2]["values"]:
-            for svc in services:
-                if ioc_value in svc:
-                    return f"Security/Testing Tool IOC (service UUID: {ioc_value})"
-        # Manufacturer ID
-        if manid is not None and manid in SECURITY_TOOL_IOCS[3]["values"]:
-            return f"Security/Testing Tool IOC (manufacturer ID: 0x{manid:04X})"
-        return None
-
 
 # ============================================================
 # BLUETOOTH SERVICE UUIDS - COMPREHENSIVE DATABASE
@@ -9051,18 +9323,17 @@ class BLEMonitor(threading.Thread):
         # Print BLE device discovery to console for immediate visibility
         if device.advertisement_count == 1:  # First time seeing this device
             print()
-            print("┌─" + "─" * 76 + "─┐")
-            print(f"│ 🔵 NEW BLE DEVICE DISCOVERED{' ' * 48}│")
-            print("├─" + "─" * 76 + "─┤")
+            print("┌" + "─" * 78 + "┐")
+            print(f"│ 🔵 NEW BLE DEVICE DISCOVERED{' ' * 50}│")
+            print("├" + "─" * 78 + "┤")
 
             # Original "details" string is shown as before, for verbatim logic:
-            print(f"│ {details:<76} │")
+            print(f"│ {details:<78} │")
 
             # ENHANCEMENTS (maximal context for device attribution and forensic value)
             manid = getattr(device, 'manufacturer_id', None)
             vendor = CompanyIdentifier.get_name(manid) if manid is not None else "Unknown"
             cat = getattr(device, 'device_category', "Unknown")
-            security_tool = getattr(device, 'security_tool_name', "")
             addr_type = getattr(device, 'address_type', "Unknown")
             trackable = "YES" if getattr(device, 'is_trackable', False) else "NO"
 
@@ -9149,10 +9420,11 @@ class BLEMonitor(threading.Thread):
                 info = device.device_information
                 gatt_manufacturer = info.get('manufacturer_name') if info else None
                 gatt_model = info.get('model_number') if info else None
-                
-            security_tool = check_security_tool_ioc(device) or "None"
 
-            # Extended: anomalies, first/last seen, advertisement interval if in stats
+            # Robust security tool IOC detection
+            security_tool = check_security_tool_ioc(device) or "None"
+            device.security_tool_name = security_tool
+
             anomaly_list = getattr(device, 'anomalies', [])
             anomaly_str = f"{len(anomaly_list)} anomaly(s): " + "; ".join(
                 [str(a.get('type', '')) for a in anomaly_list]) if anomaly_list else "None"
@@ -9167,40 +9439,42 @@ class BLEMonitor(threading.Thread):
             last_seen_str = f"{int(now - last_seen)}s ago" if last_seen else "Unknown"
 
             more_lines = [
-            f"Name: {getattr(device, 'name', 'Unknown')}",
-            f"Address: {getattr(device, 'address', 'Unknown')} | Type: {mac_type}",
-            f"Vendor: {vendor} (0x{manid:04X})" if manid is not None else f"Vendor: {vendor}",
-            f"OUI (from MAC): {oui_vendor}",
-            f"Category: {cat}",
-            f"Appearance: {appearance_str}",
-            f"Security/Testing Tool: {security_tool}",
-            f"Trackable: {trackable}",
-            f"Beacon Frame(s): {beacon_proto}",
-            f"RSSI: {rssi_disp} dBm",
-            f"Distance Estimate: {distance_str}",
-            f"Advertisement Count: {adv_count}",
-            f"Services: {services_out}",
-            f"Advertisement Interval: {adv_intvl}",
-            f"Manufacturer Data: {mdata_str}",
-            f"GATT Manufacturer: {gatt_manufacturer}",
-            f"GATT Model: {gatt_model}",
-            f"First Seen: {first_seen_str}",
-            f"Last Seen: {last_seen_str}",
-            f"Anomalies: {anomaly_str}",
-        ]
-        for line in more_lines:
-            print(f"│ {line:<76} │")
+                f"Name: {getattr(device, 'name', 'Unknown')}",
+                f"Address: {getattr(device, 'address', 'Unknown')} | Type: {mac_type}",
+                f"Vendor: {vendor} (0x{manid:04X})" if manid is not None else f"Vendor: {vendor}",
+                f"OUI (from MAC): {oui_vendor}",
+                f"Category: {cat}",
+                f"Appearance: {appearance_str}",
+                f"Security/Testing Tool: {security_tool}",
+                f"Trackable: {trackable}",
+                f"Beacon Frame(s): {beacon_proto}",
+                f"RSSI: {rssi_disp} dBm",
+                f"Distance Estimate: {distance_str}",
+                f"Advertisement Count: {adv_count}",
+                f"Services: {services_out}",
+                f"Advertisement Interval: {adv_intvl}",
+                f"Manufacturer Data: {mdata_str}",
+                f"GATT Manufacturer: {gatt_manufacturer}",
+                f"GATT Model: {gatt_model}",
+                f"First Seen: {first_seen_str}",
+                f"Last Seen: {last_seen_str}",
+                f"Anomalies: {anomaly_str}",
+            ]
+            for line in more_lines:
+                print(f"│ {line:<78} │")
+            print("└" + "─" * 78 + "┘")
+            print()
             sys.stdout.flush()
-    
-        # Report to tracker
-        self.tracker.signal_detected(
-            freq_key,
-            freq_hz,
-            band_type,
-            magnitude,
-            None,  # No audio data for BLE
-            details
-        )
+
+            # Report to tracker
+            self.tracker.signal_detected(
+                freq_key,
+                freq_hz,
+                band_type,
+                magnitude,
+                None,  # No audio data for BLE
+                details
+            )
         
         # Check for anomalies
         anomalies = self._check_anomalies(device)
