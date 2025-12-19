@@ -484,7 +484,6 @@ ENABLE_WEBSOCKET_STREAMING = WEBSOCKETS_AVAILABLE and AIOHTTP_AVAILABLE
 ENABLE_CONFIG_UI = PYQT6_AVAILABLE
 
 global estimator
-estimator = UltimateDistanceEstimator()
 
 import json
 import logging
@@ -5370,6 +5369,44 @@ from typing import (
 from abc import ABC, abstractmethod
 
 import numpy as np
+import math
+import time
+import statistics
+import threading
+import logging
+from dataclasses import dataclass, field
+from typing import Dict, List, Tuple, Optional, Deque, Any, Callable
+from collections import deque
+from enum import Enum
+import numpy as np
+
+# Conditional imports for advanced features
+try:
+    from scipy import optimize, signal as scipy_signal, stats as scipy_stats
+    from scipy.interpolate import UnivariateSpline, interp1d
+    from scipy.ndimage import gaussian_filter1d
+    SCIPY_ADVANCED_AVAILABLE = True
+except ImportError:
+    SCIPY_ADVANCED_AVAILABLE = False
+
+try:
+    from filterpy.kalman import KalmanFilter, UnscentedKalmanFilter
+    from filterpy.kalman import MerweScaledSigmaPoints
+    from filterpy.common import Q_discrete_white_noise
+    FILTERPY_AVAILABLE = True
+except ImportError:
+    FILTERPY_AVAILABLE = False
+    KalmanFilter = None
+
+try:
+    from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+    from sklearn.preprocessing import StandardScaler, PolynomialFeatures
+    from sklearn.pipeline import Pipeline
+    SKLEARN_DISTANCE_AVAILABLE = True
+except ImportError:
+    SKLEARN_DISTANCE_AVAILABLE = False
+
+
 
 # Conditional imports
 try:
@@ -8807,83 +8844,89 @@ class BLEMonitor(threading.Thread):
             return False
     
     def _print_statistics(self):
-        recent_devices = getattr(self, 'recent_devices', [])
-        if recent_devices:
-            print("║ Recent Devices:" + ' ' * 59 + "║")
-            for device in recent_devices:
-                name = (device.name or device.address[-8:])[:20]
-                rssi = f"{getattr(device, 'rssi_current', 0):.0f}dBm"
-                dist_val = getattr(device, 'estimated_distance_m', -1)
-                dist = f"~{dist_val:.1f}m" if dist_val > 0 else "N/A"
-                cat = (getattr(device, 'device_category', "Unknown"))[:12]
-                age_val = int(time.time() - getattr(device, 'last_seen', time.time()))
-                age = f"{age_val}s ago"
-                sigma_val = getattr(device, 'distance_uncertainty_m', 1.5)
-                self.estimator.add_measurement(
-                    source_type='ble',
-                    distance=dist_val,
-                    sigma=sigma_val,
-                    timestamp=time.time(),
-                    metadata={
-                        'rssi': getattr(device, 'rssi_current', None),
-                        'device': getattr(device, 'address', None)
-                    }
-                )
-                line = f"  • {name:<20} │ {rssi:<7} │ {dist:<8} │ {cat:<12} │ {age}"
-                print(f"║ {line:<76} ║")
-            result = self.estimator.get_latest_estimate()
-            print(f"Estimated distance (fused): {result['distance']} ± {result['uncertainty']} meters")
-            print(f"Sensor breakdown: {result['contributions']}")
-        else:
-            print("║ No devices currently tracked" + ' ' * 47 + "║")
-        print("╚═" + "═" * 76 + "═╝")
+        """Print BLE monitoring statistics with optional sensor fusion integration"""
         print()
-        logging.info(
-            f"BLE Stats - "
-            f"Scans: {self.stats['scan_count']}, "
-            f"Unique devices: {self.stats['unique_devices']}, "
-            f"Beacons: {self.stats['beacons_detected']}, "
-            f"Anomalies: {self.stats['anomalies_detected']}, "
-            f"Last scan: {self.stats['last_scan_device_count']} devices"
-        )
+        print("╔═" + "═" * 76 + "═╗")
+        print("║" + " 🔵 BLE MONITOR STATISTICS ".center(76) + "║")
+        print("╠═" + "═" * 76 + "═╣")
         
-        # Show up to 5 most recent devices
+        # Print basic stats line
+        stats_line = (f"Scans: {self.stats['scan_count']:<6} │ "
+                     f"Unique: {self.stats['unique_devices']:<5} │ "
+                     f"Beacons: {self.stats['beacons_detected']:<5} │ "
+                     f"Anomalies: {self.stats['anomalies_detected']:<4}")
+        print(f"║ {stats_line:<74} ║")
+        print("╠═" + "═" * 76 + "═╣")
+        
+        # Get recent devices with thread-safe access
         with self.lock:
             recent_devices = sorted(
                 self.devices.values(),
-                key=lambda d: d.last_seen,
+                key=lambda d: getattr(d, 'last_seen', 0),
                 reverse=True
             )[:20]
         
         if recent_devices:
             print("║ Recent Devices:" + ' ' * 59 + "║")
-            for device in recent_devices:
-                name = (device.name or device.address[-8:])[:20]
-                rssi = f"{device.rssi_current:.0f}dBm"
-                dist = f"~{device.estimated_distance_m:.1f}m" if device.estimated_distance_m > 0 else "N/A"
-                cat = (device.device_category or "Unknown")[:12]
-                age = f"{int(time.time() - device.last_seen)}s ago"
-                # Example for BLE reading:
-                estimator.add_measurement(
-                    source_type='ble',
-                    distance=device.estimated_distance_m,
-                    sigma=(getattr(device, 'distance_uncertainty_m', 1.5) or 1.5),
-                    timestamp=time.time(),
-                    metadata={'rssi': device.rssi_current, 'device': device.address}
-                )
-                line = f"  • {name:<20} │ {rssi:<7} │ {dist:<8} │ {cat:<12} │ {age}"
-                print(f"║ {line:<76} ║")
+            print("║ " + "-" * 74 + " ║")
             
-            # Only print the fusion output after the full for-loop:
-            result = estimator.get_latest_estimate()
-            print(f"Estimated distance (fused): {result['distance']} ± {result['uncertainty']} meters")
-            print(f"Sensor breakdown: {result['contributions']}")
+            for device in recent_devices:
+                # Safe attribute access throughout
+                name = (getattr(device, 'name', None) or getattr(device, 'address', 'Unknown')[-8:])[:20]
+                rssi_val = getattr(device, 'rssi_current', -100)
+                rssi = f"{rssi_val:.0f}dBm"
+                
+                dist_val = getattr(device, 'estimated_distance_m', -1)
+                dist = f"~{dist_val:.1f}m" if dist_val and dist_val > 0 else "N/A"
+                
+                cat = (getattr(device, 'device_category', None) or "Unknown")[:12]
+                
+                last_seen = getattr(device, 'last_seen', time.time())
+                age = f"{int(time.time() - last_seen)}s ago"
+                
+                # Add measurement to estimator if available (for sensor fusion)
+                if hasattr(self, 'estimator') and self.estimator is not None and dist_val and dist_val > 0:
+                    sigma_val = getattr(device, 'distance_uncertainty_m', None) or 1.5
+                    try:
+                        self.estimator.add_measurement(
+                            source_type='ble',
+                            distance=dist_val,
+                            sigma=sigma_val,
+                            timestamp=time.time(),
+                            metadata={
+                                'rssi': rssi_val,
+                                'device': getattr(device, 'address', 'unknown')
+                            }
+                        )
+                    except Exception as e:
+                        logging.debug(f"Could not add measurement to estimator: {e}")
+                
+                line = f"  • {name:<20} │ {rssi:<7} │ {dist:<8} │ {cat:<12} │ {age}"
+                print(f"║ {line:<74} ║")
+            
+            # Print sensor fusion result if estimator is available
+            if hasattr(self, 'estimator') and self.estimator is not None:
+                try:
+                    result = self.estimator.get_latest_estimate()
+                    if result and result.get('distance') is not None:
+                        print("║ " + "-" * 74 + " ║")
+                        fused_dist = result.get('distance', 0)
+                        fused_unc = result.get('uncertainty', 0)
+                        contributions = result.get('contributions', {})
+                        fusion_line = f"📊 Fused Distance: {fused_dist:.2f}m ± {fused_unc:.2f}m"
+                        print(f"║ {fusion_line:<74} ║")
+                        if contributions:
+                            contrib_str = ", ".join(f"{k}: {v:.0%}" for k, v in contributions.items())
+                            print(f"║    Sensors: {contrib_str:<62} ║")
+                except Exception as e:
+                    logging.debug(f"Could not get fused estimate: {e}")
         else:
             print("║ No devices currently tracked" + ' ' * 47 + "║")
-
+        
         print("╚═" + "═" * 76 + "═╝")
         print()
-
+        sys.stdout.flush()
+        
         logging.info(
             f"BLE Stats - "
             f"Scans: {self.stats['scan_count']}, "
@@ -9448,44 +9491,6 @@ SECURITY:
 # [12] Zanella, A.  (2016) "Best Practice in RSS Measurements and Ranging"
 #      IEEE Comm. Surveys & Tutorials 18(4):2662-2686
 # ============================================================
-
-import math
-import time
-import statistics
-import threading
-import logging
-from dataclasses import dataclass, field
-from typing import Dict, List, Tuple, Optional, Deque, Any, Callable
-from collections import deque
-from enum import Enum
-import numpy as np
-
-# Conditional imports for advanced features
-try:
-    from scipy import optimize, signal as scipy_signal, stats as scipy_stats
-    from scipy.interpolate import UnivariateSpline, interp1d
-    from scipy.ndimage import gaussian_filter1d
-    SCIPY_ADVANCED_AVAILABLE = True
-except ImportError:
-    SCIPY_ADVANCED_AVAILABLE = False
-
-try:
-    from filterpy.kalman import KalmanFilter, UnscentedKalmanFilter
-    from filterpy.kalman import MerweScaledSigmaPoints
-    from filterpy.common import Q_discrete_white_noise
-    FILTERPY_AVAILABLE = True
-except ImportError:
-    FILTERPY_AVAILABLE = False
-    KalmanFilter = None
-
-try:
-    from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
-    from sklearn.preprocessing import StandardScaler, PolynomialFeatures
-    from sklearn.pipeline import Pipeline
-    SKLEARN_DISTANCE_AVAILABLE = True
-except ImportError:
-    SKLEARN_DISTANCE_AVAILABLE = False
-
 
 # ============================================================
 # ENVIRONMENT CLASSIFICATION FOR ADAPTIVE MODELING
@@ -11385,18 +11390,6 @@ class EnhancedSensorFusion:
             'source_diagnostics': diagnostics
         }
 
-class UltimateDistanceEstimator:
-    def __init__(self):
-        self.sensor_fusion = EnhancedSensorFusion()
-
-    def add_measurement(self, source_type, distance, sigma, timestamp=None, metadata=None):
-        if timestamp is None:
-            timestamp = time.time()
-        self.sensor_fusion.add_measurement(source_type, distance, sigma, timestamp, metadata)
-
-    def get_latest_estimate(self, last_n=10):
-        return self.sensor_fusion.get_fused_estimate(last_n=last_n)
-
 
 # ============================================================
 # COMPREHENSIVE DISTANCE ESTIMATOR - MAIN CLASS
@@ -11474,11 +11467,11 @@ class UltimateDistanceEstimator:
                 min_beacons=3
             )
         
-        # Sensor fusion
-        self.sensor_fusion = None
+        # Multi-modal sensor fusion (advanced UKF-based fusion, separate from basic sensor_fusion)
+        self.multi_modal_fusion = None
         self.enable_fusion = enable_sensor_fusion
         if enable_sensor_fusion:
-            self.sensor_fusion = MultiModalDistanceFusion(use_ukf=True)
+            self.multi_modal_fusion = MultiModalDistanceFusion(use_ukf=True)
         
         # RSSI history per device for advanced analysis
         self.rssi_history: Dict[str, Deque[Tuple[float, float]]] = {}
@@ -11517,6 +11510,14 @@ class UltimateDistanceEstimator:
         if device_address not in self.rssi_history:
             self.rssi_history[device_address] = deque(maxlen=self.max_history)
         self.rssi_history[device_address].append((timestamp, rssi))
+        
+    def add_measurement(self, source_type, distance, sigma, timestamp=None, metadata=None):
+        if timestamp is None:
+            timestamp = time.time()
+        self.sensor_fusion.add_measurement(source_type, distance, sigma, timestamp, metadata)
+
+    def get_latest_estimate(self, last_n=10):
+        return self.sensor_fusion.get_fused_estimate(last_n=last_n)
     
     def _compute_rssi_statistics(self, device_address: str) -> Dict[str, float]:
         """Compute RSSI statistics for device."""
@@ -11946,7 +11947,12 @@ def _estimate_distance_ultimate(
 # ============================================================
 # This allows the enhanced _estimate_distance to be used automatically
 
-class BLEMonitor:
+class BLEMonitorEnhanced:
+    """
+    Enhanced BLEMonitor mixin class that adds estimator support.
+    This class provides the estimator integration that will be merged
+    into the main BLEMonitor class via monkey-patching.
+    """
     def __init__(self, tracker, config, estimator):
         self.tracker = tracker
         self.config = config
@@ -11959,22 +11965,46 @@ class BLEMonitor:
             'last_scan_device_count': 0
         }
 
-    def patch_ble_monitor_distance_estimation():
-        """
-        Patch BLEMonitor class to use ultimate distance estimation.
-        
-        Call this at module load time to enable enhanced distance estimation.
-        """
-        global BLEMonitor
-        
-        # Store original method
-        if hasattr(BLEMonitor, '_estimate_distance'):
-            BLEMonitor._estimate_distance_original = BLEMonitor._estimate_distance
-        
-        # Replace with ultimate version
-        BLEMonitor._estimate_distance = _estimate_distance_ultimate
-        
-        logging.info("BLEMonitor patched with UltimateDistanceEstimator")
+
+def patch_ble_monitor_distance_estimation():
+    """
+    Patch BLEMonitor class to use ultimate distance estimation.
+    
+    Call this at module load time to enable enhanced distance estimation.
+    """
+    global BLEMonitor
+    
+    # Store original __init__ if not already stored
+    if not hasattr(BLEMonitor, '_original_init'):
+        BLEMonitor._original_init = BLEMonitor.__init__
+    
+    # Create enhanced __init__ that accepts estimator parameter
+    def enhanced_init(self, tracker, config=None, estimator=None):
+        # Call original init
+        if config is None:
+            config = {}
+        BLEMonitor._original_init(self, tracker, config)
+        # Add estimator attribute
+        self.estimator = estimator
+    
+    # Replace __init__ with enhanced version
+    BLEMonitor.__init__ = enhanced_init
+    
+    # Store original _estimate_distance method
+    if hasattr(BLEMonitor, '_estimate_distance'):
+        BLEMonitor._estimate_distance_original = BLEMonitor._estimate_distance
+    
+    # Replace with ultimate version
+    BLEMonitor._estimate_distance = _estimate_distance_ultimate
+    
+    logging.info("BLEMonitor patched with UltimateDistanceEstimator and estimator support")
+
+
+# Apply the patch at module load time
+try:
+    patch_ble_monitor_distance_estimation()
+except Exception as e:
+    logging.warning(f"Could not patch BLEMonitor at load time: {e}")
 
 
 # ============================================================
@@ -12001,7 +12031,7 @@ class DistanceEstimationBenchmark:
         percentile_90_error: float
         percentile_95_error: float
     
-    def __init__(self, estimator:  UltimateDistanceEstimator):
+    def __init__(self, estimator: UltimateDistanceEstimator):
         """
         Initialize benchmark. 
         
@@ -14032,12 +14062,6 @@ import numpy as np
 import time
 import logging
 
-# =========================== ENGINE (MAIN) =============================
-
-
-# =========================
-# Demo (to be wired-in)
-# =========================
 
 # ==========================================================================
 # (Research based) Hidden Cameras detection Engine + Known signals IOCs
@@ -15647,7 +15671,6 @@ except ImportError:
 
 def bispectral_analysis(x, fs, nfft=2048):
     """Compute bispectrum—useful for nonlinear and watermark detection (IEEE TIFS 2025)."""
-    # Windowed third-order moments, simplified demo implementation.
     B = np.zeros((nfft, nfft), dtype=np.complex128)
     for f1 in range(0, nfft//2, 128):
         for f2 in range(0, nfft//2, 128):
@@ -15673,7 +15696,6 @@ def identify_device_from_audio_fingerprint(chunk, sample_rate):
     Used for source attribution & anomaly detection per SecDev 2024, IEEE TIFS 2025.
     """
     # Placeholder: In research, this is an ML classifier ensemble using spectro-temporal and impulse responses.
-    # Here, simple spectral centroid and rolloff for demo:
     spectral_centroid = librosa.feature.spectral_centroid(y=chunk, sr=sample_rate).mean()
     spectral_rolloff = librosa.feature.spectral_rolloff(y=chunk, sr=sample_rate).mean()
     # Domain thresholds:
@@ -16343,7 +16365,6 @@ class DummyNRAnomalyModel:
     """Drop-in model for research; replace with open-source 2025 threat classifiers as available."""
     def predict_with_details(self, feature_vector: np.ndarray):
         # Replace this with actual research-grade model: loaded from pickle/onnx/trained instance, etc.
-        # For demonstration, let's simulate some output:
         score = np.random.normal(0.1, 0.03)     # Most are safe
         if np.max(feature_vector) > 1e5:
             score = np.random.uniform(0.85, 1.0)  # Simulated 'rogue'
@@ -16871,7 +16892,6 @@ class UWBThreatMonitorEngine:
         # (Expects pre-processed embedding, clustering, or sequence model)
         # Each detection should return a score and category if possible
         results = []
-        # Example: basic outlier for demo (replace with ML result)
         s = np.std([f.toa_ns for f in window])
         if s > 10_000:
             results.append(UWBEventDetection(
@@ -20976,6 +20996,77 @@ except Exception as e:
     mesh_engine = None
     logging.warning(f"Mesh protocol engine initialization failed: {e}")
 
+try:
+    # Network covert channel detection engine
+    class StubTrafficAnalyzer:
+        """Stub traffic analyzer interface"""
+        def get_traffic_stream(self):
+            return {'timestamps': [], 'packet_lens': [], 'phy_params': {}}
+    
+    network_covert_engine = NetworkCovertChannelThreatEngine(
+        traffic_analyzer_interface=StubTrafficAnalyzer(),
+        ioc_registry=ioc_registry,
+        config=None
+    )
+    logging.info("Network covert channel engine initialized (stub mode)")
+except Exception as e:
+    network_covert_engine = None
+    logging.warning(f"Network covert engine initialization failed: {e}")
+
+try:
+    # Amateur band threat engine
+    amateur_band_engine = AmateurBandThreatEngine(
+        sdr_interface=StubSDRInterface(),
+        ioc_registry=ioc_registry
+    )
+    logging.info("Amateur band threat engine initialized (stub mode)")
+except Exception as e:
+    amateur_band_engine = None
+    logging.warning(f"Amateur band engine initialization failed: {e}")
+
+try:
+    # Laser eavesdrop detection engine
+    def stub_photodiode():
+        """Stub photodiode sensor"""
+        return (np.zeros(1024), 44100)
+    
+    def stub_accelerometer():
+        """Stub accelerometer sensor"""
+        return (np.zeros(1024), 44100)
+    
+    def stub_microphone():
+        """Stub microphone sensor"""
+        return (np.zeros(1024), 44100)
+    
+    laser_sensor_array = {
+        'photodiode': stub_photodiode,
+        'accelerometer': stub_accelerometer,
+        'microphone': stub_microphone
+    }
+    
+    laser_engine = LaserEavesdropThreatEngine(
+        backscatter_sensor_array=laser_sensor_array,
+        ioc_registry=ioc_registry,
+        jamming_cb=None,
+        visualization_cb=None
+    )
+    logging.info("Laser eavesdrop engine initialized (stub mode)")
+except Exception as e:
+    laser_engine = None
+    logging.warning(f"Laser engine initialization failed: {e}")
+
+try:
+    # Utility mesh threat engine
+    utility_mesh_engine = UtilityMeshThreatEngine(
+        sdr=DummySDRInterface(),
+        ioc_registry=ioc_registry
+    )
+    # Note: Do NOT start() here - it's a threading.Thread that should be managed separately
+    logging.info("Utility mesh threat engine initialized")
+except Exception as e:
+    utility_mesh_engine = None
+    logging.warning(f"Utility mesh engine initialization failed: {e}")
+
 # Export all initialized engines for use by other modules
 INITIALIZED_ENGINES = {
     'ioc_registry': ioc_registry,
@@ -20988,6 +21079,10 @@ INITIALIZED_ENGINES = {
     'sidechannel_engine': sidechannel_engine,
     'sdr_engine': sdr_engine,
     'mesh_engine': mesh_engine,
+    'network_covert_engine': network_covert_engine,
+    'amateur_band_engine': amateur_band_engine,
+    'laser_engine': laser_engine,
+    'utility_mesh_engine': utility_mesh_engine,
 }
 
 logging.info(f"Initialized {sum(1 for v in INITIALIZED_ENGINES.values() if v is not None)} threat detection engines")
@@ -21784,12 +21879,27 @@ def main():
     print("📡 MONITORING ACTIVE - Press Ctrl+C to stop")
     print("=" * 80)
     print()
+    
+    # Display initialized engines status
+    print("🔧 INITIALIZED THREAT DETECTION ENGINES:")
+    print("-" * 60)
+    active_count = 0
+    for name, engine in INITIALIZED_ENGINES.items():
+        status = "✅ Active" if engine is not None else "⚠️  Unavailable"
+        if engine is not None:
+            active_count += 1
+        print(f"   • {name:<25}: {status}")
+    print("-" * 60)
+    print(f"   Total Active Engines: {active_count}/{len(INITIALIZED_ENGINES)}")
+    print()
     sys.stdout.flush()
     
     last_stats = time.time()
     last_network_summary = time.time()
+    last_engine_check = time.time()
     stats_print_interval = STATISTICS_INTERVAL  # Print stats periodically
     network_summary_interval = 30.0  # Print network summary every 30 seconds
+    engine_check_interval = 15.0  # Run periodic threat engine checks
     
     while not shutdown_requested.is_set():
         time.sleep(0.5)  # Shorter sleep for more responsive shutdown
@@ -21804,6 +21914,83 @@ def main():
             except Exception as e:
                 logging.error(f"Error printing periodic statistics: {e}")
             last_stats = current_time
+        
+        # Run periodic threat engine checks on collected data
+        if (current_time - last_engine_check) >= engine_check_interval:
+            try:
+                # Collect any pending observations for threat analysis
+                pending_observations = []
+                
+                # Get recent BLE observations
+                if BLE_AVAILABLE:
+                    for mon in monitors:
+                        if mon.__class__.__name__ == 'BLEMonitor' and hasattr(mon, 'devices'):
+                            lock = getattr(mon, 'lock', None)
+                            if lock:
+                                with lock:
+                                    for addr, device in list(mon.devices.items())[:10]:
+                                        obs = {
+                                            'type': 'ble',
+                                            'address': addr,
+                                            'name': getattr(device, 'name', ''),
+                                            'rssi': getattr(device, 'rssi_current', -100),
+                                            'category': getattr(device, 'device_category', 'Unknown'),
+                                            'manufacturer': getattr(device, 'manufacturer_name', ''),
+                                            'services': getattr(device, 'service_uuids', []),
+                                        }
+                                        pending_observations.append(obs)
+                
+                # Run observations through all active engines
+                total_detections = 0
+                
+                for obs in pending_observations[:20]:  # Limit to prevent slowdown
+                    # Main threat engine
+                    if threat_engine:
+                        try:
+                            matches = threat_engine.run(obs)
+                            if matches:
+                                total_detections += len(matches)
+                                display_detection_results(matches, source="Threat Engine")
+                        except Exception as e:
+                            logging.debug(f"Threat engine error: {e}")
+                    
+                    # Hidden camera engine
+                    if hidden_cam_engine:
+                        try:
+                            cam_matches = hidden_cam_engine.run(obs)
+                            if cam_matches:
+                                total_detections += len(cam_matches)
+                                display_detection_results(cam_matches, source="Hidden Cam Engine")
+                        except Exception as e:
+                            logging.debug(f"Hidden cam engine error: {e}")
+                    
+                    # Air-gap detection engine
+                    if airgap_engine:
+                        try:
+                            airgap_result = airgap_engine.analyze(obs) if hasattr(airgap_engine, 'analyze') else None
+                            if airgap_result and isinstance(airgap_result, dict) and airgap_result.get('detections'):
+                                total_detections += len(airgap_result.get('detections', []))
+                                print(f"🔴 Air-Gap Bridge Detection: {airgap_result}")
+                        except Exception as e:
+                            logging.debug(f"Air-gap engine error: {e}")
+                    
+                    # IR surveillance engine
+                    if ir_engine:
+                        try:
+                            ir_result = ir_engine.analyze(obs) if hasattr(ir_engine, 'analyze') else None
+                            if ir_result and isinstance(ir_result, dict) and ir_result.get('anomalies'):
+                                total_detections += len(ir_result.get('anomalies', []))
+                                print(f"🔴 IR Surveillance Detection: {ir_result}")
+                        except Exception as e:
+                            logging.debug(f"IR engine error: {e}")
+                
+                if total_detections > 0:
+                    logging.info(f"Periodic threat scan: {total_detections} detection(s)")
+                    
+            except Exception as e:
+                logging.error(f"Error in periodic threat engine check: {e}")
+            
+            last_engine_check = current_time
         
         # Print network detection summary
         if (current_time - last_network_summary) >= network_summary_interval:
@@ -21835,6 +22022,10 @@ def main():
                 if hasattr(tracker, 'stats'):
                     print(f"Total Detections:        {tracker.stats.get('total_detections', 0)}")
                     print(f"IoC Matches:             {tracker.stats.get('ioc_detections', 0)}")
+                
+                # Show engine status
+                active_engines = sum(1 for e in INITIALIZED_ENGINES.values() if e is not None)
+                print(f"Active Threat Engines:   {active_engines}/{len(INITIALIZED_ENGINES)}")
                 
                 print("-" * 80)
                 sys.stdout.flush()
