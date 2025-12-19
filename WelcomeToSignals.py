@@ -11269,6 +11269,90 @@ class MultiModalDistanceFusion:
         )
         
         return max(0.1, float(predicted)), float(total_uncertainty)
+        
+import numpy as np
+
+class EnhancedSensorFusion:
+    """
+    Robust, extensible multi-modal sensor fusion with uncertainty propagation and per-sensor diagnostics.
+    """
+
+    SENSOR_WEIGHTS = {
+        'ble': 1.0,
+        'wifi': 2.0,
+        'uwb': 4.0,
+        'visual': 2.5,
+        'imu': 0.7,
+        # add more sensor types as needed
+    }
+
+    def __init__(self):
+        self.sources = []
+
+    def add_measurement(self, source_type, distance, sigma, timestamp, metadata=None):
+        """
+        Add a measurement from any sensor type.
+        :param source_type: str ('ble', 'wifi', etc)
+        :param distance: float (meters)
+        :param sigma: float (1-sigma of measurement, meters)
+        :param timestamp: float (time)
+        :param metadata: dict (optional debug info)
+        """
+        self.sources.append(dict(
+            type=source_type,
+            dist=distance,
+            sigma=sigma,
+            ts=timestamp,
+            meta=metadata or {}
+        ))
+
+    def get_fused_estimate(self, last_n=10):
+        """
+        Returns a weighted uncertainty-aware distance estimate with diagnostic details.
+        """
+        if not self.sources:
+            return {
+                'distance': None,
+                'uncertainty': None,
+                'contributions': {},
+                'source_diagnostics': []
+            }
+
+        # Use only recent measurements
+        sources = self.sources[-last_n:]
+        weights, dists, sigmas, types = [], [], [], []
+        diagnostics = []
+
+        for entry in sources:
+            w = self.SENSOR_WEIGHTS.get(entry['type'], 1.0) / max(1e-3, entry['sigma'])
+            weights.append(w)
+            dists.append(entry['dist'])
+            sigmas.append(entry['sigma'])
+            types.append(entry['type'])
+            diagnostics.append({
+                'type': entry['type'],
+                'distance': entry['dist'],
+                'sigma': entry['sigma'],
+                'timestamp': entry['ts'],
+                'meta': entry['meta'],
+            })
+
+        weights = np.array(weights)
+        norm_w = weights / np.sum(weights)
+        fused_distance = float(np.dot(norm_w, dists))
+        fused_sigma = float(np.sqrt(np.dot(norm_w, np.square(sigmas))))
+
+        contributions = {}
+        for t in set(types):
+            indices = [i for i, typ in enumerate(types) if typ == t]
+            contributions[t] = float(np.sum(norm_w[indices]))
+
+        return {
+            'distance': fused_distance,
+            'uncertainty': fused_sigma,
+            'contributions': contributions,
+            'source_diagnostics': diagnostics
+        }
 
 
 # ============================================================
@@ -11315,6 +11399,7 @@ class UltimateDistanceEstimator:
             calibration:  Optional pre-computed calibration
         """
         self.environment = environment
+        self.sensor_fusion = EnhancedSensorFusion()
         
         # Core path loss model
         self.path_loss_model = AdvancedPathLossModel(
@@ -11421,6 +11506,11 @@ class UltimateDistanceEstimator:
                 stats['rssi_trend'] = 0.0
         
         return stats
+        
+    def add_measurement(self, source_type, distance, sigma, timestamp=None, metadata=None):
+        if timestamp is None:
+            timestamp = time.time()
+        self.sensor_fusion.add_measurement(source_type, distance, sigma, timestamp, metadata)
     
     def estimate_distance(
         self,
@@ -11703,6 +11793,12 @@ class UltimateDistanceEstimator:
             del self.rssi_history[device_address]
         
         logging.debug(f"Reset tracking for device {device_address}")
+        
+    def get_latest_estimate(self, last_n=10):
+    """
+    Return the distance estimate with uncertainty and diagnostics.
+    """
+    return self.sensor_fusion.get_fused_estimate(last_n=last_n)
 
 
 # ============================================================
