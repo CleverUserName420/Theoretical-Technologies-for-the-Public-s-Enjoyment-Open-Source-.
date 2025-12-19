@@ -126,6 +126,8 @@ ALL_DEPENDENCIES = [
     "requests",      # HTTP client
     "psutil",        # System monitoring
     "colorama",      # Colored terminal output
+    # SpaceStuff
+    "pyrtlsdr",      # RTL-SDR device support for real IQ
 ]
 
 def setup_venv():
@@ -154,9 +156,15 @@ def setup_venv():
             if result.returncode != 0:
                 print("📦 Installing python-tk via Homebrew...")
                 subprocess.run(['brew', 'install', 'python-tk@3.11'], check=False)
+            
+            # === RTL-SDR system dependency ===
+            result = subprocess.run(['brew', 'list', 'librtlsdr'], capture_output=True)
+            if result.returncode != 0:
+                print("📦 Installing RTL-SDR via Homebrew...")
+                subprocess.run(['brew', 'install', 'librtlsdr'], check=False)
         except FileNotFoundError:
             print("⚠️  Homebrew not found. Please install: /bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"")
-            print("   Then run: brew install portaudio python-tk@3.11")
+            print("   Then run: brew install portaudio python-tk@3.11 librtlsdr")
         
         # Install in groups - core first, optional later
         CORE_DEPS = [
@@ -165,7 +173,7 @@ def setup_venv():
             "scikit-learn", "pyod",
             "matplotlib", "plotly", "seaborn", "pyqtgraph",
             "pandas", "reportlab", "openpyxl",
-            "geopy",
+            "geopy", "pyrtlsdr", "librtlsdr",
         ]
         
         # PyAudio needs special handling on macOS
@@ -173,7 +181,7 @@ def setup_venv():
         
         OPTIONAL_DEPS = [
             "pyfftw", "vispy", "PyOpenGL",
-            "websockets", "lz4", "zstandard", "aiohttp",
+            "websockets", "lz4", "zstandard", "aiohttp", "pyrtlsdr",
         ]
         
         # Apple M1 GPU deps (PyTorch with MPS backend)
@@ -237,6 +245,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Tuple, Optional, Dict, Any
+from rtlsdr import RtlSdr
 #from ble_device_classifier import BLEDeviceClassifier, BehavioralAnalyzer
 
 import numpy as np
@@ -17121,20 +17130,30 @@ class SatelliteThreatDetectionEngine:
         return bursts
 
     def _decode_iridium(self, iq, center_freq, sr):
-        # Dummy: Always detects one burst if IQ is present
-        if iq is not None and iq.size > 0:
-            return [SatelliteBurst(
-                burst_id="IRIDIUM123",
-                timestamp=time.time(),
-                center_freq_hz=center_freq,
-                bandwidth_hz=200e3,
-                modulation="QPSK",
-                satellite="Iridium",
-                symbol_rate=25e3,
-                snr_db=18.2,
-                protocol="iridium",
-            )]
-        return []
+        # Save IQ as a raw file or pass to gr-iridium
+        filename = "tmp_iq.raw"
+        iq.astype(np.complex64).tofile(filename)
+        # Call gr-iridium's iridium-extractor (assumes installed & in $PATH)
+        subprocess.run(
+            ["iridium-extractor", "decode", filename, "--frequency", str(center_freq), "--sample-rate", str(sr)],
+            check=True)
+        # Now parse the generated bursts.json or similar
+        with open("bursts.json","r") as f:
+            for line in f:
+                burst = json.loads(line)
+                # Map burst data fields to SatelliteBurst
+                yield SatelliteBurst(
+                    burst_id = burst["burst_id"], # or uniquely hash frame data
+                    timestamp = burst["timestamp"],
+                    center_freq_hz = center_freq,
+                    bandwidth_hz = burst.get("bandwidth", 40e3),  # Iridium
+                    modulation = "QPSK",  # Or as parsed
+                    satellite = "Iridium",
+                    symbol_rate = 25e3,
+                    snr_db = burst.get("snr", 0),
+                    protocol = "iridium",
+                    context = burst,
+                )
 
     def _decode_inmarsat(self, iq, center_freq, sr):
         # Inmarsat outphasing, degenerate frame, research burst-mapping
@@ -21932,13 +21951,19 @@ class StubMultiSensorInterface:
     def capture_em_sample(self): return None
     def capture_audio_sample(self): return None
     
-class DemoSDRBackend:
-    """Demo SDR backend that returns random IQ for any requested frequency."""
+class RealSDRBackend:
+    def __init__(self, center_freq, sample_rate):
+        self.sdr = RtlSdr()
+        self.sdr.sample_rate = sample_rate  # Hz
+        self.sdr.center_freq = center_freq  # Hz
+        self.sdr.gain = 'auto'
+        
     def capture_iq(self, center_freq, sample_rate, dwell_time):
-        # Simulate IQ: 1 second of data at sample_rate = N samples
-        N = int(sample_rate)
-        # Simulated complex noise burst
-        return (np.random.normal(0, 1, N) + 1j*np.random.normal(0,1,N)).astype(np.complex64)
+        self.sdr.center_freq = center_freq
+        self.sdr.sample_rate = sample_rate
+        num_samples = int(sample_rate * dwell_time)
+        iq = self.sdr.read_samples(num_samples)
+        return iq
     
 class StubSDRInterface:
     """Stub interface for SDR systems"""
@@ -22715,7 +22740,7 @@ def main():
     # Global shutdown flag
     shutdown_requested = threading.Event()
     force_shutdown = threading.Event()
-    demo_sdr = DemoSDRBackend()
+    real_sdr = RealSDRBackend()  # With any required settings
 
     def signal_handler(signum, frame):
         """Handle shutdown signals gracefully with guaranteed output"""
