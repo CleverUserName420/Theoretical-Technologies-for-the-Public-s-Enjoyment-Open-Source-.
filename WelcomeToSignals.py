@@ -11795,10 +11795,10 @@ class UltimateDistanceEstimator:
         logging.debug(f"Reset tracking for device {device_address}")
         
     def get_latest_estimate(self, last_n=10):
-    """
-    Return the distance estimate with uncertainty and diagnostics.
-    """
-    return self.sensor_fusion.get_fused_estimate(last_n=last_n)
+        """
+        Return the distance estimate with uncertainty and diagnostics.
+        """
+        return self.sensor_fusion.get_fused_estimate(last_n=last_n)
 
 
 # ============================================================
