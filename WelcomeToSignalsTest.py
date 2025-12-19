@@ -8806,17 +8806,46 @@ class BLEMonitor(threading.Thread):
             logging.error(f"BLE scan test failed: {e}")
             return False
     
-    def _print_statistics(self, estimator):
-        self.estimator.add_measurement:{
-        source_type: 'ble',
-    }
-        """Print BLE monitoring statistics with device table"""
+    def _print_statistics(self):
+        recent_devices = getattr(self, 'recent_devices', [])
+        if recent_devices:
+            print("║ Recent Devices:" + ' ' * 59 + "║")
+            for device in recent_devices:
+                name = (device.name or device.address[-8:])[:20]
+                rssi = f"{getattr(device, 'rssi_current', 0):.0f}dBm"
+                dist_val = getattr(device, 'estimated_distance_m', -1)
+                dist = f"~{dist_val:.1f}m" if dist_val > 0 else "N/A"
+                cat = (getattr(device, 'device_category', "Unknown"))[:12]
+                age_val = int(time.time() - getattr(device, 'last_seen', time.time()))
+                age = f"{age_val}s ago"
+                sigma_val = getattr(device, 'distance_uncertainty_m', 1.5)
+                self.estimator.add_measurement(
+                    source_type='ble',
+                    distance=dist_val,
+                    sigma=sigma_val,
+                    timestamp=time.time(),
+                    metadata={
+                        'rssi': getattr(device, 'rssi_current', None),
+                        'device': getattr(device, 'address', None)
+                    }
+                )
+                line = f"  • {name:<20} │ {rssi:<7} │ {dist:<8} │ {cat:<12} │ {age}"
+                print(f"║ {line:<76} ║")
+            result = self.estimator.get_latest_estimate()
+            print(f"Estimated distance (fused): {result['distance']} ± {result['uncertainty']} meters")
+            print(f"Sensor breakdown: {result['contributions']}")
+        else:
+            print("║ No devices currently tracked" + ' ' * 47 + "║")
+        print("╚═" + "═" * 76 + "═╝")
         print()
-        print("╔═" + "═" * 76 + "═╗")
-        print(f"║ 📊 BLE MONITOR STATUS - {self.stats['unique_devices']} Devices Tracked{' ' * 30}║")
-        print("╠═" + "═" * 76 + "═╣")
-        print(f"║ Scans: {self.stats['scan_count']:<10} │ Beacons: {self.stats['beacons_detected']:<10} │ Anomalies: {self.stats['anomalies_detected']:<10}   ║")
-        print("╠═" + "═" * 76 + "═╣")
+        logging.info(
+            f"BLE Stats - "
+            f"Scans: {self.stats['scan_count']}, "
+            f"Unique devices: {self.stats['unique_devices']}, "
+            f"Beacons: {self.stats['beacons_detected']}, "
+            f"Anomalies: {self.stats['anomalies_detected']}, "
+            f"Last scan: {self.stats['last_scan_device_count']} devices"
+        )
         
         # Show up to 5 most recent devices
         with self.lock:
@@ -8824,7 +8853,7 @@ class BLEMonitor(threading.Thread):
                 self.devices.values(),
                 key=lambda d: d.last_seen,
                 reverse=True
-            )[:5]
+            )[:20]
         
         if recent_devices:
             print("║ Recent Devices:" + ' ' * 59 + "║")
@@ -11289,33 +11318,22 @@ class MultiModalDistanceFusion:
         return max(0.1, float(predicted)), float(total_uncertainty)
         
 import numpy as np
+import time
+import logging
 
 class EnhancedSensorFusion:
-    """
-    Robust, extensible multi-modal sensor fusion with uncertainty propagation and per-sensor diagnostics.
-    """
-
     SENSOR_WEIGHTS = {
         'ble': 1.0,
         'wifi': 2.0,
         'uwb': 4.0,
         'visual': 2.5,
         'imu': 0.7,
-        # add more sensor types as needed
     }
 
     def __init__(self):
         self.sources = []
 
     def add_measurement(self, source_type, distance, sigma, timestamp, metadata=None):
-        """
-        Add a measurement from any sensor type.
-        :param source_type: str ('ble', 'wifi', etc)
-        :param distance: float (meters)
-        :param sigma: float (1-sigma of measurement, meters)
-        :param timestamp: float (time)
-        :param metadata: dict (optional debug info)
-        """
         self.sources.append(dict(
             type=source_type,
             dist=distance,
@@ -11325,9 +11343,6 @@ class EnhancedSensorFusion:
         ))
 
     def get_fused_estimate(self, last_n=10):
-        """
-        Returns a weighted uncertainty-aware distance estimate with diagnostic details.
-        """
         if not self.sources:
             return {
                 'distance': None,
@@ -11335,8 +11350,6 @@ class EnhancedSensorFusion:
                 'contributions': {},
                 'source_diagnostics': []
             }
-
-        # Use only recent measurements
         sources = self.sources[-last_n:]
         weights, dists, sigmas, types = [], [], [], []
         diagnostics = []
@@ -11371,6 +11384,18 @@ class EnhancedSensorFusion:
             'contributions': contributions,
             'source_diagnostics': diagnostics
         }
+
+class UltimateDistanceEstimator:
+    def __init__(self):
+        self.sensor_fusion = EnhancedSensorFusion()
+
+    def add_measurement(self, source_type, distance, sigma, timestamp=None, metadata=None):
+        if timestamp is None:
+            timestamp = time.time()
+        self.sensor_fusion.add_measurement(source_type, distance, sigma, timestamp, metadata)
+
+    def get_latest_estimate(self, last_n=10):
+        return self.sensor_fusion.get_fused_estimate(last_n=last_n)
 
 
 # ============================================================
@@ -11926,6 +11951,13 @@ class BLEMonitor:
         self.tracker = tracker
         self.config = config
         self.estimator = estimator
+        self.stats = {
+            'scan_count': 0,
+            'unique_devices': 0,
+            'beacons_detected': 0,
+            'anomalies_detected': 0,
+            'last_scan_device_count': 0
+        }
 
     def patch_ble_monitor_distance_estimation():
         """
@@ -21739,6 +21771,7 @@ def main():
                 'rssi_threshold': -90,
                 'environment': 'indoor_office_nlos'
             }
+            estimator = UltimateDistanceEstimator()
             ble_mon = BLEMonitor(tracker, config=ble_config, estimator=estimator)
             ble_mon.start()
             monitors.append(ble_mon)
