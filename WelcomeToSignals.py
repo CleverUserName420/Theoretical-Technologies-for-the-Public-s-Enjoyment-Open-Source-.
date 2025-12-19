@@ -8821,22 +8821,34 @@ class BLEMonitor(threading.Thread):
             )[:5]
         
         if recent_devices:
-            print("║ Recent Devices:{' ' * 59}║")
+            print("║ Recent Devices:" + ' ' * 59 + "║")
             for device in recent_devices:
                 name = (device.name or device.address[-8:])[:20]
                 rssi = f"{device.rssi_current:.0f}dBm"
                 dist = f"~{device.estimated_distance_m:.1f}m" if device.estimated_distance_m > 0 else "N/A"
-                cat = device.device_category[:12]
+                cat = (device.device_category or "Unknown")[:12]
                 age = f"{int(time.time() - device.last_seen)}s ago"
-                
+                # Example for BLE reading:
+                estimator.add_measurement(
+                    source_type='ble',
+                    distance=device.estimated_distance_m,
+                    sigma=(getattr(device, 'distance_uncertainty_m', 1.5) or 1.5),
+                    timestamp=time.time(),
+                    metadata={'rssi': device.rssi_current, 'device': device.address}
+                )
                 line = f"  • {name:<20} │ {rssi:<7} │ {dist:<8} │ {cat:<12} │ {age}"
                 print(f"║ {line:<76} ║")
+            
+            # Only print the fusion output after the full for-loop:
+            result = estimator.get_latest_estimate()
+            print(f"Estimated distance (fused): {result['distance']} ± {result['uncertainty']} meters")
+            print(f"Sensor breakdown: {result['contributions']}")
         else:
-            print("║ No devices currently tracked{' ' * 47}║")
-        
+            print("║ No devices currently tracked" + ' ' * 47 + "║")
+
         print("╚═" + "═" * 76 + "═╝")
         print()
-        
+
         logging.info(
             f"BLE Stats - "
             f"Scans: {self.stats['scan_count']}, "
