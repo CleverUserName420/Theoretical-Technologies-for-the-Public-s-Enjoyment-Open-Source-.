@@ -483,6 +483,43 @@ ENABLE_ML_DETECTION = TORCH_AVAILABLE
 ENABLE_WEBSOCKET_STREAMING = WEBSOCKETS_AVAILABLE and AIOHTTP_AVAILABLE
 ENABLE_CONFIG_UI = PYQT6_AVAILABLE
 
+import json
+import logging
+
+def get_final_config(config_ui, default_config):
+    """
+    Try config_ui first (dict or string). If that fails, try default_config (dict or string).
+    Always returns a dict.
+    """
+    # 1. Try Config UI first
+    try:
+        if config_ui and hasattr(config_ui, "config"):
+            cfg = config_ui.config
+            print(f"DEBUG: config_ui.config type is {type(cfg)} value is {repr(cfg)[:200]}")
+            if isinstance(cfg, dict):
+                return cfg
+            elif isinstance(cfg, str):
+                return json.loads(cfg)
+            else:
+                logging.warning(f"Config UI config is neither dict nor JSON string! Got type: {type(cfg)}. Skipping.")
+    except Exception as e:
+        logging.warning(f"Config UI failed: {e}. Will try default config.")
+
+    # 2. Try Default Config as fallback
+    try:
+        print(f"DEBUG: default_config type is {type(default_config)} value is {repr(default_config)[:200]}")
+        if isinstance(default_config, dict):
+            return default_config
+        elif isinstance(default_config, str):
+            return json.loads(default_config)
+        else:
+            logging.warning(f"DEFAULT_CONFIG_JSON is neither dict nor JSON string! Got type: {type(default_config)}. Using empty config.")
+    except Exception as e:
+        logging.error(f"Default config failed too! Error: {e}")
+
+    # 3. Fallback
+    return {}
+
 # ============================================================
 # GLSL SHADER STRING CONSTANTS
 # ============================================================
@@ -3350,7 +3387,12 @@ class ConfigurationUI:
                 log.error(f"Failed to load config: {e}")
         
         # Use default config
-        return json.loads(DEFAULT_CONFIG_JSON)
+        if isinstance(DEFAULT_CONFIG_JSON, str):
+            return json.loads(DEFAULT_CONFIG_JSON)
+        elif isinstance(DEFAULT_CONFIG_JSON, dict):
+            return DEFAULT_CONFIG_JSON
+        else:
+            raise TypeError("DEFAULT_CONFIG_JSON must be str or dict")
     
     def save_config(self):
         """Save configuration to file"""
@@ -21527,19 +21569,18 @@ def main():
     async_thread = None
     
     if ENABLE_WEBSOCKET_STREAMING:
-        try:
-            config = config_ui.config if config_ui else json.loads(DEFAULT_CONFIG_JSON)
-            ws_config = config.get('streaming', {})
-            
-            if ws_config.get('enabled', False):
+        config = get_final_config(config_ui, DEFAULT_CONFIG_JSON)
+        ws_config = config.get('streaming', {})
+        if ws_config.get('enabled', False):
+            try:
                 ws_server = WebSocketStreamingServer(
-                    host='localhost',
+                    host=ws_config.get('host', 'localhost'),
                     port=ws_config.get('port', 8765),
                     auth_token=ws_config.get('auth_token'),
                     compression=ws_config.get('compression', 'lz4'),
                     samplerate=AUDIO_SAMPLE_RATE
                 )
-                
+
                 # Start WebSocket server in background thread with asyncio
                 def run_async_server():
                     loop = asyncio.new_event_loop()
@@ -21556,9 +21597,9 @@ def main():
                 async_thread.start()
                 print(f"✅ WebSocket Server started (port {ws_config.get('port', 8765)})")
                 logging.info(f"WebSocket server running on ws://localhost:{ws_config.get('port', 8765)}")
-        except Exception as e:
-            logging.error(f"WebSocket Server initialization failed: {e}", exc_info=True)
-            print(f"⚠️  WebSocket Server failed: {e}")
+            except Exception as e:
+                logging.error(f"WebSocket Server initialization failed: {e}", exc_info=True)
+                print(f"⚠️  WebSocket Server failed: {e}")
     
     database = ForensicDatabase(DB_PATH)
     tracker = FrequencyTracker(database, session_id, ml_detector=ml_detector)
