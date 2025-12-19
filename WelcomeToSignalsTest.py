@@ -8807,7 +8807,7 @@ class BLEMonitor(threading.Thread):
             return False
     
     def _print_statistics(self, estimator):
-        estimator.add_measurement:{
+        self.estimator.add_measurement:{
         source_type: 'ble',
     }
         """Print BLE monitoring statistics with device table"""
@@ -21739,7 +21739,7 @@ def main():
                 'rssi_threshold': -90,
                 'environment': 'indoor_office_nlos'
             }
-            ble_mon = BLEMonitor(tracker, config=ble_config)
+            ble_mon = BLEMonitor(tracker, config=ble_config, estimator=estimator)
             ble_mon.start()
             monitors.append(ble_mon)
             print("   ✅ BLE Monitor started successfully")
