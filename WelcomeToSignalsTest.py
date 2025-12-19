@@ -6467,15 +6467,107 @@ def log_ble_scan_event(event_type: str, details: str = ""):
     print(f"[{timestamp}] [BLE-{event_type}] {details}")
 
 def log_ble_device_details(device):
-    """Log complete device details"""
-    details = []
-    if hasattr(device, 'address'):
-        details.append(f"Address: {device.address}")
-    if hasattr(device, 'name'):
-        details.append(f"Name: {device.name or 'unnamed'}")
-    if hasattr(device, 'rssi'):
-        details.append(f"RSSI: {device.rssi} dBm")
-    log_ble_scan_event("DEVICE", " | ".join(details) if details else "Unknown device")
+    """Log the most detailed BLE device summary, leveraging all known fields, company lookup, classification, IoC and anomaly status."""
+
+    # Company/Vendor identifier
+    manid = getattr(device, 'manufacturer_id', None)
+    vendor_name = CompanyIdentifier.get_name(manid) if manid is not None else "Unknown"
+    
+    # Category/classification (wearable, tracker, beacon, etc)
+    from_category = getattr(device, 'device_category', "Unknown")
+    # Security/testing device detection
+    security_tool_name = getattr(device, 'security_tool_name', None)
+    is_security = f"SecurityTool: {security_tool_name}" if security_tool_name else ""
+    
+    # Beacon protocols
+    beacon_fields = []
+    if getattr(device, 'is_beacon', False):
+        if getattr(device, 'ibeacon', None):
+            ibeacon = device.ibeacon
+            beacon_fields.append(f"iBeacon: UUID={getattr(ibeacon, 'uuid', '?')}, Major={getattr(ibeacon, 'major', '?')}, Minor={getattr(ibeacon, 'minor', '?')}, TX_Power={getattr(ibeacon, 'tx_power_1m', '?')}")
+        if getattr(device, 'eddystone_uid', None):
+            eu = device.eddystone_uid
+            beacon_fields.append(f"EddystoneUID: NS={getattr(eu, 'namespace_id', '?')}, Instance={getattr(eu, 'instance_id', '?')}, TX_Power={getattr(eu, 'tx_power_0m', '?')}")
+        if getattr(device, 'eddystone_url', None):
+            eu = device.eddystone_url
+            beacon_fields.append(f"EddystoneURL: {getattr(eu, 'url', '?')}, TX_Power={getattr(eu, 'tx_power_0m', '?')}")
+        if getattr(device, 'eddystone_tlm', None):
+            et = device.eddystone_tlm
+            beacon_fields.append(f"EddystoneTLM: Battery={getattr(et, 'battery_mv', '?')}mV, Temp={getattr(et, 'temperature_c', '?')}C, AdvCount={getattr(et, 'adv_count', '?')}, Uptime={getattr(et, 'uptime_sec', '?')}")
+    is_beacon = "Beacon: yes" if getattr(device, 'is_beacon', False) else ""
+    
+    # Address type (random/static, resolvable, etc)
+    addr_type = getattr(device, 'address_type', "Unknown")
+    trackable = "Trackable: yes" if getattr(device, 'is_trackable', False) else "Trackable: no"
+    
+    # Service info (UUIDs and resolved names)
+    service_uuids = getattr(device, 'service_uuids', [])
+    service_names = []
+    for s in service_uuids:
+        try:
+            service_names.append(ServiceUUID.get_service_name(s))
+        except Exception:
+            service_names.append(str(s))
+    
+    services = ", ".join([f"{s} ({n})" for s, n in zip(service_uuids, service_names)]) if service_uuids else "None"
+    # Manufacturer data (raw hex if present)
+    mdata = getattr(device, 'manufacturer_data', None)
+    mdata_str = mdata.hex().upper() if isinstance(mdata, bytes) else str(mdata) if mdata else "None"
+    
+    # Tx Power
+    tx_power = getattr(device, 'tx_power', None)
+    tx_str = f"{tx_power} dBm" if tx_power is not None else "Unknown"
+    
+    # Recent statistics/behavioral features
+    stats = getattr(device, 'statistics', None)
+    stat_fields = []
+    if stats:
+        stat_fields.append(f"RSSI_mean={getattr(stats, 'mean', '?'):.1f}")
+        stat_fields.append(f"RSSI_std={getattr(stats, 'std', '?'):.1f}")
+        stat_fields.append(f"RSSI_var={getattr(stats, 'variance', '?'):.2f}")
+        stat_fields.append(f"packet_rate={getattr(stats, 'packet_reception_rate', '?')}")
+        stat_fields.append(f"adv_interval_mean_ms={getattr(stats, 'advertisement_interval_mean_ms', '?')}")
+        stat_fields.append(f"mobility_score={getattr(device, 'mobility_score', '?')}")
+    stat_str = ", ".join(stat_fields) if stat_fields else "None"
+    
+    # Distance metrics, last seen, advertisement count, etc
+    est_dist = getattr(device, 'estimated_distance_m', None)
+    distance_str = f"{est_dist:.2f}m" if est_dist is not None else "Unknown"
+    adv_ct = getattr(device, 'advertisement_count', None)
+    adv_str = str(adv_ct) if adv_ct is not None else "Unknown"
+    first_seen = getattr(device, 'first_seen', None)
+    last_seen = getattr(device, 'last_seen', None)
+    now = time.time()
+    age_str = f"{(now - last_seen):.1f}s ago" if last_seen is not None else "Unknown"
+    
+    anomalies = getattr(device, 'anomalies', [])
+    anomaly_msg = f"Anomalies: {anomalies}" if anomalies else ""
+
+    # Build main log fields
+    details = [
+        f"Address: {getattr(device, 'address', '?')}",
+        f"Type: {addr_type}",
+        f"Vendor: {vendor_name} (0x{manid:04X})" if manid is not None else f"Vendor: Unknown",
+        f"Category/Class: {from_category}",
+        is_security,
+        is_beacon,
+        trackable,
+        f"Name: {getattr(device, 'name', 'unnamed')}",
+        f"RSSI: {getattr(device, 'rssi', 'N/A')} dBm",
+        f"TX Power: {tx_str}",
+        f"Estimated Distance: {distance_str}",
+        f"Adv Count: {adv_str}",
+        f"Services: {services}",
+        f"ManufData: {mdata_str}",
+        *beacon_fields,
+        f"Statistics: {stat_str}",
+        f"First Seen: {first_seen}" if first_seen is not None else "",
+        f"Last Seen: {last_seen}" if last_seen is not None else "",
+        f"Last Seen Age: {age_str}",
+        anomaly_msg
+    ]
+    # Remove blanks and join fields
+    log_ble_scan_event("DEVICE", " | ".join([d for d in details if d and d.strip() != ""]))
 
 def log_ioc_match(ioc_type: str, description: str, severity: int):
     """Log IOC match with visual indicator"""
@@ -6495,6 +6587,24 @@ def log_threat_score(score: int, address: str = "unknown"):
     else:
         level = "⚪ INFO"
     log_ble_scan_event("THREAT", f"{address}: {score}/100 - {level}")
+    
+def log_ble_device_summary(device: BLEDeviceInfo):
+    print("\n--- BLE Device Summary ---")
+    print(f"Address: {device.address} ({device.address_type})")
+    print(f"Name: {device.name!r}")
+    print(f"Vendor: {CompanyIdentifier.get_name(device.manufacturer_id) if device.manufacturer_id is not None else 'Unknown'}")
+    print(f"Category: {BLEDeviceClassifier.classify(device)}")
+    if device.security_tool_name:
+        print(f"Security Tool: {device.security_tool_name} (!!!)")
+    print(f"Trackable: {device.is_trackable} | Beacon: {device.is_beacon}")
+    print(f"Services: {[ServiceUUID.get_service_name(s) for s in device.service_uuids]}")
+    if device.ibeacon:
+        print(f"iBeacon: UUID={device.ibeacon.uuid}, Major={device.ibeacon.major}, Minor={device.ibeacon.minor}, TX_PWR={device.ibeacon.tx_power_1m}")
+    if device.eddystone_uid:
+        print(f"Eddystone UID: NS={device.eddystone_uid.namespace_id}, Instance={device.eddystone_uid.instance_id}")
+    if device.statistics:
+        print(f"RSSI/Stats: Mean={device.statistics.mean:.1f}, Std={device.statistics.std:.1f}, Mobility={getattr(device, 'mobility_score', '?')}")
+    print(f"BehavioralProfile: {repr(device.statistics) if device.statistics else 'N/A'}")
 
 
 # ============================================================
@@ -6607,6 +6717,16 @@ class CompanyIdentifier(IntEnum):
     Reference: https://www.bluetooth.com/specifications/assigned-numbers/
     """
     # Major Technology Companies
+    ACCESS_DOOR = 0x0701
+    Finatexx_SAS= 0x0701
+    PAFERS_TECH = 0x0701
+    BOSE1 = 0x02C4
+    Samsung_SmartTag = 0x0075  # Samsung SmartTag
+    Flipper_Zero_Meta = 0x05A5  # Flipper Zero/Meta
+    ESP32 = 0x02E5  # ESP32 (security tools)
+    Skullcandy = 0x02DE  # Skullcandy (sometimes used in fuzzing modules)
+    Beats_Electronics = 0x00CE  # Beats Electronics (for relay demo kits)
+    Arduino = 0x0458   # Arduino (used in research relay/proxy attacks)
     ERICSSON = 0x0000
     NOKIA = 0x0001
     INTEL = 0x0002
@@ -6969,6 +7089,111 @@ class CompanyIdentifier(IntEnum):
             if value in [m.value if hasattr(m, 'value') else m for m in manufacturers]:
                 return category
         return "Unknown"
+        
+    # Expanded, robust and modernized signature/IOC list for BLE security/pentest hardware
+    SECURITY_TOOL_IOCS = [
+        # Device names (case-insensitive substrings and signature prefixes/patterns)
+        {"field": "name", "values": [
+            # Flipper family
+            "flipper", "flipper zero", "fz-", "bt-fz", "flipperzero", "btle-flipper",
+            # Ubertooth
+            "ubertooth",
+            # BLEKey and ESPKey/ESP boards
+            "blekey", "espkey", "esp32", "esp-test", "espble", "esp devkit", "esp prototyping", "esp hine", "esp-ble",
+            # Hak5
+            "hak5", "keycroc", "key croc", "sharkjack", "shark jack", "omg cable", "omg plug", "omg-adapter", "omg adapter",
+            # Revng offensive dongles/adapters
+            "crocs", "hak5remote", "usbkey", "usb-key",
+            # Proxmark and clones
+            "proxmark", "rdv4", "chameleonmini", "chameleon tiny", "chameleon ble",
+            # Bluefruit
+            "bluefruit", "adafruit", "bluefruit52", "bluefruit le", "ada-nrf",
+            # Nordic boards/devkits
+            "nrf-dk", "nrfdk", "nrf dongle", "nrf52840", "nrf52832", "nrf52",
+            # BTLEJack
+            "btlejack", "btle-jack",
+            # Hydra firmware
+            "hydra fw", "hydra-firmware", "hydra device", "hydra ble",
+            # Pwnagotchi-like or BLE fuzzing tools
+            "pwnagotchi", "fuzz", "jammer", "replay", "attackbox", "blebox",
+            # PandaKey, PandwaRF, Keysy, etc
+            "pandakey", "pandwarf", "keysy", "smartnfc", "proxdroid", "proxgrind",
+            # Testlimiter, Laird kits, generic dev
+            "testlimiter", "testkit", "devkit", "developer kit", "proto board", "sniffer", "sniff", "capture"
+        ]},
+        # OUI vendor substrings (for public MAC addresses)
+        {"field": "oui_vendor", "values": [
+            # Dev and security hardware usual OUIs
+            "Espressif", "Adafruit", "Nordic Semiconductor", "Hak5", "Laird", "STMicroelectronics",
+            "Silicon Labs", "Bluegiga", "Dialog Semiconductor", "Seeed Technology", "Particle",
+            "Murata Manufacturing", "Texas Instruments", "Raspberry Pi", "Pycom", "Digi International"
+        ]},
+        # Service UUID substrings (all lowercase/compact; includes popular prototyping, attack & logging)
+        {"field": "services", "values": [
+            # Nordic/UART
+            "6e400001b5a3f393e0a9e50e24dcca9e", # Nordic UART
+            "0000feab", # Some Flipper/related BLE
+            "nordic",
+            "adafruit",
+            "a3c875008ed34bdf8a39a01bebede295", # Bluefruit
+            "0000fff0", # Common for demo/dev boards
+            "0000fff1",
+            "0000fff2",
+            "0000fff3",
+            "0000fff4",
+            "554b0001fea94fa9808984c91e938f72", # BLEKey custom
+            "c19c0001c1b6a4b1bdeb8b0e9c8f7b8a", # BTLEJack
+            "fd6f",      # Apple Find My/netboot for testing
+            "fd6f",      # Used in "Find My" clones, which attackers use for BLE fuzzing
+            "fdcd",      # some TinyGo boards
+            "fdaf",      # Eddystone/experimental dev
+            "ffb0"       # Test manufacturer boards, various
+        ]},
+        # Manufacturer IDs (int values): known to be used in dev/pen test hardware or left as default
+        {"field": "manid", "values": [
+            0xFFFF,       # No real manufacturer, catch misconfigured dev boards
+            0x02E5,       # Espressif Systems
+            0x0059,       # Nordic Semiconductor
+            0x0822,       # Adafruit Industries
+            0x0211,       # STMicroelectronics
+            0x0131,       # Laird
+            0x0171,       # Texas Instruments
+            0x01A6,       # Dialog Semiconductor
+            0x013F,       # Bluegiga Technologies
+            0x0374,       # Seeed Technology
+            0x02A9,       # Pycom
+            0x048F,       # Particle Industries
+            0x017F,       # Murata Manufacturing
+            0x0044,       # Digi International
+            0xC0DE,       # Sometimes used in PoC tools
+            0x4C54        # LAIRD Technologies
+        ]}
+    ]
+
+    def check_security_tool_ioc(device):
+        """Returns the first matched IOC or None. Highly expanded signatures."""
+        name = getattr(device, 'name', '').lower()
+        oui_vendor = (get_oui_vendor(getattr(device, 'address', '')) or '').lower()
+        services = [s.replace('-', '').lower() for s in getattr(device, 'service_uuids', [])]
+        manid = getattr(device, 'manufacturer_id', None)
+
+        # Name signatures
+        for value in SECURITY_TOOL_IOCS[0]["values"]:
+            if value in name:
+                return f"Security/Testing Tool IOC (name match: {value})"
+        # OUI vendor
+        for value in SECURITY_TOOL_IOCS[1]["values"]:
+            if value.lower() in oui_vendor:
+                return f"Security/Testing Tool IOC (OUI vendor: {value})"
+        # Service UUIDs
+        for ioc_value in SECURITY_TOOL_IOCS[2]["values"]:
+            for svc in services:
+                if ioc_value in svc:
+                    return f"Security/Testing Tool IOC (service UUID: {ioc_value})"
+        # Manufacturer ID
+        if manid is not None and manid in SECURITY_TOOL_IOCS[3]["values"]:
+            return f"Security/Testing Tool IOC (manufacturer ID: 0x{manid:04X})"
+        return None
 
 
 # ============================================================
@@ -8081,66 +8306,94 @@ class ThreatIndicator:
 
 
 # ============================================================
-# ANOMALY DETECTION
+# ANOMALY DETECTION — ADVANCED BLE BEHAVIORAL, SPECTRAL, AND PROTOCOL ANALYSIS
 # ============================================================
+
+import time
+import statistics
+from typing import Dict, List, Set, Any, Optional
 
 class BLEAnomalyDetector:
     """
-    Anomaly detection for BLE signals
-    
-    Detects: 
-    - Unusual RSSI fluctuations (potential interference)
-    - New device appearances in stable environments
-    - Signal spoofing attempts (RSSI/address mismatches)
-    - Advertisement pattern anomalies
-    
-    Reference: [11], [14]
+    Advanced anomaly detection for BLE signals
+
+    Detects and tracks:
+    - Unusual RSSI fluctuations (interference, jamming, hardware attacks)
+    - New device arrivals in stable or trusted environments
+    - Signal spoofing attempts (RSSI/address/manufacturer/service mismatches)
+    - Advertisement pattern anomalies (bursty/frequency/interval drift)
+    - Manufacturer inconsistencies and known tracker/fuzz fingerprints
+    - Service UUID changes, rapid changes (possible attack tools)
+    - Unusual beaconing patterns (iBeacon/Eddystone abuse)
+    - Sudden changes in TX power (indicative of relay/proxy/MITM)
+    - Vendor fingerprinting drift or offensive device/tool detection
+
+    Reference: [11], [14], plus applied 2023-2025 academic and industry publications.
     """
-    
+
     def __init__(
         self,
         rssi_anomaly_threshold: float = 15.0,  # dB sudden change
         new_device_window_sec: float = 60.0,  # Time window for "new" device
-        min_samples_for_baseline: int = 10
+        min_samples_for_baseline: int = 10,
+        aggressive_spoof_check: bool = True
     ):
         self.rssi_threshold = rssi_anomaly_threshold
         self.new_device_window = new_device_window_sec
         self.min_samples = min_samples_for_baseline
-        
-        # Track device baselines
+        self.aggressive_spoof_check = aggressive_spoof_check
+
+        # Device history: RSSI, Service, Vendor, Profile
         self.device_baselines: Dict[str, Dict[str, Any]] = {}
-        
+        self.service_uuid_history: Dict[str, Set[str]] = {}
+        self.name_history: Dict[str, Set[str]] = {}
+        self.last_tx_power: Dict[str, float] = {}
+        self.last_category: Dict[str, str] = {}
+
         # Track environment baseline
         self.environment_device_count_baseline: Optional[int] = None
         self.stable_devices: Set[str] = set()
-    
-    def update_baseline(self, device: BLEDeviceInfo, rssi_history: List[float]):
-        """Update baseline for a device"""
+        self.known_attack_tool_vendors: Set[int] = {
+            # Populate with more known attack/test devices as appropriate
+            0x0075,  # Samsung SmartTag
+            0x05A5,  # Flipper Zero/Meta
+            0x02E5,  # ESP32 (security tools)
+            0x02DE,  # Skullcandy (sometimes used in fuzzing modules)
+            0x00CE,  # Beats Electronics (for relay demo kits)
+            0x0458   # Arduino (used in research relay/proxy attacks)
+        }
+
+    def update_baseline(self, device: 'BLEDeviceInfo', rssi_history: List[float]):
+        """Update baseline profile for a device with advanced features."""
         if len(rssi_history) >= self.min_samples:
             self.device_baselines[device.address] = {
                 'rssi_mean': statistics.mean(rssi_history),
-                'rssi_std': statistics.stdev(rssi_history),
+                'rssi_std': statistics.stdev(rssi_history) if len(rssi_history) > 1 else 0.0,
                 'last_update': time.time(),
-                'sample_count': len(rssi_history)
+                'sample_count': len(rssi_history),
+                'tx_power': device.tx_power,
+                'category': getattr(device, 'device_category', "Unknown"),
+                'manufacturer_id': getattr(device, 'manufacturer_id', None)
             }
             self.stable_devices.add(device.address)
-    
+            # Track historical service UUIDs and history for drift detection
+            suids = set(getattr(device, 'service_uuids', []))
+            names = {getattr(device, 'name', None)} if getattr(device, 'name', None) else set()
+            self.service_uuid_history.setdefault(device.address, set()).update(suids)
+            self.name_history.setdefault(device.address, set()).update(names)
+            self.last_tx_power[device.address] = getattr(device, 'tx_power', None)
+            self.last_category[device.address] = getattr(device, 'device_category', "Unknown")
+
     def check_rssi_anomaly(
         self,
-        device: BLEDeviceInfo,
+        device: 'BLEDeviceInfo',
         current_rssi: float
     ) -> Optional[Dict[str, Any]]:
-        """
-        Check for RSSI anomaly
-        
-        Returns anomaly info if detected, None otherwise
-        """
-        if device.address not in self.device_baselines:
+        """Detects anomalous deviation from the RSSI baseline."""
+        baseline = self.device_baselines.get(device.address)
+        if not baseline:
             return None
-        
-        baseline = self.device_baselines[device.address]
         deviation = abs(current_rssi - baseline['rssi_mean'])
-        
         if deviation > self.rssi_threshold:
             return {
                 'type': 'rssi_anomaly',
@@ -8148,60 +8401,195 @@ class BLEAnomalyDetector:
                 'current_rssi': current_rssi,
                 'baseline_rssi': baseline['rssi_mean'],
                 'deviation_db': deviation,
-                'severity': 'high' if deviation > self.rssi_threshold * 2 else 'medium'
+                'severity': 'critical' if deviation > (self.rssi_threshold * 2) else 'high',
+                'info': 'Possible relay/jamming/interference or spoof attempt'
             }
-        
         return None
-    
+
     def check_new_device(
         self,
-        device: BLEDeviceInfo,
+        device: 'BLEDeviceInfo',
         current_time: float
     ) -> Optional[Dict[str, Any]]:
-        """Check if device is newly appeared"""
+        """Check if device is newly appeared, and resolves vendor name."""
         if device.address in self.stable_devices:
             return None
-        
         if device.first_seen > (current_time - self.new_device_window):
+            manid = getattr(device, 'manufacturer_id', None)
+            vendor_name = self.resolve_vendor_name(manid)
+            tool_vendor = (manid in self.known_attack_tool_vendors)
             return {
                 'type': 'new_device',
                 'device': device.address,
                 'name': device.name,
                 'first_seen': device.first_seen,
-                'category': device.device_category,
-                'severity': 'info'
+                'manufacturer_id': manid,
+                'manufacturer_name': vendor_name,
+                'seen_category': device.device_category,
+                'security_tool_vendor': tool_vendor,
+                'severity': 'high' if tool_vendor else 'info',
+                'info': f'{"Attack/Testing" if tool_vendor else "Vendor:"} {vendor_name}'
             }
-        
         return None
-    
+
     def check_advertisement_pattern(
         self,
-        device: BLEDeviceInfo,
+        device: 'BLEDeviceInfo',
         expected_interval_ms: float = 100.0
     ) -> Optional[Dict[str, Any]]:
-        """Check for unusual advertisement patterns"""
-        if device.statistics and device.statistics.sample_count > 5:
-            actual_interval = device.statistics.advertisement_interval_mean_ms
-            
-            # Check for significant deviation from expected interval
+        """
+        Detects anomalous advert intervals (bursty or slow).
+        """
+        stats = getattr(device, 'statistics', None)
+        if stats and getattr(stats, 'sample_count', 0) > 5:
+            actual_interval = getattr(stats, 'advertisement_interval_mean_ms', None)
+            if actual_interval is None:
+                return None
+            details = {
+                'type': None,
+                'device': device.address,
+                'expected_interval_ms': expected_interval_ms,
+                'actual_interval_ms': actual_interval
+            }
             if actual_interval > expected_interval_ms * 3:
+                details |= {'type': 'slow_advertising', 'severity': 'low'}
+                return details
+            elif actual_interval < expected_interval_ms * 0.3:
+                details |= {'type': 'fast_advertising', 'severity': 'medium', 'info': 'Could indicate aggressive scanning, attack tool, or nonstandard device'}
+                return details
+        return None
+
+    def check_service_uuid_drift(self, device: 'BLEDeviceInfo') -> Optional[Dict[str, Any]]:
+        """Detects devices whose advertised services change unusually fast."""
+        suids = set(getattr(device, 'service_uuids', []))
+        historic = self.service_uuid_history.get(device.address, set())
+        if not suids or not historic:
+            return None
+        newly_seen = suids - historic
+        if newly_seen:
+            return {
+                'type': 'service_uuid_drift',
+                'device': device.address,
+                'new_services': list(newly_seen),
+                'all_historic_services': list(historic | suids),
+                'severity': 'medium'
+            }
+        return None
+
+    def check_name_churn(self, device: 'BLEDeviceInfo') -> Optional[Dict[str, Any]]:
+        """Detects devices changing their advertised name frequently."""
+        name = getattr(device, 'name', None)
+        historic_names = self.name_history.get(device.address, set())
+        if name and name not in historic_names:
+            if len(historic_names) >= 2:
                 return {
-                    'type': 'slow_advertising',
+                    'type': 'advertised_name_churn',
                     'device': device.address,
-                    'expected_interval_ms': expected_interval_ms,
-                    'actual_interval_ms': actual_interval,
+                    'current_name': name,
+                    'historic_names': list(historic_names),
                     'severity': 'low'
                 }
-            elif actual_interval < expected_interval_ms * 0.3:
-                return {
-                    'type': 'fast_advertising',
-                    'device': device.address,
-                    'expected_interval_ms': expected_interval_ms,
-                    'actual_interval_ms': actual_interval,
-                    'severity': 'medium'  # Could indicate scanning/discovery mode
-                }
-        
         return None
+
+    def check_tx_power_change(self, device: 'BLEDeviceInfo') -> Optional[Dict[str, Any]]:
+        """Detects significant drifts in transmitted power (relay/proxy/physical attack indicator)."""
+        tx_power = getattr(device, 'tx_power', None)
+        last_tx = self.last_tx_power.get(device.address, None)
+        if tx_power is not None and last_tx is not None and abs(tx_power - last_tx) > 8:
+            return {
+                'type': 'tx_power_change',
+                'device': device.address,
+                'old_tx_power': last_tx,
+                'new_tx_power': tx_power,
+                'severity': 'high',
+                'info': 'Sudden change in transmit power: possible relay/proxy/attack'
+            }
+        return None
+
+    def check_category_drift(self, device: 'BLEDeviceInfo') -> Optional[Dict[str, Any]]:
+        """Detects changes in device functional category (profile impersonation/spoof)."""
+        last_cat = self.last_category.get(device.address, None)
+        category = getattr(device, 'device_category', None)
+        if last_cat is not None and category and last_cat != category:
+            return {
+                'type': 'category_impersonation_drift',
+                'device': device.address,
+                'old_category': last_cat,
+                'new_category': category,
+                'severity': 'critical',
+                'info': 'Device shifted category; possible impersonation or upgrade/downgrade behavior'
+            }
+        return None
+        
+    def resolve_vendor_name(self, manid: Optional[int]) -> str:
+        """Return vendor name or 'Unknown'."""
+        if manid is not None:
+            try:
+                return CompanyIdentifier.get_name(manid)
+            except Exception:
+                pass
+        return "Unknown"
+
+    def check_security_tool(self, device: 'BLEDeviceInfo') -> Optional[Dict[str, Any]]:
+        """Checks if the device is from a known attack/security-testing vendor."""
+        manid = getattr(device, 'manufacturer_id', None)
+        vendor_name = self.resolve_vendor_name(manid)
+        if manid in self.known_attack_tool_vendors:
+            return {
+                'type': 'security_testing_device',
+                'device': device.address,
+                'manufacturer_id': manid,
+                'manufacturer_name': vendor_name,
+                'all_ids': [v for v in self.known_attack_tool_vendors],
+                'severity': 'critical',
+                'info': f'Known BLE attack/test device vendor detected: {vendor_name}',
+            }
+        return None
+
+    def check_beacon_abuse(self, device: 'BLEDeviceInfo') -> Optional[Dict[str, Any]]:
+        """Detects unexpected beaconing or altered iBeacon/Eddystone frames."""
+        res = []
+        if getattr(device, 'ibeacon', None):
+            beacon = device.ibeacon
+            if not beacon.uuid or beacon.tx_power_1m is None:
+                res.append({'info': 'Malformed/empty iBeacon advert'})
+            if beacon.major == 0 and beacon.minor == 0:
+                res.append({'info': 'iBeacon with all-zero major/minor (potential fuzzer/attack)'})
+        if getattr(device, 'eddystone_uid', None):
+            uid = device.eddystone_uid
+            if not (uid.namespace_id and uid.instance_id):
+                res.append({'info': 'Malformed Eddystone-UID'})
+        return res if res else None
+
+    def detect_all(self, device: 'BLEDeviceInfo', current_rssi: float, rssi_history: List[float], current_time: float) -> List[Dict[str, Any]]:
+        """Runs all anomaly/subversion/attack checks."""
+        results = []
+        if rssi_history:
+            self.update_baseline(device, rssi_history)
+            if (r := self.check_rssi_anomaly(device, current_rssi)):
+                results.append(r)
+        if (r := self.check_new_device(device, current_time)):
+            results.append(r)
+        if (r := self.check_advertisement_pattern(device)):
+            results.append(r)
+        if (r := self.check_service_uuid_drift(device)):
+            results.append(r)
+        if (r := self.check_name_churn(device)):
+            results.append(r)
+        if (r := self.check_tx_power_change(device)):
+            results.append(r)
+        if (r := self.check_category_drift(device)):
+            results.append(r)
+        if (r := self.check_security_tool(device)):
+            results.append(r)
+        beacon_abuse = self.check_beacon_abuse(device)
+        if beacon_abuse:
+            for entry in (beacon_abuse if isinstance(beacon_abuse, list) else [beacon_abuse]):
+                entry['type'] = 'beacon_abuse'
+                entry['device'] = device.address
+                entry['severity'] = entry.get('severity', 'medium')
+                results.append(entry)
+        return results
 
 
 # ============================================================
@@ -8666,11 +9054,144 @@ class BLEMonitor(threading.Thread):
             print("┌─" + "─" * 76 + "─┐")
             print(f"│ 🔵 NEW BLE DEVICE DISCOVERED{' ' * 48}│")
             print("├─" + "─" * 76 + "─┤")
+
+            # Original "details" string is shown as before, for verbatim logic:
             print(f"│ {details:<76} │")
-            print("└─" + "─" * 76 + "─┘")
-            print()
+
+            # ENHANCEMENTS (maximal context for device attribution and forensic value)
+            manid = getattr(device, 'manufacturer_id', None)
+            vendor = CompanyIdentifier.get_name(manid) if manid is not None else "Unknown"
+            cat = getattr(device, 'device_category', "Unknown")
+            security_tool = getattr(device, 'security_tool_name', "")
+            addr_type = getattr(device, 'address_type', "Unknown")
+            trackable = "YES" if getattr(device, 'is_trackable', False) else "NO"
+
+            # Beacon protocol & detail improvements
+            beacon_proto = ""
+            ibeacon = getattr(device, 'ibeacon', None)
+            eddystone_uid = getattr(device, 'eddystone_uid', None)
+            eddystone_url = getattr(device, 'eddystone_url', None)
+            eddystone_tlm = getattr(device, 'eddystone_tlm', None)
+            if getattr(device, 'is_beacon', False):
+                if ibeacon:
+                    beacon_proto += (
+                        f"iBeacon UUID:{getattr(ibeacon, 'uuid', '?')} "
+                        f"(Major:{getattr(ibeacon, 'major', '?')} Minor:{getattr(ibeacon, 'minor', '?')}"
+                        f" TX:{getattr(ibeacon, 'tx_power_1m', '?')})"
+                    )
+                if eddystone_uid:
+                    beacon_proto += (
+                        f" Eddystone UID NS:{getattr(eddystone_uid, 'namespace_id', '?')}"
+                        f" Inst:{getattr(eddystone_uid, 'instance_id', '?')}"
+                    )
+                if eddystone_url:
+                    beacon_proto += f" Eddystone URL:{getattr(eddystone_url, 'url', '?')}"
+                if eddystone_tlm:
+                    beacon_proto += (
+                        f" Eddystone TLM Bat:{getattr(eddystone_tlm, 'battery_mv', '?')}mV "
+                        f"Tmp:{getattr(eddystone_tlm, 'temperature_c', '?')}C"
+                        f" Cnt:{getattr(eddystone_tlm, 'adv_count', '?')}"
+                        f" Uptime:{getattr(eddystone_tlm, 'uptime_sec', '?')}"
+                    )
+            # RSSI/Distance enhancements
+            rssi_disp = getattr(device, 'rssi_current', 'N/A')
+            dist = getattr(device, 'estimated_distance_m', None)
+            dist_sigma = getattr(device, 'distance_uncertainty_m', None)
+            distance_str = f"{dist:.2f}m" if dist is not None else "N/A"
+            if dist_sigma is not None:
+                distance_str += f" ±{dist_sigma:.2f}m"
+            adv_count = getattr(device, 'advertisement_count', "N/A")
+            mac_type = addr_type if addr_type else "Unknown"
+
+            # Manufacturer data in hex
+            mdata = getattr(device, "manufacturer_data", None)
+            if mdata:
+                if isinstance(mdata, bytes):
+                    mdata_str = mdata.hex(" ").upper()
+                else:
+                    mdata_str = str(mdata)
+            else:
+                mdata_str = ""
+
+            # Service UUIDs + names
+            svc_uuids = getattr(device, 'service_uuids', [])
+            service_names = []
+            for s in svc_uuids[:3]:
+                try:
+                    service_names.append(ServiceUUID.get_service_name(s))
+                except Exception:
+                    service_names.append(str(s))
+            more_svcs = ""
+            if len(svc_uuids) > 3:
+                more_svcs = f"... +{len(svc_uuids) - 3} more"
+            services_out = f"{len(svc_uuids)} ({', '.join(service_names)}{more_svcs})" if svc_uuids else "None"
+
+            # OUI lookup (only valid for non-random public MAC addresses)
+            oui_vendor = None
+            try:
+                oui_vendor = get_oui_vendor(device.address)
+            except Exception:
+                pass
+
+            # BLE Appearance field
+            appearance_str = ""
+            if hasattr(device, 'appearance'):
+                try:
+                    appearance_val = device.appearance
+                    appearance_str = f"{ble_appearance_lookup(appearance_val)} (0x{appearance_val:04X})"
+                except Exception:
+                    appearance_str = f"0x{getattr(device, 'appearance', 0):04X}"
+
+            # GATT Device Info Service (if available)
+            gatt_manufacturer = None
+            gatt_model = None
+            if hasattr(device, "device_information"):
+                info = device.device_information
+                gatt_manufacturer = info.get('manufacturer_name') if info else None
+                gatt_model = info.get('model_number') if info else None
+                
+            security_tool = check_security_tool_ioc(device) or "None"
+
+            # Extended: anomalies, first/last seen, advertisement interval if in stats
+            anomaly_list = getattr(device, 'anomalies', [])
+            anomaly_str = f"{len(anomaly_list)} anomaly(s): " + "; ".join(
+                [str(a.get('type', '')) for a in anomaly_list]) if anomaly_list else "None"
+            stats = getattr(device, "statistics", None)
+            adv_intvl = ""
+            if stats and hasattr(stats, 'advertisement_interval_mean_ms'):
+                adv_intvl = f"{stats.advertisement_interval_mean_ms:.1f} ms"
+            first_seen = getattr(device, 'first_seen', None)
+            last_seen = getattr(device, 'last_seen', None)
+            now = time.time()
+            first_seen_str = f"{int(now - first_seen)}s ago" if first_seen else "Unknown"
+            last_seen_str = f"{int(now - last_seen)}s ago" if last_seen else "Unknown"
+
+            more_lines = [
+            f"Name: {getattr(device, 'name', 'Unknown')}",
+            f"Address: {getattr(device, 'address', 'Unknown')} | Type: {mac_type}",
+            f"Vendor: {vendor} (0x{manid:04X})" if manid is not None else f"Vendor: {vendor}",
+            f"OUI (from MAC): {oui_vendor}",
+            f"Category: {cat}",
+            f"Appearance: {appearance_str}",
+            f"Security/Testing Tool: {security_tool}",
+            f"Trackable: {trackable}",
+            f"Beacon Frame(s): {beacon_proto}",
+            f"RSSI: {rssi_disp} dBm",
+            f"Distance Estimate: {distance_str}",
+            f"Advertisement Count: {adv_count}",
+            f"Services: {services_out}",
+            f"Advertisement Interval: {adv_intvl}",
+            f"Manufacturer Data: {mdata_str}",
+            f"GATT Manufacturer: {gatt_manufacturer}",
+            f"GATT Model: {gatt_model}",
+            f"First Seen: {first_seen_str}",
+            f"Last Seen: {last_seen_str}",
+            f"Anomalies: {anomaly_str}",
+        ]
+        for line in more_lines:
+            print(f"│ {line:<76} │")
             sys.stdout.flush()
-        
+    
         # Report to tracker
         self.tracker.signal_detected(
             freq_key,
@@ -8844,7 +9365,7 @@ class BLEMonitor(threading.Thread):
             return False
     
     def _print_statistics(self):
-        """Print BLE monitoring statistics with optional sensor fusion integration"""
+        """Print BLE monitoring statistics with optional sensor fusion integration and enriched device detail."""
         print()
         print("╔═" + "═" * 76 + "═╗")
         print("║" + " 🔵 BLE MONITOR STATISTICS ".center(76) + "║")
@@ -8871,27 +9392,75 @@ class BLEMonitor(threading.Thread):
             print("║ " + "-" * 74 + " ║")
             
             for device in recent_devices:
-                # Safe attribute access throughout
+                # Safe attribute access throughout, extended/enhanced
                 name = (getattr(device, 'name', None) or getattr(device, 'address', 'Unknown')[-8:])[:20]
                 rssi_val = getattr(device, 'rssi_current', -100)
                 rssi = f"{rssi_val:.0f}dBm"
-                
+
                 dist_val = getattr(device, 'estimated_distance_m', -1)
                 dist = f"~{dist_val:.1f}m" if dist_val and dist_val > 0 else "N/A"
                 
                 cat = (getattr(device, 'device_category', None) or "Unknown")[:12]
-                
                 last_seen = getattr(device, 'last_seen', time.time())
                 age = f"{int(time.time() - last_seen)}s ago"
                 
-                # Add measurement to estimator if available (for sensor fusion)
+                # ENHANCED FIELDS
+                # Vendor and security tool status
+                manid = getattr(device, 'manufacturer_id', None)
+                vendor = CompanyIdentifier.get_name(manid) if manid is not None else "Unknown"
+                security_tool = getattr(device, 'security_tool_name', None) or ""
+                security_str = f" | Tool: {security_tool}" if security_tool else ""
+                
+                # Is beacon? If so, protocol specifics
+                beacon_str = ""
+                if getattr(device, 'is_beacon', False):
+                    if getattr(device, 'ibeacon', None):
+                        ibeacon = device.ibeacon
+                        beacon_str += f" [iBeacon UUID:{getattr(ibeacon, 'uuid', '?')}]"
+                    if getattr(device, 'eddystone_uid', None):
+                        eu = device.eddystone_uid
+                        beacon_str += f" [Eddystone NS:{getattr(eu, 'namespace_id', '?')} Inst:{getattr(eu, 'instance_id', '?')}]"
+                    if getattr(device, 'eddystone_url', None):
+                        eu = device.eddystone_url
+                        beacon_str += f" [EURL:{getattr(eu, 'url', '?')}]"
+                    if getattr(device, 'eddystone_tlm', None):
+                        et = device.eddystone_tlm
+                        beacon_str += f" [ETLM Bat:{getattr(et, 'battery_mv', '?')}mV Up:{getattr(et, 'uptime_sec', '?')}]"
+                # Service UUIDs and resolved names
+                service_uuids = getattr(device, 'service_uuids', [])
+                service_names = []
+                for s in service_uuids:
+                    try:
+                        service_names.append(ServiceUUID.get_service_name(s))
+                    except Exception:
+                        service_names.append(str(s))
+                services = ";".join(service_names) if service_names else "None"
+                n_svcs = len(service_uuids)
+                
+                # Tx power and uncertainty
+                tx_power = getattr(device, 'tx_power', None)
+                txp_str = f" | TxPwr: {tx_power}" if tx_power is not None else ""
+                sigma_val = getattr(device, 'distance_uncertainty_m', None)
+                sigma_str = f" ±{sigma_val:.2f}m" if sigma_val is not None else ""
+                
+                # Trackable/Anomaly
+                trackable = "TRACK" if getattr(device, 'is_trackable', False) else ""
+                anomaly = bool(getattr(device, 'anomalies', []))
+                anomaly_str = "ANOM" if anomaly else ""
+                
+                # Adv count/advertisement/connection
+                adv_count = getattr(device, 'advertisement_count', None)
+                adv_str = f" | AdvCt: {adv_count}" if adv_count else ""
+                mac_type = getattr(device, 'address_type', None) or ""
+                
+                # Attempt estimator integration (verbatim original logic)
                 if hasattr(self, 'estimator') and self.estimator is not None and dist_val and dist_val > 0:
-                    sigma_val = getattr(device, 'distance_uncertainty_m', None) or 1.5
+                    sigma_est_val = sigma_val or 1.5
                     try:
                         self.estimator.add_measurement(
                             source_type='ble',
                             distance=dist_val,
-                            sigma=sigma_val,
+                            sigma=sigma_est_val,
                             timestamp=time.time(),
                             metadata={
                                 'rssi': rssi_val,
@@ -8901,8 +9470,13 @@ class BLEMonitor(threading.Thread):
                     except Exception as e:
                         logging.debug(f"Could not add measurement to estimator: {e}")
                 
-                line = f"  • {name:<20} │ {rssi:<7} │ {dist:<8} │ {cat:<12} │ {age}"
-                print(f"║ {line:<74} ║")
+                # Compose the mega-rich line with all possible detail
+                line = (
+                    f"  • {name:<20} │ {rssi:<7} │ {dist:<8}{sigma_str:<8}│ {cat:<12} │ {age}"
+                    f" | {vendor} ({manid if manid is not None else '--'}){security_str}"
+                    f"{beacon_str} | Svc:{n_svcs} {services}{txp_str}{adv_str} | {trackable} {anomaly_str} {mac_type}"
+                )
+                print(f"║ {line[:74]:<74} ║")
             
             # Print sensor fusion result if estimator is available
             if hasattr(self, 'estimator') and self.estimator is not None:
@@ -8937,22 +9511,56 @@ class BLEMonitor(threading.Thread):
         )
     
     def get_device(self, address: str) -> Optional[BLEDeviceInfo]:
-        """Get device info by address"""
+        """Get device info by address, including full vendor, class, beacons, anomalies, and stats."""
         with self.lock:
-            return self.devices.get(address)
-    
+            device = self.devices.get(address)
+            if not device:
+                return None
+            # Enrich with on-demand attributes for diagnostics if needed (no logging/printing here)
+            manid = getattr(device, 'manufacturer_id', None)
+            device.vendor_name = CompanyIdentifier.get_name(manid) if manid is not None else "Unknown"
+            device.beacon_kind = "iBeacon" if getattr(device, 'ibeacon', None) else (
+                                 "Eddystone" if getattr(device, 'eddystone_uid', None) else
+                                 "AltBeacon" if getattr(device, 'eddystone_url', None) else None)
+            device.anomaly_status = bool(getattr(device, 'anomalies', []))
+            device.security_tool_status = getattr(device, 'security_tool_name', None)
+            return device
+
     def get_all_devices(self) -> Dict[str, BLEDeviceInfo]:
-        """Get all tracked devices"""
+        """
+        Get all tracked devices, including enriched details for diagnostics.
+        """
         with self.lock:
-            return dict(self.devices)
-    
+            out = {}
+            for addr, device in self.devices.items():
+                manid = getattr(device, 'manufacturer_id', None)
+                device.vendor_name = CompanyIdentifier.get_name(manid) if manid is not None else "Unknown"
+                device.beacon_kind = "iBeacon" if getattr(device, 'ibeacon', None) else (
+                                     "Eddystone" if getattr(device, 'eddystone_uid', None) else
+                                     "AltBeacon" if getattr(device, 'eddystone_url', None) else None)
+                device.anomaly_status = bool(getattr(device, 'anomalies', []))
+                device.security_tool_status = getattr(device, 'security_tool_name', None)
+                out[addr] = device
+            return out
+
     def get_beacons(self) -> List[BLEDeviceInfo]:
-        """Get all detected beacons"""
+        """Get all detected beacons with enhanced info."""
         with self.lock:
-            return [d for d in self.devices.values() if d.is_beacon]
-    
+            beacons = []
+            for d in self.devices.values():
+                if getattr(d, 'is_beacon', False):
+                    manid = getattr(d, 'manufacturer_id', None)
+                    d.vendor_name = CompanyIdentifier.get_name(manid) if manid is not None else "Unknown"
+                    d.beacon_kind = "iBeacon" if getattr(d, 'ibeacon', None) else (
+                                    "Eddystone" if getattr(d, 'eddystone_uid', None) else
+                                    "AltBeacon" if getattr(d, 'eddystone_url', None) else None)
+                    d.anomaly_status = bool(getattr(d, 'anomalies', []))
+                    d.security_tool_status = getattr(d, 'security_tool_name', None)
+                    beacons.append(d)
+            return beacons
+
     def get_statistics_report(self) -> str:
-        """Generate human-readable statistics report"""
+        """Generate human-readable statistics report, including deep device and fusion statistics."""
         with self.lock:
             lines = [
                 "=" * 70,
@@ -8963,49 +9571,82 @@ class BLEMonitor(threading.Thread):
                 f"Unique devices discovered: {self.stats['unique_devices']}",
                 f"Beacons detected: {self.stats['beacons_detected']}",
                 f"Anomalies detected: {self.stats['anomalies_detected']}",
-                "",
-                "Device Categories:",
+                ""
             ]
-            
-            # Count by category
+
+            # Count by category, with vendor-aware info
             categories = defaultdict(int)
+            sec_tools = 0
+            beacons = 0
             for device in self.devices.values():
                 categories[device.device_category] += 1
-            
+                if getattr(device, 'security_tool_name', None):
+                    sec_tools += 1
+                if getattr(device, 'is_beacon', False):
+                    beacons += 1
+
+            lines.append("Device Categories:")
             for category, count in sorted(categories.items(), key=lambda x:  -x[1]):
                 lines.append(f"  {category}: {count}")
-            
+            lines.append(f"Security/Attack Devices: {sec_tools}")
+            lines.append(f"Total Beacons: {beacons}")
+
             lines.append("")
             lines.append("Path Loss Model Configuration:")
             lines.append(f"  Environment: {self.path_loss_model.environment}")
             lines.append(f"  Path loss exponent (n): {self.path_loss_model.n}")
             lines.append(f"  Shadow fading σ: {self.path_loss_model.sigma} dB")
             
-            # Top devices by signal strength
+            # Top devices by signal strength & vendor/class/attack status
             if self.devices:
                 lines.append("")
-                lines.append("Top 5 Devices by Signal Strength:")
+                lines.append("Top 5 Devices by Signal Strength (with Class/Vendor/Threat):")
                 sorted_devices = sorted(
                     self.devices.values(),
-                    key=lambda d: d.rssi_filtered,
+                    key=lambda d: getattr(d, 'rssi_filtered', -120),
                     reverse=True
                 )[:5]
-                
                 for i, device in enumerate(sorted_devices, 1):
                     name = device.name or device.address[-8:]
+                    manid = getattr(device, 'manufacturer_id', None)
+                    vendor_name = CompanyIdentifier.get_name(manid) if manid is not None else "Unknown"
+                    security_status = getattr(device, 'security_tool_name', None) or "-"
+                    beacon_kind = "iBeacon" if getattr(device, 'ibeacon', None) else (
+                                  "Eddystone" if getattr(device, 'eddystone_uid', None) else
+                                  "AltBeacon" if getattr(device, 'eddystone_url', None) else "")
+                    cat = getattr(device, 'device_category', None) or "Unknown"
                     lines.append(
                         f"  {i}.{name}: {device.rssi_filtered:.0f} dBm "
-                        f"(~{device.estimated_distance_m:.1f}m) [{device.device_category}]"
+                        f"(~{device.estimated_distance_m:.1f}m) "
+                        f"[{cat}] "
+                        f"Vendor: {vendor_name}, "
+                        f"Sec: {security_status}, "
+                        f"Beacon: {beacon_kind}"
                     )
-            
+            # Enhanced estimator summary if available
+            if hasattr(self, 'estimator') and self.estimator is not None:
+                try:
+                    result = self.estimator.get_latest_estimate()
+                    if result and result.get('distance') is not None:
+                        lines.append("")
+                        fused_dist = result.get('distance', 0)
+                        fused_unc = result.get('uncertainty', 0)
+                        contributions = result.get('contributions', {})
+                        lines.append(f"Sensor Fusion: Fused BLE distance: {fused_dist:.2f}m ± {fused_unc:.2f}m")
+                        if contributions:
+                            contrib_str = ", ".join(f"{k}: {v:.0%}" for k, v in contributions.items())
+                            lines.append(f"  Contributions: {contrib_str}")
+                except Exception as e:
+                    lines.append(f" [Could not get fused estimate: {e}]")
+
             lines.append("=" * 70)
             return "\n".join(lines)
-    
+
     def stop(self):
         """Stop the monitor thread"""
         self.running = False
         logging.info("BLE monitor stopping...")
-
+        
 
 # ============================================================
 # TRILATERATION FOR MULTI-BEACON POSITIONING
@@ -14389,141 +15030,229 @@ class HiddenCamIOCRegistry:
         return matches
 
 # ============================
-# Hidden Camera Detection Engine (with new research vectors)
+# Hidden Camera Detection Engine (with new research vectors AND best-practice enhancements)
 # ============================
+import time
+import numpy as np
+from typing import List, Dict, Any, Optional
+from collections import deque
+
 class HiddenCameraDetectionEngine:
     """Extended Research-Based Hidden Camera Detection (all major research/industry vectors)"""
-    def __init__(self, registry: HiddenCamIOCRegistry):
-        self.registry = registry
+
+    def __init__(self, registry: Optional['HiddenCamIOCRegistry'] = None, logger=None, result_callback=None):
+        # Use passed registry, or automatically create and load defaults
+        self.registry = registry if registry is not None else HiddenCamIOCRegistry()
+        try:
+            self.registry.load_default_iocs()
+        except Exception:
+            # Already loaded, or not needed
+            pass
+
+        # History deques for all supported sources
         self.history = {v: deque(maxlen=1000) for v in [
-            "rf","wifi","ble","optical","lidar","thermal","ml_vision",
-            "acoustic","powerline","network","protocol","rf_backscatter",
-            "uwb","ir_nightvis","cross_sensor"
+            "rf", "wifi", "ble", "optical", "lidar", "thermal", "ml_vision",
+            "acoustic", "powerline", "network", "protocol", "rf_backscatter",
+            "uwb", "ir_nightvis", "cross_sensor"
         ]}
+        self.logger = logger
+        self.result_callback = result_callback
+
+    # ----- Utility: logging/hooks -----
+    def _on_detection(self, source, detections):
+        # Internal hook: publish results to callback, logger, etc.
+        if self.logger:
+            for result in detections:
+                self.logger.info(f"[{source}] {result}")
+        if self.result_callback:
+            self.result_callback(source, detections)
+
+    def get_history(self, source=None, n=None) -> List['HiddenCamDetectionResult']:
+        """Returns detection results for a source (or all sources)."""
+        if source:
+            return list(self.history.get(source, []))[-n if n else None:]
+        # merge all
+        out = []
+        for v in self.history.values():
+            out.extend(list(v)[-n if n else None:])
+        return out
+
+    def clear_history(self, source=None):
+        """Clears detection result history."""
+        if source and source in self.history:
+            self.history[source].clear()
+        else:
+            for v in self.history.values():
+                v.clear()
+
+    def export_results(self, source=None) -> List[dict]:
+        """Export all results as list of dicts for reporting/UI."""
+        def to_dict(x):
+            if hasattr(x, "__dict__"):
+                return x.__dict__
+            return dict(x)
+        return [to_dict(r) for r in self.get_history(source)]
+
+    # ===== Detection Methods =====
+
     # RF Envelope
-    def detect_rf(self, envelope: np.ndarray, freq_mhz: float, meta=None) -> List[HiddenCamDetectionResult]:
-        suspicious = np.std(envelope) > 3 * np.median(np.abs(envelope))
+    def detect_rf(self, envelope: np.ndarray, freq_mhz: float, meta=None) -> List['HiddenCamDetectionResult']:
+        suspicious = False
+        try:
+            if isinstance(envelope, np.ndarray) and envelope.size > 0:
+                suspicious = np.std(envelope) > 3 * np.median(np.abs(envelope))
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"RF detection: envelope analysis failed: {e}")
         matches = []
         if suspicious and 900 <= freq_mhz <= 2500:
             for ioc in self.registry.match("rf", {"envelope": envelope, "freq": freq_mhz}):
                 matches.append(HiddenCamDetectionResult(ioc=ioc, confidence=0.92, occurred_at=time.time(), matched_value="rf_spike", context=meta or {}))
         self.history["rf"].extend(matches)
+        self._on_detection("rf", matches)
         return matches
+
     # Wi-Fi SSID etc
-    def detect_wifi(self, ssid: str, meta: dict = None) -> List[HiddenCamDetectionResult]:
+    def detect_wifi(self, ssid: str, meta: dict = None) -> List['HiddenCamDetectionResult']:
         matches = [HiddenCamDetectionResult(ioc=ioc, confidence=0.88, occurred_at=time.time(), matched_value=ssid, context=meta or {})
                    for ioc in self.registry.match("wifi", ssid)]
         self.history["wifi"].extend(matches)
+        self._on_detection("wifi", matches)
         return matches
+
     # BLE
-    def detect_ble(self, device_name: str, meta: dict = None) -> List[HiddenCamDetectionResult]:
+    def detect_ble(self, device_name: str, meta: dict = None) -> List['HiddenCamDetectionResult']:
         matches = [HiddenCamDetectionResult(ioc=ioc, confidence=0.85, occurred_at=time.time(), matched_value=device_name, context=meta or {})
                    for ioc in self.registry.match("ble", device_name)]
         self.history["ble"].extend(matches)
+        self._on_detection("ble", matches)
         return matches
+
     # Optical
-    def detect_optical(self, scan: Dict[str,Any], meta: dict = None) -> List[HiddenCamDetectionResult]:
+    def detect_optical(self, scan: Dict[str,Any], meta: dict = None) -> List['HiddenCamDetectionResult']:
         matches = []
-        if scan.get("glint"):
+        if isinstance(scan, dict) and scan.get("glint"):
             for ioc in self.registry.match("optical", scan):
                 matches.append(HiddenCamDetectionResult(ioc=ioc, confidence=0.96, occurred_at=time.time(), matched_value="optical_glint", context=meta or {}))
         self.history["optical"].extend(matches)
+        self._on_detection("optical", matches)
         return matches
+
     # LiDAR
-    def detect_lidar(self, scan: Dict[str,Any], meta: dict = None) -> List[HiddenCamDetectionResult]:
+    def detect_lidar(self, scan: Dict[str,Any], meta: dict = None) -> List['HiddenCamDetectionResult']:
         matches = []
-        if scan.get("lidar"):
+        if isinstance(scan, dict) and scan.get("lidar"):
             for ioc in self.registry.match("lidar", scan):
                 matches.append(HiddenCamDetectionResult(ioc=ioc, confidence=0.90, occurred_at=time.time(), matched_value="lidar_reflection", context=meta or {}))
         self.history["lidar"].extend(matches)
+        self._on_detection("lidar", matches)
         return matches
+
     # Backscatter
-    def detect_rf_backscatter(self, scan: Dict[str,Any], meta=None) -> List[HiddenCamDetectionResult]:
+    def detect_rf_backscatter(self, scan: Dict[str,Any], meta=None) -> List['HiddenCamDetectionResult']:
         matches = []
-        if scan.get("backscatter_anomaly"):
+        if isinstance(scan, dict) and scan.get("backscatter_anomaly"):
             for ioc in self.registry.match("rf_backscatter", scan):
                 matches.append(HiddenCamDetectionResult(ioc=ioc, confidence=0.89, occurred_at=time.time(), matched_value="rf_backscatter", context=meta or {}))
         self.history["rf_backscatter"].extend(matches)
+        self._on_detection("rf_backscatter", matches)
         return matches
+
     # UWB
-    def detect_uwb(self, scan: Dict[str,Any], meta=None) -> List[HiddenCamDetectionResult]:
+    def detect_uwb(self, scan: Dict[str,Any], meta=None) -> List['HiddenCamDetectionResult']:
         matches = []
-        if scan.get("uwb_burst"):
+        if isinstance(scan, dict) and scan.get("uwb_burst"):
             for ioc in self.registry.match("uwb", scan):
                 matches.append(HiddenCamDetectionResult(ioc=ioc, confidence=0.86, occurred_at=time.time(), matched_value="uwb_burst", context=meta or {}))
         self.history["uwb"].extend(matches)
+        self._on_detection("uwb", matches)
         return matches
+
     # Powerline
-    def detect_powerline(self, scan: Dict[str,Any], meta=None) -> List[HiddenCamDetectionResult]:
+    def detect_powerline(self, scan: Dict[str,Any], meta=None) -> List['HiddenCamDetectionResult']:
         matches = []
-        if scan.get("powerline_anomaly"):
+        if isinstance(scan, dict) and scan.get("powerline_anomaly"):
             for ioc in self.registry.match("powerline", scan):
                 matches.append(HiddenCamDetectionResult(ioc=ioc, confidence=0.83, occurred_at=time.time(), matched_value="powerline_anomaly", context=meta or {}))
         self.history["powerline"].extend(matches)
+        self._on_detection("powerline", matches)
         return matches
+
     # Thermal
-    def detect_thermal(self, scan: Dict[str,Any], meta: dict = None) -> List[HiddenCamDetectionResult]:
+    def detect_thermal(self, scan: Dict[str,Any], meta: dict = None) -> List['HiddenCamDetectionResult']:
         matches = []
-        if scan.get("hotspot"):
+        if isinstance(scan, dict) and scan.get("hotspot"):
             for ioc in self.registry.match("thermal", scan):
                 matches.append(HiddenCamDetectionResult(ioc=ioc, confidence=0.91, occurred_at=time.time(), matched_value="thermal_hotspot", context=meta or {}))
         self.history["thermal"].extend(matches)
+        self._on_detection("thermal", matches)
         return matches
+
     # ML Vision
-    def detect_ml_vision(self, vision_result: Dict[str,Any], meta: dict = None) -> List[HiddenCamDetectionResult]:
+    def detect_ml_vision(self, vision_result: Dict[str,Any], meta: dict = None) -> List['HiddenCamDetectionResult']:
         matches = []
-        if vision_result.get("lens"):
+        if isinstance(vision_result, dict) and vision_result.get("lens"):
             for ioc in self.registry.match("ml_vision", vision_result):
                 matches.append(HiddenCamDetectionResult(ioc=ioc, confidence=0.99, occurred_at=time.time(), matched_value="ml_lens", context=meta or {}))
         self.history["ml_vision"].extend(matches)
+        self._on_detection("ml_vision", matches)
         return matches
+
     # Acoustic/MEMS
-    def detect_acoustic(self, audio: Dict[str,Any], meta=None) -> List[HiddenCamDetectionResult]:
+    def detect_acoustic(self, audio: Dict[str,Any], meta=None) -> List['HiddenCamDetectionResult']:
         matches = []
-        if audio.get("mechanical_clicks"):
+        if isinstance(audio, dict) and audio.get("mechanical_clicks"):
             for ioc in self.registry.match("acoustic", audio):
                 matches.append(HiddenCamDetectionResult(ioc=ioc, confidence=0.82, occurred_at=time.time(), matched_value="acoustic_click", context=meta or {}))
         self.history["acoustic"].extend(matches)
+        self._on_detection("acoustic", matches)
         return matches
+
     # Network/Traffic
-    def detect_network(self, scan: Dict[str,Any], meta=None) -> List[HiddenCamDetectionResult]:
+    def detect_network(self, scan: Dict[str,Any], meta=None) -> List['HiddenCamDetectionResult']:
         matches = []
-        if scan.get("stream_detected"):
+        if isinstance(scan, dict) and scan.get("stream_detected"):
             for ioc in self.registry.match("network", scan):
                 matches.append(HiddenCamDetectionResult(ioc=ioc, confidence=0.93, occurred_at=time.time(), matched_value="video_stream", context=meta or {}))
         self.history["network"].extend(matches)
+        self._on_detection("network", matches)
         return matches
+
     # Protocol
-    def detect_protocol(self, banner: str, meta=None) -> List[HiddenCamDetectionResult]:
+    def detect_protocol(self, banner: str, meta=None) -> List['HiddenCamDetectionResult']:
         matches = [HiddenCamDetectionResult(ioc=ioc, confidence=0.92, occurred_at=time.time(), matched_value=banner, context=meta or {})
                    for ioc in self.registry.match("protocol", banner)]
         self.history["protocol"].extend(matches)
+        self._on_detection("protocol", matches)
         return matches
+
     # IR/Nightvision
-    def detect_ir_nightvis(self, scan: Dict[str,Any], meta=None) -> List[HiddenCamDetectionResult]:
+    def detect_ir_nightvis(self, scan: Dict[str,Any], meta=None) -> List['HiddenCamDetectionResult']:
         matches = []
-        if scan.get("ir"):
+        if isinstance(scan, dict) and scan.get("ir"):
             for ioc in self.registry.match("ir_nightvis", scan):
                 matches.append(HiddenCamDetectionResult(ioc=ioc, confidence=0.89, occurred_at=time.time(), matched_value="ir_emitter", context=meta or {}))
         self.history["ir_nightvis"].extend(matches)
+        self._on_detection("ir_nightvis", matches)
         return matches
+
     # Sensor Fusion (e.g., matching hotspot in IR, RF, Optical in same zone)
-    def detect_cross_sensor(self, cor: Dict[str,Any], meta=None) -> List[HiddenCamDetectionResult]:
+    def detect_cross_sensor(self, cor: Dict[str,Any], meta=None) -> List['HiddenCamDetectionResult']:
         matches = []
-        if cor.get("cross_sensor_correlate"):
+        if isinstance(cor, dict) and cor.get("cross_sensor_correlate"):
             for ioc in self.registry.match("cross_sensor", cor):
                 matches.append(HiddenCamDetectionResult(ioc=ioc, confidence=0.995, occurred_at=time.time(), matched_value="cross_confirmed", context=meta or {}))
         self.history["cross_sensor"].extend(matches)
+        self._on_detection("cross_sensor", matches)
         return matches
 
     # === Master Run Function for all sources ===
-    def run(self, observation: Dict[str, Any]) -> List[HiddenCamDetectionResult]:
+    def run(self, observation: Dict[str, Any]) -> List['HiddenCamDetectionResult']:
         t = observation.get("type")
         results = []
         try:
             if t == "rf":
-                results += self.detect_rf(observation.get("envelope", np.array([])),
-                                         observation.get("freq_mhz", 0), meta=observation)
+                results += self.detect_rf(observation.get("envelope", np.array([])), observation.get("freq_mhz", 0), meta=observation)
             elif t == "wifi":
                 results += self.detect_wifi(observation.get("ssid", ""), meta=observation)
             elif t == "ble":
@@ -14552,13 +15281,15 @@ class HiddenCameraDetectionEngine:
                 results += self.detect_ir_nightvis(observation.get("scan", {}), meta=observation)
             elif t == "cross_sensor":
                 results += self.detect_cross_sensor(observation.get("cor", {}), meta=observation)
+            else:
+                if self.logger:
+                    self.logger.warning(f"Unknown observation type: {t}")
         except Exception as e:
-            print(f"[HiddenCameraDetectionEngine.run] Exception: {e}")
+            if self.logger:
+                self.logger.error(f"[HiddenCameraDetectionEngine.run] Exception: {e}")
+            else:
+                print(f"[HiddenCameraDetectionEngine.run] Exception: {e}")
         return results
-
-# ===============================
-# Demo (standalone ready)
-# ===============================
 
 
 
@@ -22114,51 +22845,92 @@ def main():
     print("📊 FINAL STATISTICS REPORT")
     print("=" * 80)
     sys.stdout.flush()
-    
+
     # Print BLE devices summary if BLE monitor was active
     print("\n" + "-" * 80)
     print("🔵 BLE DEVICES DETECTED DURING SESSION")
     print("-" * 80)
     sys.stdout.flush()
-    
+
     ble_monitor = None
     for monitor in monitors:
         if monitor.__class__.__name__ == 'BLEMonitor':
             ble_monitor = monitor
             break
-    
+
     if ble_monitor and hasattr(ble_monitor, 'devices') and ble_monitor.devices:
         try:
-            print(f"Total BLE devices discovered: {len(ble_monitor.devices)}")
-            print()
-            
+            print(f"Total BLE devices discovered: {len(ble_monitor.devices)}\n")
             # Sort devices by last seen (most recent first)
             sorted_devices = sorted(
                 ble_monitor.devices.values(),
-                key=lambda d: d.last_seen if hasattr(d, 'last_seen') else 0,
+                key=lambda d: getattr(d, 'last_seen', 0),
                 reverse=True
             )
-            
-            # Print table header
-            print(f"{'Device Name':<25} {'Address':<20} {'RSSI':<8} {'Distance':<10} {'Category':<15} {'Seen':<8}")
-            print("-" * 100)
+
+            # Build advanced header
+            header = (
+                f"{'Name':<22} {'Addr':<17} {'Vendor':<12} {'RSSI':<7} {'Distance':<9} "
+                f"{'Beacon':<12} {'SecTool':<10} {'Category':<14} {'Track':<7} {'Anom':<6} {'Services':<12} {'Last Seen':<10}"
+            )
+            print(header)
+            print("-" * len(header))
             
             for device in sorted_devices[:20]:  # Show up to 20 devices
-                name = (device.name or "Unknown")[:24]
-                addr = device.address[-17:] if len(device.address) > 17 else device.address
-                rssi = f"{device.rssi_current:.0f}dBm" if hasattr(device, 'rssi_current') else "N/A"
-                dist = f"~{device.estimated_distance_m:.1f}m" if hasattr(device, 'estimated_distance_m') and device.estimated_distance_m > 0 else "N/A"
-                cat = (device.device_category if hasattr(device, 'device_category') else "Unknown")[:14]
-                seen = f"{int(time.time() - device.last_seen)}s ago" if hasattr(device, 'last_seen') else "N/A"
+                # Name/Addr
+                name = (getattr(device, 'name', None) or "Unknown")[:21]
+                addr = getattr(device, 'address', 'N/A')[-17:]
+                # Vendor/company
+                manid = getattr(device, 'manufacturer_id', None)
+                vendor = CompanyIdentifier.get_name(manid) if manid is not None else "Unknown"
+                # RSSI current
+                rssi = f"{getattr(device, 'rssi_current', float('nan')):.0f}dBm" if hasattr(device, 'rssi_current') else "N/A"
+                # Distance and uncertainty
+                dist_val = getattr(device, 'estimated_distance_m', -1)
+                sigma = getattr(device, 'distance_uncertainty_m', None)
+                dist = f"~{dist_val:.1f}m" if dist_val and dist_val > 0 else "N/A"
+                if sigma and sigma > 0.01:
+                    dist += f"±{sigma:.2f}m"
+                # Beacon kind
+                beacon_kind = ""
+                if getattr(device, 'is_beacon', False):
+                    if getattr(device, 'ibeacon', None): beacon_kind = "iBeacon"
+                    elif getattr(device, 'eddystone_uid', None): beacon_kind = "EddystoneUID"
+                    elif getattr(device, 'eddystone_url', None): beacon_kind = "EddystoneURL"
+                    else: beacon_kind = "Beacon"
+                # Security
+                security_tool = getattr(device, 'security_tool_name', None) or ""
+                # Category/class
+                cat = (getattr(device, 'device_category', None) or "Unknown")[:13]
+                # Trackable
+                track = "Y" if getattr(device, 'is_trackable', False) else ""
+                # Anomaly
+                anomaly_flag = "Y" if getattr(device, 'anomalies', []) else ""
+                # Services (count and examples)
+                service_uuids = getattr(device, 'service_uuids', [])
+                n_svcs = len(service_uuids)
+                service_names = []
+                for s in service_uuids[:2]:  # Show 2 example services
+                    try:
+                        service_names.append(ServiceUUID.get_service_name(s))
+                    except Exception:
+                        service_names.append(str(s))
+                services_disp = f"{n_svcs}"
+                if service_names:
+                    services_disp += f" ({'/'.join(service_names)})"
+                # Last seen
+                last_seen = getattr(device, 'last_seen', time.time())
+                seen = f"{int(time.time() - last_seen)}s ago"
                 
-                print(f"{name:<25} {addr:<20} {rssi:<8} {dist:<10} {cat:<15} {seen:<8}")
-            
+                print(
+                    f"{name:<22} {addr:<17} {vendor:<12} {rssi:<7} {dist:<9} "
+                    f"{beacon_kind:<12} {security_tool:<10} {cat:<14} {track:<7} {anomaly_flag:<6} "
+                    f"{services_disp:<12} {seen:<10}"
+                )
             if len(sorted_devices) > 20:
                 print(f"... and {len(sorted_devices) - 20} more devices")
-            
             print()
             sys.stdout.flush()
-            
             # Print BLE statistics
             if hasattr(ble_monitor, 'stats'):
                 stats = ble_monitor.stats
@@ -22168,9 +22940,34 @@ def main():
                 print(f"  Unique devices:              {stats.get('unique_devices', 0)}")
                 print(f"  Beacons detected:            {stats.get('beacons_detected', 0)}")
                 print(f"  Anomalies detected:          {stats.get('anomalies_detected', 0)}")
+                # Category breakdown
+                from collections import defaultdict
+                cat_counts = defaultdict(int)
+                sec_tools = 0
+                beacons = 0
+                for device in ble_monitor.devices.values():
+                    cc = getattr(device, 'device_category', None) or "Unknown"
+                    cat_counts[cc] += 1
+                    if getattr(device, 'security_tool_name', None): sec_tools += 1
+                    if getattr(device, 'is_beacon', False): beacons += 1
+                print(f"  Security/Attack devices:     {sec_tools}")
+                print(f"  Total beacons:               {beacons}")
+                print(f"  Categories seen:             " + ", ".join(f"{k}:{v}" for k,v in cat_counts.items()))
                 print()
-                sys.stdout.flush()
-                
+                # Sensor fusion/final estimator summary, if available
+                if hasattr(ble_monitor, 'estimator') and ble_monitor.estimator is not None:
+                    try:
+                        fusion = ble_monitor.estimator.get_latest_estimate()
+                        if fusion and fusion.get('distance') is not None:
+                            fused_dist = fusion.get('distance', 0)
+                            fused_unc = fusion.get('uncertainty', 0)
+                            contribs = fusion.get('contributions', {})
+                            print(f"  Sensor Fusion: BLE Range: {fused_dist:.2f}m ± {fused_unc:.2f}m")
+                            if contribs:
+                                print(f"    Sensors: " + ", ".join(f"{k}: {v:.0%}" for k, v in contribs.items()))
+                            print()
+                    except Exception as e:
+                        print(f"  [Fusion unavailable: {e}]")
         except Exception as e:
             print(f"⚠️  Error printing BLE device summary: {e}")
             logging.error(f"Error printing BLE device summary: {e}")
@@ -22179,12 +22976,12 @@ def main():
         print("No BLE devices detected during session")
         print()
         sys.stdout.flush()
-    
-    # Print WiFi networks summary if WiFi monitor was active
-    print("-" * 80)
-    print("📶 WiFi NETWORKS DETECTED DURING SESSION")
-    print("-" * 80)
-    sys.stdout.flush()
+        
+        # Print WiFi networks summary if WiFi monitor was active
+        print("-" * 80)
+        print("📶 WiFi NETWORKS DETECTED DURING SESSION")
+        print("-" * 80)
+        sys.stdout.flush()
     
     wifi_monitor = None
     for monitor in monitors:
