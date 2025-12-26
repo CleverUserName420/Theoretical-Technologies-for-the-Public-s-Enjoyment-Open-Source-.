@@ -15151,6 +15151,7 @@ HIDDEN_CAMERA_IOC_SOURCES = {
 # IOC Data Classes
 # ================
 @dataclass
+@dataclass
 class HiddenCamIOC:
     type: str
     indicator: str
@@ -15329,9 +15330,20 @@ class HiddenCamIOCRegistry:
         for ioc in self.iocs:
             if ioc.type == ioc_type:
                 try:
-                    if ioc.match_method == "regex" and isinstance(value, str):
+                    # String-based matching methods (for BLE, WiFi, protocol, etc.)
+                    if ioc.match_method == "prefix" and isinstance(value, str):
+                        if str(value).startswith(ioc.indicator):
+                            matches.append(ioc)
+                    elif ioc.match_method == "exact" and isinstance(value, str):
+                        if str(value) == ioc.indicator:
+                            matches.append(ioc)
+                    elif ioc.match_method == "substring" and isinstance(value, str):
+                        if ioc.indicator in str(value):
+                            matches.append(ioc)
+                    elif ioc.match_method == "regex" and isinstance(value, str):
                         if re.search(ioc.indicator, value, re.IGNORECASE):
                             matches.append(ioc)
+                    # RF periodic detection
                     elif ioc.match_method == "rf_periodic":
                         # value: dict with {"envelope": [np.array], "freq": MHz}
                         if isinstance(value, dict):
@@ -15341,36 +15353,47 @@ class HiddenCamIOCRegistry:
                                 # Naive: spike count or autocorrelation
                                 if np.std(env) > 3*np.median(np.abs(env)):
                                     matches.append(ioc)
+                    # Optical glint detection
                     elif ioc.match_method == "glint_detect":
                         if isinstance(value, dict) and value.get("glint", False):
                             matches.append(ioc)
+                    # Thermal hotspot detection
                     elif ioc.match_method == "thermal_spot":
                         if isinstance(value, dict) and value.get("hotspot", False):
                             matches.append(ioc)
+                    # ML vision lens detection
                     elif ioc.match_method == "ml_detect":
                         if isinstance(value, dict) and value.get("lens", False):
                             matches.append(ioc)
+                    # LiDAR reflection detection
                     elif ioc.match_method == "lidar_reflect":
                         if isinstance(value, dict) and value.get("lidar", False):
                             matches.append(ioc)
+                    # IR pattern detection
                     elif ioc.match_method == "ir_pattern":
                         if isinstance(value, dict) and value.get("ir", False):
                             matches.append(ioc)
+                    # RF backscatter detection
                     elif ioc.match_method == "backscatter_pattern":
                         if isinstance(value, dict) and value.get("backscatter_anomaly", False):
                             matches.append(ioc)
+                    # UWB burst detection
                     elif ioc.match_method == "uwb_burst":
                         if isinstance(value, dict) and value.get("uwb_burst", False):
                             matches.append(ioc)
+                    # Audio periodic clicks detection
                     elif ioc.match_method == "audio_periodic":
                         if isinstance(value, dict) and value.get("mechanical_clicks", False):
                             matches.append(ioc)
+                    # Powerline pattern detection
                     elif ioc.match_method == "powerline_pattern":
                         if isinstance(value, dict) and value.get("powerline_anomaly", False):
                             matches.append(ioc)
+                    # Network stream detection
                     elif ioc.match_method == "network_stream":
                         if isinstance(value, dict) and value.get("stream_detected", False):
                             matches.append(ioc)
+                    # Cross-sensor correlation detection
                     elif ioc.match_method == "cross_sensor":
                         if isinstance(value, dict) and value.get("cross_sensor_correlate", False):
                             matches.append(ioc)
@@ -15392,11 +15415,7 @@ class HiddenCameraDetectionEngine:
     def __init__(self, registry: Optional['HiddenCamIOCRegistry'] = None, logger=None, result_callback=None):
         # Use passed registry, or automatically create and load defaults
         self.registry = registry if registry is not None else HiddenCamIOCRegistry()
-        try:
-            self.registry.load_default_iocs()
-        except Exception:
-            # Already loaded, or not needed
-            pass
+        # Note: load_default_iocs() is already called in HiddenCamIOCRegistry.__init__()
 
         # History deques for all supported sources
         self.history = {v: deque(maxlen=1000) for v in [
