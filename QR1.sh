@@ -1,14 +1,52 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+################################################################################
+# QR CODE MALWARE SCANNER - ULTIMATE FORENSIC EDITION
+# Version: 4.1.0-ENHANCED
+#
+# Automatically uses Homebrew bash on macOS if available
+################################################################################
+
+# Auto-detect and re-execute with Homebrew bash if needed
+if ((BASH_VERSINFO[0] < 4)); then
+    # Try to find Homebrew bash
+    if [[ -x /opt/homebrew/bin/bash ]]; then
+        exec /opt/homebrew/bin/bash "$0" "$@"
+    elif [[ -x /usr/local/bin/bash ]]; then
+        exec /usr/local/bin/bash "$0" "$@"
+    else
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "ERROR: This script requires Bash 4.0 or higher."
+        echo "Your current version: $BASH_VERSION"
+        echo ""
+        echo "On macOS, install newer bash with Homebrew:"
+        echo "  brew install bash"
+        echo ""
+        echo "Then run this script normally:"
+        echo "  bash $0 $@"
+        echo "═══════════════════════════════════════════════════════════════"
+        exit 1
+    fi
+fi
 
 # Strict error handling
 set -o pipefail
 shopt -s nullglob extglob nocasematch
 
+# Set locale for proper Unicode display (if available)
+if locale -a 2>/dev/null | grep -qi "en_US.UTF-8\|en_US.utf8"; then
+    export LANG="en_US.UTF-8"
+    export LC_ALL="en_US.UTF-8"
+elif locale -a 2>/dev/null | grep -qi "C.UTF-8"; then
+    export LANG="C.UTF-8"
+    export LC_ALL="C.UTF-8"
+fi
+
 ################################################################################
 # GLOBAL CONFIGURATION
 ################################################################################
 
-VERSION="4.0.0-ULTIMATE-FORENSIC"
+VERSION="4.1.0-ENHANCED"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 OUTPUT_DIR="${SCRIPT_DIR}/qr_analysis_${TIMESTAMP}"
@@ -28,6 +66,30 @@ APT_REPORT="${OUTPUT_DIR}/apt_attribution.txt"
 ENTROPY_REPORT="${OUTPUT_DIR}/entropy_analysis.txt"
 STEGANOGRAPHY_REPORT="${OUTPUT_DIR}/steganography_analysis.txt"
 ML_REPORT="${OUTPUT_DIR}/ml_heuristics.txt"
+
+# Extended Report Files
+CLOUD_ABUSE_REPORT=""
+MOBILE_THREAT_REPORT=""
+GEOFENCING_REPORT=""
+HARDWARE_EXPLOIT_REPORT=""
+FILELESS_REPORT=""
+ADVERSARIAL_QR_REPORT=""
+SIEM_EXPORT_FILE=""
+ML_CLASSIFICATION_REPORT=""
+PERSONA_REPORT=""
+TOR_VPN_REPORT=""
+ASN_REPORT=""
+QR_VISUAL_REPORT=""
+RANSOMWARE_NOTE_REPORT=""
+ZERO_DAY_REPORT=""
+CLOAKING_REPORT=""
+WIRELESS_REPORT=""
+TELEPHONY_REPORT=""
+OBFUSCATION_REPORT=""
+INJECTION_REPORT=""
+C2_BEACON_REPORT=""
+CRYPTO_SCAM_REPORT=""
+INDUSTRY_THREAT_REPORT=""
 
 # Threat scoring
 THREAT_SCORE=0
@@ -98,8 +160,261 @@ URLSCAN_API_KEY="${URLSCAN_API_KEY:-}"
 GREYNOISE_API_KEY="${GREYNOISE_API_KEY:-}"
 CENSYS_API_KEY="${CENSYS_API_KEY:-}"
 
-# Extended Report Files (set after OUTPUT_DIR is defined in initialize())
-# These will be set dynamically in initialize_extended_reports()
+################################################################################
+# LOGGING FUNCTIONS (defined BEFORE use)
+################################################################################
+
+# Flag to track if directories are initialized
+DIRS_INITIALIZED=false
+
+log_msg() {
+    local level=$1
+    shift
+    local msg="$*"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    if [ "$DIRS_INITIALIZED" = true ] && [ -d "$OUTPUT_DIR" ]; then
+        echo "[$timestamp] [$level] $msg" >> "$LOG_FILE" 2>/dev/null
+        echo "$(date -Iseconds 2>/dev/null || date '+%Y-%m-%dT%H:%M:%S'),$level,\"$msg\"" >> "$TIMELINE_FILE" 2>/dev/null
+    fi
+}
+
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $*"
+    log_msg "INFO" "$*"
+}
+
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $*"
+    log_msg "SUCCESS" "$*"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $*"
+    log_msg "WARNING" "$*"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $*"
+    log_msg "ERROR" "$*"
+}
+
+log_critical() {
+    echo -e "${RED}[CRITICAL]${NC} $*"
+    log_msg "CRITICAL" "$*"
+}
+
+log_threat() {
+    local score=$1
+    shift
+    local msg="$*"
+    THREAT_SCORE=$((THREAT_SCORE + score))
+    echo -e "${MAGENTA}[THREAT +$score]${NC} $msg"
+    log_msg "THREAT" "+$score: $msg"
+}
+
+log_apt() {
+    echo -e "${CYAN}[APT]${NC} $*"
+    log_msg "APT" "$*"
+}
+
+log_stego() {
+    echo -e "${ORANGE}[STEGO]${NC} $*"
+    log_msg "STEGO" "$*"
+}
+
+log_ml() {
+    echo -e "${WHITE}[ML]${NC} $*"
+    log_msg "ML" "$*"
+}
+
+log_behavioral() {
+    echo -e "${CYAN}[BEHAVIORAL]${NC} $*"
+    log_msg "BEHAVIORAL" "$*"
+}
+
+log_forensic() {
+    echo -e "${WHITE}[FORENSIC]${NC} $*"
+    log_msg "FORENSIC" "$*"
+}
+
+# Analysis status output helpers
+analysis_success_none() {
+    local analyzer="$1"
+    echo -e "${GREEN}[✓ ${analyzer}]${NC} Analysis successful: ${WHITE}None detected${NC}"
+}
+
+analysis_success_found() {
+    local analyzer="$1"
+    local count="$2"
+    shift 2
+    local details="$*"
+    echo -e "${YELLOW}[⚠ ${analyzer}]${NC} Analysis successful: ${RED}${count} threat(s) detected${NC}"
+    if [ -n "$details" ]; then
+        echo -e "    ${CYAN}└─${NC} $details"
+    fi
+}
+
+analysis_error() {
+    local analyzer="$1"
+    local error_msg="$2"
+    echo -e "${RED}[✗ ${analyzer}]${NC} Analysis unsuccessful: ${WHITE}${error_msg}${NC}"
+}
+
+# IP Address Extraction and Display
+extract_and_display_ips() {
+    local content="$1"
+    local source_name="${2:-content}"
+    
+    # Extract IPv4 addresses
+    local ipv4_addrs=$(echo "$content" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' 2>/dev/null | sort -u)
+    
+    # Extract IPv6 addresses (simplified pattern)
+    local ipv6_addrs=$(echo "$content" | grep -oE '([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|::[0-9a-fA-F]{1,4}' 2>/dev/null | sort -u)
+    
+    local ip_count=0
+    
+    if [ -n "$ipv4_addrs" ] || [ -n "$ipv6_addrs" ]; then
+        echo ""
+        echo -e "${CYAN}┌─────────────────────────────────────────────────────────────┐${NC}"
+        echo -e "${CYAN}│                 IP ADDRESSES DETECTED                        │${NC}"
+        echo -e "${CYAN}├─────────────────────────────────────────────────────────────┤${NC}"
+        
+        # Process IPv4 addresses
+        while IFS= read -r ip; do
+            [ -z "$ip" ] && continue
+            ((ip_count++))
+            
+            # Classify IP type
+            local ip_type="External"
+            local ip_risk="LOW"
+            
+            # Check for private/reserved IPs
+            if [[ "$ip" =~ ^10\. ]] || [[ "$ip" =~ ^192\.168\. ]] || [[ "$ip" =~ ^172\.(1[6-9]|2[0-9]|3[01])\. ]]; then
+                ip_type="Private (RFC1918)"
+                ip_risk="INFO"
+            elif [[ "$ip" =~ ^127\. ]]; then
+                ip_type="Loopback"
+                ip_risk="INFO"
+            elif [[ "$ip" =~ ^169\.254\. ]]; then
+                ip_type="Link-Local"
+                ip_risk="INFO"
+            elif [[ "$ip" =~ ^0\. ]]; then
+                ip_type="This Network"
+                ip_risk="SUSPICIOUS"
+            fi
+            
+            # Check against known malicious IPs
+            if [ -n "${KNOWN_MALICIOUS_IPS[$ip]}" ]; then
+                ip_risk="CRITICAL"
+                echo -e "${CYAN}│${NC} ${RED}⚠ $ip${NC}"
+                echo -e "${CYAN}│${NC}   Type: ${RED}KNOWN MALICIOUS${NC}"
+                echo -e "${CYAN}│${NC}   Info: ${KNOWN_MALICIOUS_IPS[$ip]}"
+                record_ioc "malicious_ip" "$ip" "Known malicious IP"
+            else
+                case "$ip_risk" in
+                    "CRITICAL") echo -e "${CYAN}│${NC} ${RED}● $ip ($ip_type)${NC}" ;;
+                    "SUSPICIOUS") echo -e "${CYAN}│${NC} ${YELLOW}● $ip ($ip_type)${NC}" ;;
+                    *) echo -e "${CYAN}│${NC} ${WHITE}● $ip ($ip_type)${NC}" ;;
+                esac
+            fi
+            
+            # Record external IPs as IOCs
+            if [ "$ip_type" = "External" ]; then
+                record_ioc "ip_address" "$ip" "External IP from $source_name"
+            fi
+            
+        done <<< "$ipv4_addrs"
+        
+        # Process IPv6 addresses
+        while IFS= read -r ip; do
+            [ -z "$ip" ] && continue
+            ((ip_count++))
+            echo -e "${CYAN}│${NC} ${WHITE}● $ip (IPv6)${NC}"
+            record_ioc "ipv6_address" "$ip" "IPv6 from $source_name"
+        done <<< "$ipv6_addrs"
+        
+        echo -e "${CYAN}│${NC}"
+        echo -e "${CYAN}│${NC} Total IPs found: ${WHITE}$ip_count${NC}"
+        echo -e "${CYAN}└─────────────────────────────────────────────────────────────┘${NC}"
+        echo ""
+        
+        # Log forensic detail
+        log_forensic "Extracted $ip_count IP address(es) from $source_name"
+    fi
+    
+    echo "$ip_count"
+}
+
+################################################################################
+# INITIALIZATION FUNCTIONS
+################################################################################
+
+initialize_extended_reports() {
+    CLOUD_ABUSE_REPORT="${OUTPUT_DIR}/cloud_abuse_analysis.txt"
+    MOBILE_THREAT_REPORT="${OUTPUT_DIR}/mobile_threats.txt"
+    GEOFENCING_REPORT="${OUTPUT_DIR}/geofencing_analysis.txt"
+    HARDWARE_EXPLOIT_REPORT="${OUTPUT_DIR}/hardware_exploits.txt"
+    FILELESS_REPORT="${OUTPUT_DIR}/fileless_malware.txt"
+    ADVERSARIAL_QR_REPORT="${OUTPUT_DIR}/adversarial_qr.txt"
+    SIEM_EXPORT_FILE="${OUTPUT_DIR}/siem_export.json"
+    ML_CLASSIFICATION_REPORT="${OUTPUT_DIR}/ml_classification.txt"
+    PERSONA_REPORT="${OUTPUT_DIR}/persona_analysis.txt"
+    TOR_VPN_REPORT="${OUTPUT_DIR}/tor_vpn_analysis.txt"
+    ASN_REPORT="${OUTPUT_DIR}/asn_analysis.txt"
+    QR_VISUAL_REPORT="${OUTPUT_DIR}/qr_visual_analysis.txt"
+    RANSOMWARE_NOTE_REPORT="${OUTPUT_DIR}/ransomware_notes.txt"
+    ZERO_DAY_REPORT="${OUTPUT_DIR}/zero_day_anomalies.txt"
+    CLOAKING_REPORT="${OUTPUT_DIR}/cloaking_detection.txt"
+    WIRELESS_REPORT="${OUTPUT_DIR}/wireless_analysis.txt"
+    TELEPHONY_REPORT="${OUTPUT_DIR}/telephony_analysis.txt"
+    OBFUSCATION_REPORT="${OUTPUT_DIR}/url_obfuscation.txt"
+    INJECTION_REPORT="${OUTPUT_DIR}/injection_attacks.txt"
+    C2_BEACON_REPORT="${OUTPUT_DIR}/c2_beacon_analysis.txt"
+    CRYPTO_SCAM_REPORT="${OUTPUT_DIR}/crypto_scam_analysis.txt"
+    INDUSTRY_THREAT_REPORT="${OUTPUT_DIR}/industry_threats.txt"
+}
+
+initialize() {
+    echo -e "${BLUE}[INFO]${NC} Initializing QR Malware Scanner..."
+    
+    # Create output directories FIRST
+    mkdir -p "$OUTPUT_DIR" "$TEMP_DIR" "$EVIDENCE_DIR"
+    
+    # Now we can log
+    DIRS_INITIALIZED=true
+    
+    # Initialize log file
+    echo "=== QR Malware Scanner Log ===" > "$LOG_FILE"
+    echo "Started: $(date)" >> "$LOG_FILE"
+    echo "" >> "$LOG_FILE"
+    
+    # Initialize report file
+    {
+        echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+        echo "║           QR CODE MALWARE SCANNER - FORENSIC ANALYSIS REPORT              ║"
+        echo "║                         Version: $VERSION                                   ║"
+        echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+        echo ""
+        echo "Analysis Date: $(date)"
+        echo "Hostname: $(hostname)"
+        echo "User: $(whoami)"
+        echo ""
+    } > "$REPORT_FILE"
+    
+    # Initialize IOC CSV
+    echo "type,value,context,timestamp,threat_score" > "$IOC_REPORT"
+    
+    # Initialize timeline
+    echo "timestamp,event_type,description,threat_level" > "$TIMELINE_FILE"
+    
+    # Initialize YARA matches file
+    echo "rule,timestamp,content" > "$YARA_MATCHES"
+    
+    # Initialize extended reports
+    initialize_extended_reports
+    
+    log_success "Initialization complete"
+}
 
 ################################################################################
 # DEPENDENCY VERIFICATION
@@ -178,145 +493,17 @@ check_dependencies() {
         exit 1
     fi
     
-    if [ ${#missing_optional[@]} -ne 0 ]; then
+    if [ ${#missing_optional[@]} -ne 0 ] && [ "$VERBOSE" = true ]; then
         log_warning "Missing optional dependencies (reduced functionality):"
         printf '%s\n' "${missing_optional[@]}"
-        echo -e "\n${YELLOW}Install additional tools:${NC}"
-        echo "brew install qrencode quirc imagemagick tesseract exiftool ssdeep steghide zsteg whois nmap bind binwalk foremost"
-        echo "gem install zsteg"
-        echo "pip3 install opencv-python-headless numpy scipy scikit-learn"
     fi
     
     # Check Python modules
-    python3 -c "import PIL, pyzbar" 2>/dev/null || {
-        log_error "Missing Python dependencies"
-        echo "Install: pip3 install pillow pyzbar qrcode opencv-python-headless numpy scipy scikit-learn"
-        exit 1
-    }
+    if ! python3 -c "import PIL" 2>/dev/null; then
+        log_warning "Python PIL/Pillow not found. Install: pip3 install pillow"
+    fi
     
     log_success "Dependency check complete"
-}
-
-################################################################################
-# LOGGING FUNCTIONS
-################################################################################
-
-log_msg() {
-    local level=$1
-    shift
-    local msg="$*"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo "[$timestamp] [$level] $msg" >> "$LOG_FILE"
-    
-    # Add to timeline
-    echo "$(date -Iseconds),$level,\"$msg\"" >> "$TIMELINE_FILE"
-}
-
-log_info() {
-    echo -e "${BLUE}[INFO]${NC} $*"
-    log_msg "INFO" "$*"
-}
-
-log_success() {
-
-# Extended Report Files (initialized dynamically)
-CLOUD_ABUSE_REPORT=""
-MOBILE_THREAT_REPORT=""
-GEOFENCING_REPORT=""
-HARDWARE_EXPLOIT_REPORT=""
-FILELESS_REPORT=""
-ADVERSARIAL_QR_REPORT=""
-SIEM_EXPORT_FILE=""
-ML_CLASSIFICATION_REPORT=""
-PERSONA_REPORT=""
-TOR_VPN_REPORT=""
-ASN_REPORT=""
-QR_VISUAL_REPORT=""
-RANSOMWARE_NOTE_REPORT=""
-ZERO_DAY_REPORT=""
-CLOAKING_REPORT=""
-WIRELESS_REPORT=""
-TELEPHONY_REPORT=""
-OBFUSCATION_REPORT=""
-INJECTION_REPORT=""
-C2_BEACON_REPORT=""
-CRYPTO_SCAM_REPORT=""
-INDUSTRY_THREAT_REPORT=""
-
-initialize_extended_reports() {
-    CLOUD_ABUSE_REPORT="${OUTPUT_DIR}/cloud_abuse_analysis.txt"
-    MOBILE_THREAT_REPORT="${OUTPUT_DIR}/mobile_threats.txt"
-    GEOFENCING_REPORT="${OUTPUT_DIR}/geofencing_analysis.txt"
-    HARDWARE_EXPLOIT_REPORT="${OUTPUT_DIR}/hardware_exploits.txt"
-    FILELESS_REPORT="${OUTPUT_DIR}/fileless_malware.txt"
-    ADVERSARIAL_QR_REPORT="${OUTPUT_DIR}/adversarial_qr.txt"
-    SIEM_EXPORT_FILE="${OUTPUT_DIR}/siem_export.json"
-    ML_CLASSIFICATION_REPORT="${OUTPUT_DIR}/ml_classification.txt"
-    PERSONA_REPORT="${OUTPUT_DIR}/persona_analysis.txt"
-    TOR_VPN_REPORT="${OUTPUT_DIR}/tor_vpn_analysis.txt"
-    ASN_REPORT="${OUTPUT_DIR}/asn_analysis.txt"
-    QR_VISUAL_REPORT="${OUTPUT_DIR}/qr_visual_analysis.txt"
-    RANSOMWARE_NOTE_REPORT="${OUTPUT_DIR}/ransomware_notes.txt"
-    ZERO_DAY_REPORT="${OUTPUT_DIR}/zero_day_anomalies.txt"
-    CLOAKING_REPORT="${OUTPUT_DIR}/cloaking_detection.txt"
-    WIRELESS_REPORT="${OUTPUT_DIR}/wireless_analysis.txt"
-    TELEPHONY_REPORT="${OUTPUT_DIR}/telephony_analysis.txt"
-    OBFUSCATION_REPORT="${OUTPUT_DIR}/url_obfuscation.txt"
-    INJECTION_REPORT="${OUTPUT_DIR}/injection_attacks.txt"
-    C2_BEACON_REPORT="${OUTPUT_DIR}/c2_beacon_analysis.txt"
-    CRYPTO_SCAM_REPORT="${OUTPUT_DIR}/crypto_scam_analysis.txt"
-    INDUSTRY_THREAT_REPORT="${OUTPUT_DIR}/industry_threats.txt"
-}
-
-    echo -e "${GREEN}[SUCCESS]${NC} $*"
-    log_msg "SUCCESS" "$*"
-}
-
-log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $*" >&2
-    log_msg "WARNING" "$*"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $*" >&2
-    log_msg "ERROR" "$*"
-}
-
-log_critical() {
-    echo -e "${RED}[CRITICAL]${NC} $*" >&2
-    log_msg "CRITICAL" "$*"
-}
-
-log_threat() {
-    local score=$1
-    shift
-    echo -e "${MAGENTA}[THREAT:$score]${NC} $*"
-    log_msg "THREAT:$score" "$*"
-    ((THREAT_SCORE += score))
-}
-
-log_forensic() {
-    local msg="$*"
-    echo -e "${CYAN}[FORENSIC]${NC} $msg"
-    log_msg "FORENSIC" "$msg"
-}
-
-log_apt() {
-    local msg="$*"
-    echo -e "${ORANGE}[APT]${NC} $msg"
-    log_msg "APT" "$msg"
-}
-
-log_ml() {
-    local msg="$*"
-    echo -e "${WHITE}[ML-HEURISTIC]${NC} $msg"
-    log_msg "ML" "$msg"
-}
-
-log_stego() {
-    local msg="$*"
-    echo -e "${CYAN}[STEGANOGRAPHY]${NC} $msg"
-    log_msg "STEGO" "$msg"
 }
 
 ################################################################################
@@ -913,40 +1100,34 @@ declare -a PHISHING_BRANDS=(
     "irs" "ssa" "medicare" "dmv" "dhs" "ice"
 )
 
-# HOMOGRAPH ATTACK CHARACTERS
+# HOMOGRAPH ATTACK CHARACTERS (non-ASCII only - lookalikes for Latin letters)
 declare -a HOMOGRAPH_CHARS=(
-    "а" "е" "о" "р" "с" "у" "х"    # Cyrillic lookalikes
-    "α" "ο" "ρ"                    # Greek lookalikes
-    "ı" "ɪ" "l" "I" "1" "|"        # i/l/1 confusion
-    "0" "O" "Ο" "О"                # o/0 confusion
-    "ɡ" "ɢ"                        # g lookalikes
-    "ν" "v"                        # v/nu confusion
-    "ω" "w"                        # w/omega confusion
-    "ß" "β"                        # B lookalikes
-    "ḁ" "ạ" "ą" "ă" "ā" "ã"        # a variants
-    "ḃ" "ḅ" "ḇ"                    # b variants
-    "ċ" "ç" "ć" "č"                # c variants
-    "ḋ" "ḍ" "ḏ" "ḑ"                # d variants
-    "ė" "ę" "ě" "ē" "ẹ"            # e variants
-    "ḟ" "ƒ"                        # f variants
-    "ġ" "ğ" "ģ" "ǧ"                # g variants
-    "ḣ" "ḥ" "ḧ" "ħ"                # h variants
-    "ì" "í" "î" "ï" "ị"            # i variants
-    "ǰ" "ĵ"                        # j variants
-    "ḱ" "ķ" "ǩ"                    # k variants
-    "ḷ" "ļ" "ľ" "ł"                # l variants
-    "ṁ" "ṃ"                        # m variants
-    "ṅ" "ņ" "ň" "ñ"                # n variants
-    "ò" "ó" "ô" "õ" "ö" "ọ"        # o variants
-    "ṗ"                            # p variants
-    "ŗ" "ř" "ṛ" "ṟ"                # r variants
-    "ṡ" "ş" "ș" "š"                # s variants
-    "ṫ" "ţ" "ț" "ť"                # t variants
-    "ù" "ú" "û" "ü" "ụ"            # u variants
-    "ẃ" "ẅ" "ẇ"                    # w variants
-    "ẋ" "ẍ"                        # x variants
-    "ỳ" "ý" "ŷ" "ÿ" "ỵ"            # y variants
-    "ẑ" "ž" "ż"                    # z variants
+    # Cyrillic lookalikes (look like Latin a,e,o,p,c,y,x)
+    "а" "е" "о" "р" "с" "у" "х"
+    # Greek lookalikes
+    "α" "ο" "ρ" "ν" "ω"
+    # Special lookalikes
+    "ı" "ɪ" "Ι" "І"              # i lookalikes (Turkish dotless i, small capital I, Greek Iota, Cyrillic I)
+    "Ο" "О"                      # O lookalikes (Greek Omicron, Cyrillic O)
+    "ɡ" "ɢ"                      # g lookalikes
+    "ß" "β"                      # B lookalikes
+    # Accented variants that could be deceptive
+    "ḁ" "ạ" "ą" "ă" "ā" "ã"
+    "ċ" "ç" "ć" "č"
+    "ė" "ę" "ě" "ē" "ẹ"
+    "ġ" "ğ" "ģ" "ǧ"
+    "ḣ" "ḥ" "ḧ" "ħ"
+    "ì" "í" "î" "ï" "ị"
+    "ḷ" "ļ" "ľ" "ł"
+    "ṅ" "ņ" "ň" "ñ"
+    "ò" "ó" "ô" "õ" "ö" "ọ"
+    "ŗ" "ř" "ṛ" "ṟ"
+    "ṡ" "ş" "ș" "š"
+    "ṫ" "ţ" "ț" "ť"
+    "ù" "ú" "û" "ü" "ụ"
+    "ẃ" "ẅ" "ẇ"
+    "ỳ" "ý" "ŷ" "ÿ" "ỵ"
+    "ẑ" "ž" "ż"
 )
 
 # APT GROUP INDICATORS DATABASE
@@ -1200,82 +1381,82 @@ declare -a CREDENTIAL_PATTERNS=(
 declare -A API_KEY_PATTERNS=(
     # Cloud Providers
     ["aws_access_key"]="AKIA[0-9A-Z]{16}"
-    ["aws_secret_key"]="[A-Za-z0-9/+=]{40}"
+    ["aws_secret_key"]='[A-Za-z0-9/+=]{40}'
     ["aws_session_token"]="FwoGZXIvYXdzE[A-Za-z0-9/+=]+"
     ["gcp_api_key"]="AIza[0-9A-Za-z_-]{35}"
-    ["gcp_oauth"]="[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com"
+    ["gcp_oauth"]='[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com'
     ["gcp_service_account"]="\"type\":.*\"service_account\""
-    ["azure_client_id"]="[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}"
-    ["azure_subscription"]="[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}"
+    ["azure_client_id"]='[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'
+    ["azure_subscription"]='[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}'
     ["digitalocean_token"]="dop_v1_[a-f0-9]{64}"
     ["digitalocean_oauth"]="doo_v1_[a-f0-9]{64}"
-    ["linode_token"]="[a-f0-9]{64}"
+    ["linode_token"]='[a-f0-9]{64}'
     ["vultr_api_key"]="[A-Z0-9]{36}"
-    ["heroku_api_key"]="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+    ["heroku_api_key"]='[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
     # Version Control
-    ["github_token"]="ghp_[0-9a-zA-Z]{36}"
-    ["github_oauth"]="gho_[0-9a-zA-Z]{36}"
-    ["github_app_token"]="ghu_[0-9a-zA-Z]{36}"
-    ["github_refresh_token"]="ghr_[0-9a-zA-Z]{36}"
-    ["github_fine_grained"]="github_pat_[0-9a-zA-Z]{22}_[0-9a-zA-Z]{59}"
-    ["gitlab_token"]="glpat-[0-9a-zA-Z_-]{20}"
-    ["gitlab_runner"]="GR1348941[0-9a-zA-Z_-]{20}"
+    ["github_token"]='ghp_[0-9a-zA-Z]{36}'
+    ["github_oauth"]='gho_[0-9a-zA-Z]{36}'
+    ["github_app_token"]='ghu_[0-9a-zA-Z]{36}'
+    ["github_refresh_token"]='ghr_[0-9a-zA-Z]{36}'
+    ["github_fine_grained"]='github_pat_[0-9a-zA-Z]{22}_[0-9a-zA-Z]{59}'
+    ["gitlab_token"]='glpat-[0-9a-zA-Z_-]{20}'
+    ["gitlab_runner"]='GR1348941[0-9a-zA-Z_-]{20}'
     ["bitbucket_token"]="ATBB[A-Za-z0-9_-]{32}"
     # Communication
     ["slack_token"]="xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24}"
     ["slack_webhook"]="https://hooks\.slack\.com/services/T[a-zA-Z0-9]+/B[a-zA-Z0-9]+/[a-zA-Z0-9]+"
     ["discord_token"]="[MN][A-Za-z\\d]{23,}\.[\\w-]{6}\\.[\\w-]{27}"
     ["discord_webhook"]="https://discord(app)?\.com/api/webhooks/[0-9]+/[A-Za-z0-9_-]+"
-    ["telegram_token"]="[0-9]{8,10}:[a-zA-Z0-9_-]{35}"
+    ["telegram_token"]='[0-9]{8,10}:[a-zA-Z0-9_-]{35}'
     ["twilio_sid"]="AC[a-z0-9]{32}"
-    ["twilio_auth"]="[a-z0-9]{32}"
+    ["twilio_auth"]='[a-z0-9]{32}'
     # Payment
-    ["stripe_publishable"]="pk_(test|live)_[0-9a-zA-Z]{24,99}"
-    ["stripe_secret"]="sk_(test|live)_[0-9a-zA-Z]{24,99}"
-    ["stripe_restricted"]="rk_(test|live)_[0-9a-zA-Z]{24,99}"
+    ["stripe_publishable"]='pk_(test|live)_[0-9a-zA-Z]{24,99}'
+    ["stripe_secret"]='sk_(test|live)_[0-9a-zA-Z]{24,99}'
+    ["stripe_restricted"]='rk_(test|live)_[0-9a-zA-Z]{24,99}'
     ["square_access"]="sq0atp-[0-9A-Za-z_-]{22}"
     ["square_application"]="sq0idp-[0-9A-Za-z_-]{22}"
     ["paypal_client_id"]="A[a-zA-Z0-9_-]{20,}[A-Za-z0-9]"
-    ["braintree_access"]="access_token\\$production\\$[0-9a-z]{16}\\$[0-9a-f]{32}"
+    ["braintree_access"]='access_token\$production\$[0-9a-z]{16}\$[0-9a-f]{32}'
     # Social Media
-    ["twitter_api_key"]="[a-zA-Z0-9]{25}"
-    ["twitter_secret"]="[a-zA-Z0-9]{50}"
+    ["twitter_api_key"]='[a-zA-Z0-9]{25}'
+    ["twitter_secret"]='[a-zA-Z0-9]{50}'
     ["twitter_bearer"]="AAAAAAAAAAAAAAAAAAAAAA[a-zA-Z0-9%]+"
     ["facebook_access"]="EAACEdEose0cBA[0-9A-Za-z]+"
     ["instagram_access"]="IGQV[a-zA-Z0-9_-]+"
-    ["linkedin_client"]="[0-9a-z]{12,14}"
+    ["linkedin_client"]='[0-9a-z]{12,14}'
     # Email Services
     ["sendgrid_api"]="SG\.[a-zA-Z0-9_-]{22}\.[a-zA-Z0-9_-]{43}"
-    ["mailchimp_api"]="[a-f0-9]{32}-us[0-9]{1,2}"
-    ["mailgun_api"]="key-[0-9a-zA-Z]{32}"
-    ["postmark_token"]="[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}"
+    ["mailchimp_api"]='[a-f0-9]{32}-us[0-9]{1,2}'
+    ["mailgun_api"]='key-[0-9a-zA-Z]{32}'
+    ["postmark_token"]='[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'
     # Databases
     ["mongodb_uri"]="mongodb(\\+srv)?://[^:]+:[^@]+@[^/]+"
     ["postgres_uri"]="postgres://[^:]+:[^@]+@[^/]+"
     ["mysql_uri"]="mysql://[^:]+:[^@]+@[^/]+"
     ["redis_uri"]="redis://[^:]+:[^@]+@[^:]+:[0-9]+"
     # Analytics
-    ["mixpanel_token"]="[a-f0-9]{32}"
-    ["amplitude_api"]="[a-f0-9]{32}"
-    ["segment_write"]="[a-zA-Z0-9]{32}"
+    ["mixpanel_token"]='[a-f0-9]{32}'
+    ["amplitude_api"]='[a-f0-9]{32}'
+    ["segment_write"]='[a-zA-Z0-9]{32}'
     # Security/Auth
     ["okta_token"]="00[A-Za-z0-9_-]{40,}"
-    ["auth0_token"]="[a-zA-Z0-9_-]{32,}"
+    ["auth0_token"]='[a-zA-Z0-9_-]{32,}'
     ["jwt_token"]="eyJ[a-zA-Z0-9_-]*\\.eyJ[a-zA-Z0-9_-]*\\.[a-zA-Z0-9_-]*"
     # CI/CD
-    ["circleci_token"]="[a-f0-9]{40}"
-    ["travis_token"]="[a-zA-Z0-9]{22}"
-    ["jenkins_token"]="[a-f0-9]{32,}"
+    ["circleci_token"]='[a-f0-9]{40}'
+    ["travis_token"]='[a-zA-Z0-9]{22}'
+    ["jenkins_token"]='[a-f0-9]{32,}'
     # Other
-    ["algolia_api"]="[a-f0-9]{32}"
+    ["algolia_api"]='[a-f0-9]{32}'
     ["mapbox_token"]="pk\\.[a-zA-Z0-9-_]+\\.[a-zA-Z0-9-_]+"
     ["npm_token"]="npm_[A-Za-z0-9]{36}"
     ["pypi_token"]="pypi-AgEIcHlwaS5vcmc[A-Za-z0-9-_]{50,}"
     ["nuget_api"]="oy2[a-z0-9]{43}"
     ["sentry_dsn"]="https://[a-f0-9]+@[a-z]+\\.ingest\\.sentry\\.io/[0-9]+"
-    ["datadog_api"]="[a-f0-9]{32}"
+    ["datadog_api"]='[a-f0-9]{32}'
     ["newrelic_api"]="NRAK-[A-Z0-9]{27}"
-    ["pagerduty_token"]="[a-zA-Z0-9+/]{20}"
+    ["pagerduty_token"]='[a-zA-Z0-9+/]{20}'
 )
 
 ################################################################################
@@ -1289,9 +1470,9 @@ declare -A OBFUSCATION_PATTERNS=(
     ["base64_prefix"]="(data:|base64,|;base64)"
     ["base64_decode_call"]="(atob|base64_decode|b64decode|Base64\.decode|Buffer\.from)"
     # Hex encoding
-    ["hex_string"]="^[0-9a-fA-F]{40,}$"
-    ["hex_escape"]="(\\\\x[0-9a-fA-F]{2}){10,}"
-    ["unicode_escape"]="(\\\\u[0-9a-fA-F]{4}){10,}"
+    ["hex_string"]='^[0-9a-fA-F]{40,}$'
+    ["hex_escape"]='(\\x[0-9a-fA-F]{2}){10,}'
+    ["unicode_escape"]='(\\u[0-9a-fA-F]{4}){10,}'
     # Character code obfuscation
     ["charcode_js"]="String\\.fromCharCode\\([0-9,\\s]+\\)"
     ["chr_php"]="chr\\([0-9]+\\)"
@@ -1313,7 +1494,7 @@ declare -A OBFUSCATION_PATTERNS=(
     ["deflate_data"]="\\x78\\x01"
     # XOR patterns
     ["xor_loop"]="(\\^=|xor|XOR)"
-    ["xor_key"]="[A-Za-z0-9]{8,32}"
+    ["xor_key"]='[A-Za-z0-9]{8,32}'
     # ROT13/Caesar
     ["rot13"]="(ROT13|rot13|str_rot13)"
     # Packing
@@ -1378,7 +1559,7 @@ declare -A NETWORK_IOC_PATTERNS=(
     ["suspicious_headers"]="(X-Forwarded-For.*,.*,|X-Originating-IP|X-Remote-Addr)"
     ["proxy_headers"]="(Via:|X-Proxy-ID:|Forwarded:)"
     # DNS anomalies
-    ["long_subdomain"]="[a-z0-9]{50,}\\."
+    ["long_subdomain"]='[a-z0-9]{50,}\\.'
     ["many_subdomains"]="([a-z0-9]+\\.){5,}"
     ["txt_record_abuse"]="TXT.*[A-Za-z0-9+/=]{50,}"
     ["null_mx"]="MX.*0\\s+\\."
@@ -1524,6 +1705,391 @@ declare -a CODE_HOSTING_ABUSE_PATTERNS=(
     "observablehq\.com"
     "runkit\.com"
     "carbon\.now\.sh"
+)
+
+################################################################################
+# OFFENSIVE SECURITY / PENTESTING TOOLS DETECTION
+################################################################################
+
+# Red Team / Pentesting Frameworks and Tools
+declare -a OFFENSIVE_TOOLS_PATTERNS=(
+    # Command & Control Frameworks
+    "cobalt.*strike"
+    "cobaltstrike"
+    "beacon\.dll"
+    "beacon\.exe"
+    "artifact\.exe"
+    "sleeve.*\.dll"
+    "metasploit"
+    "meterpreter"
+    "msfvenom"
+    "msfconsole"
+    "msf[0-9]"
+    "exploit/multi"
+    "payload/windows"
+    "reverse.*tcp"
+    "reverse.*https?"
+    "bind.*shell"
+    "staged.*payload"
+    # Empire / PowerShell Empire
+    "empire.*agent"
+    "powershell.*empire"
+    "invoke-empire"
+    "empire\.ps1"
+    "stager\.ps1"
+    # Covenant / Grunt
+    "covenant"
+    "grunt\.exe"
+    "gruntstager"
+    # Sliver C2
+    "sliver.*c2"
+    "sliver.*implant"
+    "sliver-server"
+    # Havoc C2
+    "havoc.*c2"
+    "havoc.*demon"
+    # Brute Ratel
+    "bruteratel"
+    "brute.*ratel"
+    "badger\.exe"
+    # Mythic C2
+    "mythic.*c2"
+    "apfell"
+    "athena.*payload"
+    # PoshC2
+    "poshc2"
+    "posh.*server"
+    # Merlin C2
+    "merlin.*c2"
+    "merlin.*agent"
+    # Silver / Deimos
+    "silver.*c2"
+    "deimos.*agent"
+    # Koadic
+    "koadic"
+    "zomb.*js"
+    # Pupy RAT
+    "pupy.*rat"
+    "pupysh"
+    # Other RATs
+    "quasar.*rat"
+    "nanocore"
+    "njrat"
+    "darkcomet"
+    "remcos"
+    "asyncrat"
+    "warzone.*rat"
+    "netwire"
+    "agent.*tesla"
+    "formbook"
+    "redline.*stealer"
+    "vidar.*stealer"
+    "raccoon.*stealer"
+    "mars.*stealer"
+    "erbium.*stealer"
+    "aurora.*stealer"
+    # Exploitation Tools
+    "mimikatz"
+    "lsassy"
+    "secretsdump"
+    "sharphound"
+    "bloodhound"
+    "rubeus"
+    "kerberoast"
+    "getst"
+    "gettgt"
+    "asreproast"
+    "lazagne"
+    "pypykatz"
+    "kerbrute"
+    "spray"
+    "crackmapexec"
+    "evil-winrm"
+    "impacket"
+    "psexec"
+    "wmiexec"
+    "smbexec"
+    "atexec"
+    "dcomexec"
+    "winpeas"
+    "linpeas"
+    "pspy"
+    "chisel"
+    "ligolo"
+    "proxychains"
+    "ssh.*tunnel"
+    "ngrok"
+    "localtunnel"
+    "serveo"
+    # Reconaissance
+    "nmap"
+    "masscan"
+    "rustscan"
+    "shodan"
+    "censys"
+    "amass"
+    "subfinder"
+    "dnsenum"
+    "dnsrecon"
+    "fierce"
+    "gobuster"
+    "dirbuster"
+    "ffuf"
+    "feroxbuster"
+    "wfuzz"
+    "nuclei"
+    "httpx"
+    "katana"
+    "waybackurls"
+    "gau"
+    "hakrawler"
+    # Web Exploitation
+    "sqlmap"
+    "burp.*suite"
+    "zap.*proxy"
+    "nikto"
+    "wpscan"
+    "joomscan"
+    "droopescan"
+    "drupwn"
+    "xsstrike"
+    "dalfox"
+    "ssrf.*detector"
+    "tplmap"
+    "commix"
+    # Password Attacks
+    "hashcat"
+    "john.*ripper"
+    "hydra"
+    "medusa"
+    "patator"
+    "crowbar"
+    "sprayhound"
+    # Wireless
+    "aircrack"
+    "wifite"
+    "fluxion"
+    "evilginx"
+    "gophish"
+    "modlishka"
+    "muraena"
+    # Mobile
+    "frida.*server"
+    "objection"
+    "apktool"
+    "jadx"
+    "dex2jar"
+    # Evasion
+    "veil.*evasion"
+    "shellter"
+    "unicorn"
+    "msvenom"
+    "donut"
+    "scarecrow"
+    "nimcrypt"
+    "freeze"
+)
+
+# Known Offensive Tool File Signatures
+declare -a OFFENSIVE_FILE_PATTERNS=(
+    "\.cna$"                    # Cobalt Strike Aggressor scripts
+    "\.profile$"                # Malleable C2 profiles
+    "stageless.*payload"
+    "shellcode.*loader"
+    "dll.*injector"
+    "process.*hollow"
+    "reflective.*dll"
+    "beacon.*config"
+    "meterpreter.*payload"
+    "reverse.*shell.*payload"
+    "webshell"
+    "aspxspy"
+    "c99shell"
+    "r57shell"
+    "wso.*shell"
+    "phpspy"
+    "b374k"
+    "weevely"
+    "antsword"
+    "behinder"
+    "godzilla"
+    "china.*chopper"
+    "ice.*scorpion"
+)
+
+# Offensive Infrastructure Indicators
+declare -a OFFENSIVE_INFRA_PATTERNS=(
+    "teamserver"
+    "c2.*server"
+    "listener.*port"
+    "stager.*url"
+    "payload.*staging"
+    "redirector"
+    "front.*domain"
+    "domain.*front"
+    "cdn.*front"
+    "malleable"
+    "profile.*http"
+    "jitter"
+    "sleep.*time"
+    "user.*agent.*rotate"
+    "cert.*pinning.*bypass"
+    "amsi.*bypass"
+    "etw.*bypass"
+    "disable.*defender"
+    "kill.*av"
+    "unhook"
+    "syscall.*direct"
+    "ntdll.*unhook"
+)
+
+################################################################################
+# LEGITIMATE SERVICE ABUSE PATTERNS
+################################################################################
+
+# Services commonly abused for malware delivery/C2
+declare -A SERVICE_ABUSE_INDICATORS=(
+    # Messaging Platforms as C2
+    ["telegram_bot_c2"]="api\.telegram\.org/bot"
+    ["discord_webhook_c2"]="discord(app)?\.com/api/webhooks"
+    ["discord_cdn_malware"]="cdn\.discordapp\.com/attachments"
+    ["slack_webhook_abuse"]="hooks\.slack\.com/services"
+    ["teams_webhook"]="\.webhook\.office\.com"
+    # Paste Sites for Payload Hosting
+    ["pastebin_raw"]="pastebin\.com/raw"
+    ["ghostbin_payload"]="ghostbin\.(co|com)"
+    ["paste_ee"]="paste\.ee/(r|p)"
+    ["hastebin_raw"]="hastebin\.com/raw"
+    ["dpaste_raw"]="dpaste\.(org|com)/.*raw"
+    ["rentry_payload"]="rentry\.(co|org)"
+    ["privatebin_share"]="privatebin\.net"
+    ["0bin_share"]="0bin\.net"
+    ["ix_io_paste"]="ix\.io/"
+    ["termbin_paste"]="termbin\.com"
+    # File Sharing for Malware
+    ["transfer_sh"]="transfer\.sh"
+    ["file_io"]="file\.io"
+    ["tmpfiles"]="tmpfiles\.org"
+    ["anonfiles"]="anonfiles\.com"
+    ["bayfiles"]="bayfiles\.com"
+    ["mediafire_dl"]="mediafire\.com/file"
+    ["mega_dl"]="mega\.(nz|io)/file"
+    ["gofile"]="gofile\.io"
+    ["pixeldrain"]="pixeldrain\.com"
+    ["catbox"]="files\.catbox\.moe"
+    ["litterbox"]="litter\.catbox\.moe"
+    ["uguu"]="uguu\.se"
+    ["pomf"]="pomf\.(cat|lain)"
+    ["cockfile"]="cockfile\.com"
+    ["zippyshare"]="zippyshare\.com"
+    ["sendspace"]="sendspace\.com"
+    ["uploaded"]="uploaded\.(net|to)"
+    # URL Shorteners (often hide malicious URLs)
+    ["bitly_short"]="bit\.ly/"
+    ["tinyurl_short"]="tinyurl\.com/"
+    ["isgd_short"]="is\.gd/"
+    ["vgd_short"]="v\.gd/"
+    ["owly_short"]="ow\.ly/"
+    ["rebrandly_short"]="rebrand\.ly/"
+    ["cutt_ly"]="cutt\.ly/"
+    ["shorturl_at"]="shorturl\.at/"
+    ["t_co"]="t\.co/"
+    ["goo_gl"]="goo\.gl/"
+    ["yourls"]="yourls\."
+    ["clicky"]="clck\.ru/"
+    # Dynamic DNS (often used for C2)
+    ["noip_ddns"]="\.no-ip\.(com|org|biz)"
+    ["duckdns"]="\.duckdns\.org"
+    ["dynu"]="\.dynu\.(com|net)"
+    ["freedns"]="\.freedns\.afraid\.org"
+    ["changeip"]="\.changeip\.(com|org)"
+    ["hopto"]="\.hopto\.org"
+    ["zapto"]="\.zapto\.org"
+    ["serveftp"]="\.serveftp\.com"
+    ["ddns_net"]="\.ddns\.net"
+    ["sytes"]="\.sytes\.net"
+    ["myftpupload"]="\.myftpupload\.com"
+    # Code Execution Platforms
+    ["replit_exec"]="replit\.com/@.*"
+    ["glitch_exec"]="\.glitch\.me"
+    ["vercel_exec"]="\.vercel\.app"
+    ["netlify_exec"]="\.netlify\.app"
+    ["heroku_exec"]="\.herokuapp\.com"
+    ["railway_exec"]="\.railway\.app"
+    ["render_exec"]="\.onrender\.com"
+    ["fly_exec"]="\.fly\.dev"
+    ["deno_exec"]="\.deno\.dev"
+    # Ngrok/Tunneling (common for C2 callbacks)
+    ["ngrok_tunnel"]="\.ngrok\.io"
+    ["ngrok_tcp"]="tcp\.ngrok\.io"
+    ["localtunnel"]="\.loca\.lt"
+    ["serveo"]="serveo\.net"
+    ["localhost_run"]="localhost\.run"
+    ["telebit"]="\.telebit\.io"
+    ["bore"]="bore\.pub"
+    # Serverless Function Abuse
+    ["aws_lambda"]="\.execute-api\..*\.amazonaws\.com"
+    ["azure_func"]="\.azurewebsites\.net/api"
+    ["gcp_func"]="\.cloudfunctions\.net"
+    ["cloudflare_workers"]="\.workers\.dev"
+    ["vercel_func"]="\.vercel\.app/api"
+    ["netlify_func"]="\.netlify\.app/\.netlify/functions"
+)
+
+# Suspicious Callback Patterns
+declare -a CALLBACK_PATTERNS=(
+    # Common C2 callback paths
+    "/__init\\.py$"
+    "/beacon$"
+    "/pixel\\.gif"
+    "/1x1\\.gif"
+    "/submit\\.php"
+    "/gate\\.php"
+    "/panel/gate"
+    "/command$"
+    "/tasks$"
+    "/results$"
+    "/upload$"
+    "/download$"
+    "/config$"
+    "/update$"
+    "/check-in$"
+    "/heartbeat$"
+    "/status$"
+    "/c2$"
+    "/cc$"
+    "/cnc$"
+    # Cobalt Strike default paths
+    "/ca$"
+    "/dpixel$"
+    "/ptj$"
+    "/j\\.ad$"
+    "/activity$"
+    "/\_\_utm\\.gif"
+    "/pixel\\.gif$"
+    "/submit\.php\?id="
+    "/updates\.rss$"
+    # Empire paths
+    "/login/process\.php"
+    "/admin/get\.php"
+    "/news\.php"
+    # Common webshell paths
+    "/shell\.php"
+    "/cmd\.php"
+    "/eval\.php"
+    "/exec\.php"
+    "/system\.php"
+    "/passthru\.php"
+    "/proc_open\.php"
+    "/popen\.php"
+    "/c99\.php"
+    "/r57\.php"
+    "/wso\.php"
+    "/b374k\.php"
+    "/alfa\.php"
+    "/mini\.php"
+    "/up\.php"
+    "/spy\.php"
 )
 
 ################################################################################
@@ -1891,6 +2457,61 @@ declare -a BULLETPROOF_ASNS=(
     "AS53667"    # FranTech
     "AS25820"    # IT7 Networks
     "AS26548"    # Sprious LLC
+)
+
+################################################################################
+# APT XOR ENCRYPTION KEY PATTERNS (for encrypted domain/C2 extraction)
+################################################################################
+
+# Chinese APT XOR keys (APT41, Winnti, PlugX, ShadowPad, Gh0st)
+declare -a CHINESE_APT_XOR_KEYS=(
+    0x88 0x99 0xAA 0xBB 0xCC 0xDD 0xEE
+    0x86 0x87 0x93 0x95 0x9C 0xA3 0xB8
+    0x35 0x36 0x37 0x38 0x39 0x3A 0x3B
+    0xC3 0xC6 0xC9 0xCA 0xCB 0xCE 0xCF
+)
+
+# Russian APT XOR keys (APT28, APT29, Sandworm, Turla)
+declare -a RUSSIAN_APT_XOR_KEYS=(
+    0xAB 0xBA 0xCD 0xDC 0xEF 0xFE
+    0x47 0x74 0x52 0x25 0x71 0x17
+    0x2E 0x3E 0x4E 0x5E 0x6E 0x7E
+    0xA7 0xB4 0xC2 0xD3 0xE1 0xF8
+)
+
+# North Korean APT XOR keys (Lazarus, APT38, Kimsuky)
+declare -a NK_APT_XOR_KEYS=(
+    0x95 0x59 0x6B 0xB6 0x4D 0xD4
+    0x32 0x23 0x45 0x54 0x67 0x76
+    0xAD 0xDA 0xBC 0xCB 0xDE 0xED
+)
+
+# Iranian APT XOR keys (APT33, APT34, APT35, MuddyWater)
+declare -a IRANIAN_APT_XOR_KEYS=(
+    0x7C 0xC7 0x8E 0xE8 0x9F 0xF9
+    0x29 0x92 0x3D 0xD3 0x4B 0xB4
+    0x56 0x65 0x78 0x87 0x8A 0xA8
+)
+
+# Ransomware XOR keys (common across ransomware families)
+declare -a RANSOMWARE_XOR_KEYS=(
+    0x66 0x77 0x88 0x99 0xAA 0xBB 0xCC 0xDD
+    0x13 0x31 0x26 0x62 0x39 0x93 0x4C 0xC4
+    0xF5 0x5F 0xE6 0x6E 0xD7 0x7D 0xA9 0x9A
+)
+
+# Banking Trojan XOR keys
+declare -a BANKING_TROJAN_XOR_KEYS=(
+    0x3C 0x7E 0x8F 0xDC 0x58 0x47
+    0x10 0x03 0xCC 0x1F 0xBE 0x22
+    0x11 0x44 0x64 0x82 0xA1 0xC8
+)
+
+# iOS/macOS Malware XOR keys (Pegasus-style)
+declare -a IOS_MACOS_MALWARE_XOR_KEYS=(
+    0xAC 0xCA 0xFD 0xDF 0xB1 0x1B 0xC4 0x4C
+    0x51 0x15 0x8D 0xD8 0x9E 0xE9 0x2A 0xA2
+    0x6F 0xF6 0x7A 0xA7 0x48 0x84 0x53 0x35
 )
 
 ################################################################################
@@ -2335,8 +2956,8 @@ declare -a HARDWARE_EXPLOIT_PATTERNS=(
     # Command injection for embedded systems
     ";.*sh"
     "|.*sh"
-    "\`.*\`"
-    "\\$\\(.*\\)"
+    "[\\x60].*[\\x60]"
+    "[$][(].*[)]"
     # POS terminal exploits
     "pos.*exploit"
     "verifone"
@@ -2942,7 +3563,7 @@ declare -a COMMAND_INJECTION_PATTERNS=(
     "\\|.*\\|"
     "&.*&"
     "\\$\\(.*\\)"
-    "\`.*\`"
+    "[\\x60].*[\\x60]"
     # Common injection payloads
     ";id;"
     ";whoami;"
@@ -4452,12 +5073,26 @@ analyze_url_structure() {
     
     log_info "Deep URL analysis: $url"
     
-    # Extract components
-    local protocol=$(echo "$url" | grep -oP '^[a-z]+(?=:)' | head -1)
+    # Extract components (POSIX compatible)
+    local protocol=$(echo "$url" | sed -n 's/^\([a-z]*\):.*/\1/p' | head -1)
     local domain=$(echo "$url" | sed -E 's|^[a-z]+://||' | cut -d'/' -f1 | cut -d':' -f1)
-    local port=$(echo "$url" | grep -oP ':[0-9]+' | tr -d ':' | head -1)
+    local port=$(echo "$url" | sed -n 's/.*:\([0-9][0-9]*\).*/\1/p' | head -1)
     local path=$(echo "$url" | sed 's|^[^/]*//[^/]*/||')
-    local query=$(echo "$url" | grep -oP '\?.*$' | head -1)
+    local query=$(echo "$url" | sed -n 's/.*\(\?.*\)$/\1/p' | head -1)
+    
+    # Display parsed URL components
+    echo ""
+    echo -e "${CYAN}┌─────────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${CYAN}│                    URL FORENSIC ANALYSIS                    │${NC}"
+    echo -e "${CYAN}├─────────────────────────────────────────────────────────────┤${NC}"
+    echo -e "${CYAN}│${NC} Protocol:    ${WHITE}${protocol:-N/A}${NC}"
+    echo -e "${CYAN}│${NC} Domain:      ${WHITE}${domain:-N/A}${NC}"
+    echo -e "${CYAN}│${NC} Port:        ${WHITE}${port:-default}${NC}"
+    echo -e "${CYAN}│${NC} Path:        ${WHITE}${path:-/}${NC}"
+    echo -e "${CYAN}│${NC} Query:       ${WHITE}${query:-none}${NC}"
+    echo -e "${CYAN}│${NC} Length:      ${WHITE}${#url} characters${NC}"
+    echo -e "${CYAN}└─────────────────────────────────────────────────────────────┘${NC}"
+    echo ""
     
     # Check for dangerous URI schemes
     for scheme in "${DANGEROUS_URI_SCHEMES[@]}"; do
@@ -4590,8 +5225,8 @@ analyze_data_uri() {
     
     log_info "Analyzing Data URI..."
     
-    # Extract MIME type
-    local mime_type=$(echo "$uri" | grep -oP 'data:[^;,]+' | sed 's/data://')
+    # Extract MIME type (POSIX compatible)
+    local mime_type=$(echo "$uri" | sed -n 's/^data:\([^;,]*\).*/\1/p')
     log_forensic "Data URI MIME type: $mime_type"
     
     # Check for dangerous MIME types
@@ -4684,20 +5319,32 @@ check_homograph_attack() {
     local domain="$1"
     
     # Mixed scripts detection
-    local has_latin=$(echo "$domain" | grep -P '[a-zA-Z]' | wc -l)
-    local has_cyrillic=$(echo "$domain" | grep -P '[а-яА-ЯёЁ]' | wc -l)
-    local has_greek=$(echo "$domain" | grep -P '[α-ωΑ-Ω]' | wc -l)
+    local has_latin=$(echo "$domain" | grep '[a-zA-Z]' | wc -l)
+    local has_cyrillic=$(echo "$domain" | grep -E '[а-яА-ЯёЁ]' | wc -l)
+    local has_greek=$(echo "$domain" | grep -E '[α-ωΑ-Ω]' | wc -l)
     
     if [ $has_latin -gt 0 ] && ([ $has_cyrillic -gt 0 ] || [ $has_greek -gt 0 ]); then
         log_threat 50 "HOMOGRAPH ATTACK: Mixed character sets detected"
     fi
     
-    # Check for lookalike characters
+    # Check for lookalike characters (non-ASCII only)
+    local homograph_found=false
     for char in "${HOMOGRAPH_CHARS[@]}"; do
+        [ -z "$char" ] && continue
         if echo "$domain" | grep -qF "$char"; then
-            log_threat 40 "Homograph character detected: $char"
+            if [ "$homograph_found" = false ]; then
+                log_threat 50 "⚠️  HOMOGRAPH ATTACK DETECTED in domain!"
+                log_warning "    ├─ Domain: $domain"
+                homograph_found=true
+            fi
+            # Get the Unicode code point for the character
+            local codepoint=$(printf '%s' "$char" | od -An -tx1 | tr -d ' \n')
+            log_warning "    ├─ Lookalike character: '$char' (bytes: $codepoint)"
         fi
     done
+    if [ "$homograph_found" = true ]; then
+        log_warning "    └─ Recommendation: Verify domain authenticity - may be spoofing a legitimate site"
+    fi
     
     # Punycode detection
     if echo "$domain" | grep -qE 'xn--'; then
@@ -4776,13 +5423,27 @@ check_domain_whois() {
         fi
     fi
     
-    # Registrar check
+    # Registrar check - check against suspicious registrars
     local registrar=$(grep -i "Registrar:" "$whois_file" | head -1)
-    [ -n "$registrar" ] && log_forensic "Registrar: $registrar"
+    if [ -n "$registrar" ]; then
+        log_forensic "Registrar: $registrar"
+        
+        # Check against known high-abuse registrars
+        local registrar_lower=$(echo "$registrar" | tr '[:upper:]' '[:lower:]')
+        for suspicious_reg in "${SUSPICIOUS_REGISTRARS[@]}"; do
+            [ -z "$suspicious_reg" ] && continue
+            if echo "$registrar_lower" | grep -qi "$suspicious_reg"; then
+                log_warning "Domain registered with high-abuse registrar: $suspicious_reg"
+                log_threat 15 "High-abuse registrar detected: $suspicious_reg"
+                record_ioc "suspicious_registrar" "$suspicious_reg" "Known high-abuse domain registrar"
+            fi
+        done
+    fi
     
     # Privacy protection
-    if grep -qi "privacy\|proxy\|whoisguard\|domains by proxy\|perfect privacy" "$whois_file"; then
+    if grep -qi "privacy\|proxy\|whoisguard\|domains by proxy\|perfect privacy\|withheld\|redacted" "$whois_file"; then
         log_warning "Domain uses privacy protection service"
+        log_threat 5 "WHOIS privacy protection (common with malicious domains)"
     fi
     
     # Save to evidence
@@ -5068,7 +5729,11 @@ check_against_threat_intel() {
             # OpenPhish
             if [ -f "${TEMP_DIR}/threat_intel/openphish.txt" ]; then
                 if grep -qF "$ioc" "${TEMP_DIR}/threat_intel/openphish.txt" 2>/dev/null; then
-                    log_threat 100 "URL found in OpenPhish feed!"
+                    log_threat 100 "⚠️  PHISHING URL DETECTED!"
+                    log_error "    ├─ Source: OpenPhish Feed"
+                    log_error "    ├─ URL: $ioc"
+                    log_error "    └─ Recommendation: DO NOT VISIT - Known phishing site"
+                    record_ioc "phishing_url" "$ioc" "OpenPhish match"
                     ((matches++))
                 fi
             fi
@@ -5076,7 +5741,11 @@ check_against_threat_intel() {
             # URLhaus
             if [ -f "${TEMP_DIR}/threat_intel/urlhaus.txt" ]; then
                 if grep -qF "$ioc" "${TEMP_DIR}/threat_intel/urlhaus.txt" 2>/dev/null; then
-                    log_threat 100 "URL found in URLhaus feed!"
+                    log_threat 100 "⚠️  MALWARE URL DETECTED!"
+                    log_error "    ├─ Source: URLhaus (Abuse.ch)"
+                    log_error "    ├─ URL: $ioc"
+                    log_error "    └─ Recommendation: DO NOT VISIT - Known malware distribution"
+                    record_ioc "malware_url" "$ioc" "URLhaus match"
                     ((matches++))
                 fi
             fi
@@ -5084,7 +5753,11 @@ check_against_threat_intel() {
             # PhishTank
             if [ -f "${TEMP_DIR}/threat_intel/phishtank.json" ]; then
                 if jq -e ".[] | select(.url == \"$ioc\")" "${TEMP_DIR}/threat_intel/phishtank.json" > /dev/null 2>&1; then
-                    log_threat 100 "URL found in PhishTank!"
+                    log_threat 100 "⚠️  VERIFIED PHISHING URL!"
+                    log_error "    ├─ Source: PhishTank (Verified)"
+                    log_error "    ├─ URL: $ioc"
+                    log_error "    └─ Recommendation: DO NOT VISIT - Community verified phishing"
+                    record_ioc "phishing_url" "$ioc" "PhishTank match"
                     ((matches++))
                 fi
             fi
@@ -5093,7 +5766,11 @@ check_against_threat_intel() {
             # Ransomware domains
             if [ -f "${TEMP_DIR}/threat_intel/ransomware_domains.txt" ]; then
                 if grep -qiF "$ioc" "${TEMP_DIR}/threat_intel/ransomware_domains.txt" 2>/dev/null; then
-                    log_threat 100 "Domain found in ransomware tracker!"
+                    log_threat 100 "🔒 RANSOMWARE DOMAIN DETECTED!"
+                    log_error "    ├─ Source: Ransomware Tracker"
+                    log_error "    ├─ Domain: $ioc"
+                    log_error "    └─ Recommendation: Block immediately - Associated with ransomware operations"
+                    record_ioc "ransomware_domain" "$ioc" "Ransomware tracker match"
                     ((matches++))
                 fi
             fi
@@ -5101,7 +5778,11 @@ check_against_threat_intel() {
             # OTX IOCs
             if [ -f "${TEMP_DIR}/threat_intel/otx_iocs.txt" ]; then
                 if grep -qiF "$ioc" "${TEMP_DIR}/threat_intel/otx_iocs.txt" 2>/dev/null; then
-                    log_threat 80 "Domain found in OTX AlienVault!"
+                    log_threat 80 "⚠️  THREAT INTELLIGENCE MATCH!"
+                    log_warning "    ├─ Source: OTX AlienVault"
+                    log_warning "    ├─ Domain: $ioc"
+                    log_warning "    └─ Recommendation: Investigate - Known threat indicator"
+                    record_ioc "otx_ioc" "$ioc" "OTX AlienVault match"
                     ((matches++))
                 fi
             fi
@@ -5110,7 +5791,11 @@ check_against_threat_intel() {
             # Spamhaus DROP
             if [ -f "${TEMP_DIR}/threat_intel/spamhaus_drop.txt" ]; then
                 if grep -qF "$ioc" "${TEMP_DIR}/threat_intel/spamhaus_drop.txt" 2>/dev/null; then
-                    log_threat 100 "IP found in Spamhaus DROP list!"
+                    log_threat 100 "🚫 BLOCKED IP DETECTED!"
+                    log_error "    ├─ Source: Spamhaus DROP List"
+                    log_error "    ├─ IP: $ioc"
+                    log_error "    └─ Recommendation: Block at firewall - Known malicious infrastructure"
+                    record_ioc "blocked_ip" "$ioc" "Spamhaus DROP match"
                     ((matches++))
                 fi
             fi
@@ -5118,7 +5803,11 @@ check_against_threat_intel() {
             # Feodo Tracker
             if [ -f "${TEMP_DIR}/threat_intel/feodo_ips.txt" ]; then
                 if grep -qF "$ioc" "${TEMP_DIR}/threat_intel/feodo_ips.txt" 2>/dev/null; then
-                    log_threat 100 "IP found in Feodo Tracker (banking trojan C2)!"
+                    log_threat 100 "💰 BANKING TROJAN C2 DETECTED!"
+                    log_error "    ├─ Source: Feodo Tracker (Abuse.ch)"
+                    log_error "    ├─ IP: $ioc"
+                    log_error "    └─ Recommendation: Block immediately - Banking trojan command & control"
+                    record_ioc "c2_ip" "$ioc" "Feodo Tracker match"
                     ((matches++))
                 fi
             fi
@@ -5341,6 +6030,10 @@ analyze_apt_indicators() {
             echo "Attribution Confidence: $(calculate_apt_confidence "${apt_matches[@]}")"
             echo ""
         } >> "$APT_REPORT"
+        
+        analysis_success_found "APT-ANALYSIS" "${#apt_matches[@]}" "Matched indicators found"
+    else
+        analysis_success_none "APT-ANALYSIS"
     fi
 }
 
@@ -6811,6 +7504,297 @@ analyze_cloud_service_abuse() {
         if [ $cloud_score -ge 50 ]; then
             log_threat $((cloud_score / 2)) "Cloud service abuse indicators detected"
         fi
+        
+        analysis_success_found "CLOUD-ABUSE" "${#cloud_findings[@]}" "Score: $cloud_score"
+    else
+        analysis_success_none "CLOUD-ABUSE"
+    fi
+}
+
+analyze_offensive_tools() {
+    local content="$1"
+    
+    log_info "Analyzing for offensive security tools and indicators..."
+    
+    local offensive_findings=()
+    local offensive_score=0
+    
+    # Check for known offensive tools patterns
+    for pattern in "${OFFENSIVE_TOOLS_PATTERNS[@]}"; do
+        [ -z "$pattern" ] && continue
+        if echo "$content" | grep -qiE "$pattern" 2>/dev/null; then
+            local matched=$(echo "$content" | grep -oiE "$pattern" 2>/dev/null | head -1)
+            offensive_findings+=("offensive_tool:$matched")
+            ((offensive_score += 50))
+            log_threat 60 "🔴 OFFENSIVE TOOL DETECTED: $matched"
+            log_error "    ├─ Category: Pentesting/Red Team Tool"
+            log_error "    ├─ Pattern: $pattern"
+            log_error "    └─ Risk: HIGH - Often used in attacks"
+        fi
+    done
+    
+    # Check for offensive file patterns
+    for pattern in "${OFFENSIVE_FILE_PATTERNS[@]}"; do
+        [ -z "$pattern" ] && continue
+        if echo "$content" | grep -qiE "$pattern" 2>/dev/null; then
+            local matched=$(echo "$content" | grep -oiE "$pattern" 2>/dev/null | head -1)
+            offensive_findings+=("offensive_file:$matched")
+            ((offensive_score += 40))
+            log_threat 50 "🔴 OFFENSIVE FILE SIGNATURE: $matched"
+            log_error "    ├─ Type: Known malicious file pattern"
+            log_error "    └─ Risk: HIGH - Webshell or exploit payload"
+        fi
+    done
+    
+    # Check for offensive infrastructure patterns
+    for pattern in "${OFFENSIVE_INFRA_PATTERNS[@]}"; do
+        [ -z "$pattern" ] && continue
+        if echo "$content" | grep -qiE "$pattern" 2>/dev/null; then
+            local matched=$(echo "$content" | grep -oiE "$pattern" 2>/dev/null | head -1)
+            offensive_findings+=("offensive_infra:$matched")
+            ((offensive_score += 35))
+            log_threat 45 "⚠️  OFFENSIVE INFRASTRUCTURE INDICATOR: $matched"
+            log_warning "    ├─ Type: C2/Attack infrastructure pattern"
+            log_warning "    └─ Risk: MEDIUM-HIGH - Possible attack setup"
+        fi
+    done
+    
+    # Specific high-confidence detections with detailed output
+    if echo "$content" | grep -qiE "cobalt.*strike|cobaltstrike|beacon\.(dll|exe)" 2>/dev/null; then
+        log_critical "════════════════════════════════════════════════════════"
+        log_critical "🚨 COBALT STRIKE DETECTED!"
+        log_critical "════════════════════════════════════════════════════════"
+        log_error "    ├─ Tool: Cobalt Strike (Commercial Red Team Tool)"
+        log_error "    ├─ Usage: Commonly abused by ransomware groups"
+        log_error "    ├─ Threat Actors: APT29, APT41, FIN7, Conti, LockBit"
+        log_error "    └─ Action: BLOCK IMMEDIATELY - Report to security team"
+        offensive_findings+=("COBALT_STRIKE_CONFIRMED")
+        ((offensive_score += 200))
+    fi
+    
+    if echo "$content" | grep -qiE "meterpreter|msfvenom|metasploit" 2>/dev/null; then
+        log_critical "════════════════════════════════════════════════════════"
+        log_critical "🚨 METASPLOIT FRAMEWORK DETECTED!"
+        log_critical "════════════════════════════════════════════════════════"
+        log_error "    ├─ Tool: Metasploit Framework"
+        log_error "    ├─ Usage: Popular exploitation framework"
+        log_error "    ├─ Risk: Active exploitation attempt"
+        log_error "    └─ Action: Investigate source and block"
+        offensive_findings+=("METASPLOIT_CONFIRMED")
+        ((offensive_score += 150))
+    fi
+    
+    if echo "$content" | grep -qiE "mimikatz|sekurlsa|lsadump" 2>/dev/null; then
+        log_critical "════════════════════════════════════════════════════════"
+        log_critical "🚨 MIMIKATZ CREDENTIAL THEFT TOOL DETECTED!"
+        log_critical "════════════════════════════════════════════════════════"
+        log_error "    ├─ Tool: Mimikatz"
+        log_error "    ├─ Purpose: Windows credential extraction"
+        log_error "    ├─ Risk: CRITICAL - Password/hash theft"
+        log_error "    └─ Action: Assume credentials compromised"
+        offensive_findings+=("MIMIKATZ_CONFIRMED")
+        ((offensive_score += 200))
+    fi
+    
+    if echo "$content" | grep -qiE "bloodhound|sharphound" 2>/dev/null; then
+        log_threat 80 "🔴 BLOODHOUND/SHARPHOUND DETECTED!"
+        log_error "    ├─ Tool: BloodHound Active Directory reconnaissance"
+        log_error "    ├─ Purpose: AD privilege escalation path discovery"
+        log_error "    └─ Risk: HIGH - Attack reconnaissance phase"
+        offensive_findings+=("BLOODHOUND_RECON")
+        ((offensive_score += 100))
+    fi
+    
+    if echo "$content" | grep -qiE "rubeus|kerberoast|asreproast" 2>/dev/null; then
+        log_threat 80 "🔴 KERBEROS ATTACK TOOL DETECTED!"
+        log_error "    ├─ Tool: Rubeus/Kerberoasting toolkit"
+        log_error "    ├─ Purpose: Kerberos ticket attacks"
+        log_error "    └─ Risk: HIGH - Credential compromise"
+        offensive_findings+=("KERBEROS_ATTACK")
+        ((offensive_score += 100))
+    fi
+    
+    if echo "$content" | grep -qiE "empire.*agent|powershell.*empire" 2>/dev/null; then
+        log_threat 90 "🔴 POWERSHELL EMPIRE DETECTED!"
+        log_error "    ├─ Tool: PowerShell Empire C2 Framework"
+        log_error "    ├─ Purpose: Post-exploitation & C2"
+        log_error "    └─ Risk: HIGH - Active compromise"
+        offensive_findings+=("POWERSHELL_EMPIRE")
+        ((offensive_score += 120))
+    fi
+    
+    # Check for webshell indicators
+    if echo "$content" | grep -qiE "c99|r57|wso.*shell|b374k|antsword|behinder|godzilla|china.*chopper" 2>/dev/null; then
+        log_critical "════════════════════════════════════════════════════════"
+        log_critical "🚨 WEBSHELL DETECTED!"
+        log_critical "════════════════════════════════════════════════════════"
+        local shell_name=$(echo "$content" | grep -oiE "c99|r57|wso|b374k|antsword|behinder|godzilla|china.*chopper" | head -1)
+        log_error "    ├─ Type: $shell_name webshell"
+        log_error "    ├─ Purpose: Remote server control"
+        log_error "    ├─ Risk: CRITICAL - Server compromised"
+        log_error "    └─ Action: Immediate incident response required"
+        offensive_findings+=("WEBSHELL:$shell_name")
+        ((offensive_score += 200))
+    fi
+    
+    # Check for RAT indicators
+    if echo "$content" | grep -qiE "asyncrat|quasar.*rat|nanocore|njrat|remcos|darkcomet|agent.*tesla|netwire" 2>/dev/null; then
+        local rat_name=$(echo "$content" | grep -oiE "asyncrat|quasar|nanocore|njrat|remcos|darkcomet|agent.*tesla|netwire" | head -1)
+        log_critical "════════════════════════════════════════════════════════"
+        log_critical "🚨 REMOTE ACCESS TROJAN (RAT) DETECTED!"
+        log_critical "════════════════════════════════════════════════════════"
+        log_error "    ├─ RAT Family: $rat_name"
+        log_error "    ├─ Capabilities: Remote control, keylogging, screen capture"
+        log_error "    ├─ Risk: CRITICAL - Full system compromise"
+        log_error "    └─ Action: Isolate system, begin IR procedures"
+        offensive_findings+=("RAT:$rat_name")
+        ((offensive_score += 200))
+    fi
+    
+    # Check for info stealers
+    if echo "$content" | grep -qiE "redline.*stealer|vidar|raccoon.*stealer|mars.*stealer|erbium|aurora.*stealer|formbook" 2>/dev/null; then
+        local stealer_name=$(echo "$content" | grep -oiE "redline|vidar|raccoon|mars|erbium|aurora|formbook" | head -1)
+        log_critical "════════════════════════════════════════════════════════"
+        log_critical "🚨 INFO STEALER MALWARE DETECTED!"
+        log_critical "════════════════════════════════════════════════════════"
+        log_error "    ├─ Stealer Family: $stealer_name"
+        log_error "    ├─ Target: Browser data, crypto wallets, credentials"
+        log_error "    ├─ Risk: CRITICAL - Data exfiltration"
+        log_error "    └─ Action: Change all passwords, check crypto wallets"
+        offensive_findings+=("INFOSTEALER:$stealer_name")
+        ((offensive_score += 200))
+    fi
+    
+    # Report findings
+    if [ ${#offensive_findings[@]} -gt 0 ]; then
+        {
+            echo "═══════════════════════════════════════════════"
+            echo "OFFENSIVE SECURITY TOOLS ANALYSIS"
+            echo "═══════════════════════════════════════════════"
+            echo "Timestamp: $(date -Iseconds)"
+            echo "Offensive Tool Score: $offensive_score"
+            echo ""
+            echo "Detected Tools/Indicators:"
+            for finding in "${offensive_findings[@]}"; do
+                echo "  ⚠ $finding"
+            done
+            echo ""
+            if [ $offensive_score -ge 200 ]; then
+                echo "VERDICT: CRITICAL - Confirmed malicious tooling"
+            elif [ $offensive_score -ge 100 ]; then
+                echo "VERDICT: HIGH - Strong offensive tool indicators"
+            elif [ $offensive_score -ge 50 ]; then
+                echo "VERDICT: MEDIUM - Suspicious tool references"
+            fi
+            echo ""
+        } >> "${OUTPUT_DIR}/offensive_tools_analysis.txt"
+        
+        log_threat $((offensive_score / 3)) "Offensive security tools detected"
+        analysis_success_found "OFFENSIVE-TOOLS" "${#offensive_findings[@]}" "Score: $offensive_score"
+    else
+        analysis_success_none "OFFENSIVE-TOOLS"
+    fi
+}
+
+analyze_service_abuse() {
+    local content="$1"
+    
+    log_info "Analyzing for legitimate service abuse patterns..."
+    
+    local abuse_findings=()
+    local abuse_score=0
+    
+    # Check each service abuse indicator
+    for key in "${!SERVICE_ABUSE_INDICATORS[@]}"; do
+        local pattern="${SERVICE_ABUSE_INDICATORS[$key]}"
+        [ -z "$pattern" ] && continue
+        if echo "$content" | grep -qiE "$pattern" 2>/dev/null; then
+            local matched=$(echo "$content" | grep -oiE "$pattern" 2>/dev/null | head -1)
+            abuse_findings+=("$key:$matched")
+            ((abuse_score += 25))
+            
+            # Categorize and provide detailed output
+            case "$key" in
+                *_c2|*_webhook*)
+                    log_threat 50 "🔴 C2 CHANNEL ABUSE: $key"
+                    log_error "    ├─ Service: $matched"
+                    log_error "    ├─ Abuse Type: Command & Control communication"
+                    log_error "    └─ Risk: HIGH - Active malware communication"
+                    ((abuse_score += 25))
+                    ;;
+                *_malware|*_payload|*_raw)
+                    log_threat 45 "🔴 PAYLOAD HOSTING: $key"
+                    log_warning "    ├─ Service: $matched"
+                    log_warning "    ├─ Abuse Type: Malware/payload hosting"
+                    log_warning "    └─ Risk: HIGH - Malware delivery"
+                    ((abuse_score += 20))
+                    ;;
+                *_ddns|*_tunnel|*ngrok*)
+                    log_threat 40 "⚠️  DYNAMIC/TUNNEL SERVICE: $key"
+                    log_warning "    ├─ Service: $matched"
+                    log_warning "    ├─ Abuse Type: Dynamic DNS or tunneling"
+                    log_warning "    └─ Risk: MEDIUM-HIGH - Evasion/C2 callback"
+                    ((abuse_score += 15))
+                    ;;
+                *_short*)
+                    log_warning "⚠️  URL SHORTENER: $key"
+                    log_info "    ├─ Service: $matched"
+                    log_info "    ├─ Abuse Type: URL obfuscation"
+                    log_info "    └─ Risk: MEDIUM - Hiding destination"
+                    ;;
+                *_exec|*_func)
+                    log_threat 35 "⚠️  SERVERLESS EXECUTION: $key"
+                    log_warning "    ├─ Service: $matched"
+                    log_warning "    ├─ Abuse Type: Serverless function abuse"
+                    log_warning "    └─ Risk: MEDIUM - Ephemeral malicious code"
+                    ((abuse_score += 10))
+                    ;;
+                *)
+                    log_warning "⚠️  SERVICE ABUSE: $key"
+                    log_info "    ├─ Service: $matched"
+                    log_info "    └─ Risk: Review required"
+                    ;;
+            esac
+        fi
+    done
+    
+    # Check callback patterns
+    for pattern in "${CALLBACK_PATTERNS[@]}"; do
+        [ -z "$pattern" ] && continue
+        if echo "$content" | grep -qiE "$pattern" 2>/dev/null; then
+            local matched=$(echo "$content" | grep -oiE "$pattern" 2>/dev/null | head -1)
+            log_threat 55 "🔴 C2 CALLBACK PATH DETECTED: $matched"
+            log_error "    ├─ Pattern: Known C2/malware callback endpoint"
+            log_error "    ├─ Examples: Cobalt Strike beacons, webshells"
+            log_error "    └─ Risk: HIGH - Active C2 communication"
+            abuse_findings+=("c2_callback:$matched")
+            ((abuse_score += 40))
+        fi
+    done
+    
+    # Report findings
+    if [ ${#abuse_findings[@]} -gt 0 ]; then
+        {
+            echo "═══════════════════════════════════════════════"
+            echo "LEGITIMATE SERVICE ABUSE ANALYSIS"
+            echo "═══════════════════════════════════════════════"
+            echo "Timestamp: $(date -Iseconds)"
+            echo "Service Abuse Score: $abuse_score"
+            echo ""
+            echo "Detected Abuse Patterns:"
+            for finding in "${abuse_findings[@]}"; do
+                echo "  ⚠ $finding"
+            done
+            echo ""
+        } >> "${OUTPUT_DIR}/service_abuse_analysis.txt"
+        
+        if [ $abuse_score -ge 50 ]; then
+            log_threat $((abuse_score / 2)) "Legitimate service abuse detected"
+        fi
+        
+        analysis_success_found "SERVICE-ABUSE" "${#abuse_findings[@]}" "Score: $abuse_score"
+    else
+        analysis_success_none "SERVICE-ABUSE"
     fi
 }
 
@@ -6997,6 +7981,10 @@ analyze_mobile_deeplinks() {
         if [ $mobile_score -ge 40 ]; then
             log_threat $((mobile_score / 2)) "Mobile platform threats detected"
         fi
+        
+        analysis_success_found "MOBILE-DEEPLINKS" "${#mobile_findings[@]}" "Score: $mobile_score"
+    else
+        analysis_success_none "MOBILE-DEEPLINKS"
     fi
 }
 
@@ -7105,6 +8093,10 @@ analyze_wireless_attacks() {
         if [ $wireless_score -ge 30 ]; then
             log_threat $((wireless_score / 2)) "Wireless attack indicators detected"
         fi
+        
+        analysis_success_found "WIRELESS" "${#wireless_findings[@]}" "Score: $wireless_score"
+    else
+        analysis_success_none "WIRELESS"
     fi
 }
 
@@ -7219,6 +8211,10 @@ analyze_telephony_attacks() {
         if [ $telephony_score -ge 30 ]; then
             log_threat $((telephony_score / 2)) "Telephony/USSD threats detected"
         fi
+        
+        analysis_success_found "TELEPHONY" "${#telephony_findings[@]}" "Score: $telephony_score"
+    else
+        analysis_success_none "TELEPHONY"
     fi
 }
 
@@ -7240,8 +8236,10 @@ analyze_hardware_exploits() {
     
     # Check hardware exploit patterns
     for pattern in "${HARDWARE_EXPLOIT_PATTERNS[@]}"; do
-        if echo "$content" | grep -qiE "$pattern"; then
-            local matched=$(echo "$content" | grep -oiE "$pattern" | head -1)
+        # Skip empty patterns
+        [ -z "$pattern" ] && continue
+        if echo "$content" | grep -qiE "$pattern" 2>/dev/null; then
+            local matched=$(echo "$content" | grep -oiE "$pattern" 2>/dev/null | head -1)
             hardware_findings+=("hardware_exploit:$matched")
             ((hardware_score += 35))
             log_threat 45 "Hardware/IoT exploit pattern: $matched"
@@ -7326,6 +8324,10 @@ analyze_hardware_exploits() {
         if [ $hardware_score -ge 30 ]; then
             log_threat $((hardware_score / 2)) "Hardware/IoT exploit patterns detected"
         fi
+        
+        analysis_success_found "HARDWARE-IOT" "${#hardware_findings[@]}" "Score: $hardware_score"
+    else
+        analysis_success_none "HARDWARE-IOT"
     fi
 }
 
@@ -7429,6 +8431,10 @@ analyze_geofencing_cloaking() {
         if [ $geo_score -ge 30 ]; then
             log_threat $((geo_score / 3)) "Geofencing/Cloaking detected"
         fi
+        
+        analysis_success_found "GEOFENCING" "${#geo_findings[@]}" "Score: $geo_score"
+    else
+        analysis_success_none "GEOFENCING"
     fi
 }
 
@@ -7623,6 +8629,10 @@ analyze_fileless_malware() {
         if [ $fileless_score -ge 40 ]; then
             log_threat $((fileless_score / 2)) "Fileless malware techniques detected"
         fi
+        
+        analysis_success_found "FILELESS" "${#fileless_findings[@]}" "Score: $fileless_score"
+    else
+        analysis_success_none "FILELESS"
     fi
 }
 
@@ -7773,6 +8783,10 @@ analyze_ransomware_notes() {
         if [ $ransom_score -ge 40 ]; then
             log_threat $((ransom_score / 2)) "Ransomware indicators detected"
         fi
+        
+        analysis_success_found "RANSOMWARE" "${#ransom_findings[@]}" "Score: $ransom_score"
+    else
+        analysis_success_none "RANSOMWARE"
     fi
 }
 
@@ -7882,6 +8896,10 @@ analyze_tor_vpn() {
         if [ $anon_score -ge 30 ]; then
             log_threat $((anon_score / 2)) "Tor/VPN/Anonymization indicators detected"
         fi
+        
+        analysis_success_found "TOR-VPN" "${#anon_findings[@]}" "Score: $anon_score"
+    else
+        analysis_success_none "TOR-VPN"
     fi
 }
 
@@ -8065,6 +9083,10 @@ analyze_social_engineering() {
         if [ $se_score -ge 35 ]; then
             log_threat $((se_score / 3)) "Social engineering patterns detected"
         fi
+        
+        analysis_success_found "SOCIAL-ENGINEERING" "${#se_findings[@]}" "Score: $se_score"
+    else
+        analysis_success_none "SOCIAL-ENGINEERING"
     fi
 }
 
@@ -8076,6 +9098,7 @@ analyze_asn_infrastructure() {
     local content="$1"
     
     if [ "$ASN_ANALYSIS" = false ] || [ "$NETWORK_CHECK" = false ]; then
+        analysis_success_none "ASN-ANALYSIS"
         return
     fi
     
@@ -8083,16 +9106,27 @@ analyze_asn_infrastructure() {
     
     local asn_findings=()
     local asn_score=0
+    local analyzed_count=0
     
     # Extract domains and IPs
     local domains=$(echo "$content" | grep -oiE "[a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,}" | sort -u)
     local ips=$(echo "$content" | grep -oE "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}" | sort -u)
     
+    # Display extracted targets
+    if [ -n "$domains" ] || [ -n "$ips" ]; then
+        echo ""
+        echo -e "${CYAN}┌─────────────────────────────────────────────────────────────┐${NC}"
+        echo -e "${CYAN}│                 ASN/INFRASTRUCTURE ANALYSIS                  │${NC}"
+        echo -e "${CYAN}├─────────────────────────────────────────────────────────────┤${NC}"
+    fi
+    
     # Resolve domains to IPs
     for domain in $domains; do
         local resolved_ip=$(dig +short A "$domain" 2>/dev/null | head -1)
         if [ -n "$resolved_ip" ] && [ "$resolved_ip" != "$domain" ]; then
+            echo -e "${CYAN}│${NC} Domain: ${WHITE}$domain${NC} → ${YELLOW}$resolved_ip${NC}"
             ips="$ips $resolved_ip"
+            ((analyzed_count++))
         fi
     done
     
@@ -8103,19 +9137,23 @@ analyze_asn_infrastructure() {
             continue
         fi
         
-        # Get ASN info
-        local asn_info=$(whois -h whois.cymru.com " -v $ip" 2>/dev/null | tail -1)
+        ((analyzed_count++))
         
-        if [ -n "$asn_info" ]; then
+        # Get ASN info (with timeout)
+        local asn_info=$(timeout 5 whois -h whois.cymru.com " -v $ip" 2>/dev/null | tail -1)
+        
+        if [ -n "$asn_info" ] && [ "$asn_info" != "Error" ]; then
             local asn=$(echo "$asn_info" | awk -F'|' '{print $1}' | tr -d ' ')
             local asn_name=$(echo "$asn_info" | awk -F'|' '{print $NF}' | xargs)
             local country=$(echo "$asn_info" | awk -F'|' '{print $3}' | tr -d ' ')
             
+            echo -e "${CYAN}│${NC} IP: ${WHITE}$ip${NC} → AS${YELLOW}$asn${NC} (${WHITE}$asn_name${NC}) [${YELLOW}$country${NC}]"
             log_forensic "IP $ip -> AS$asn ($asn_name) [$country]"
             
             # Check against bulletproof ASN list
             for bp_asn in "${BULLETPROOF_ASNS[@]}"; do
                 if [ "AS$asn" = "$bp_asn" ]; then
+                    echo -e "${CYAN}│${NC}   ${RED}⚠ BULLETPROOF/HIGH-ABUSE ASN${NC}"
                     log_threat 40 "IP $ip is in known bulletproof/abuse-prone ASN: $bp_asn ($asn_name)"
                     asn_findings+=("bulletproof_asn:$bp_asn:$ip")
                     ((asn_score += 30))
@@ -8124,23 +9162,61 @@ analyze_asn_infrastructure() {
             
             # Check country
             case "$country" in
-                "RU"|"CN"|"IR"|"KP"|"SY")
-                    log_warning "IP $ip is in high-risk country: $country"
-                    asn_findings+=("high_risk_country:$country:$ip")
+                "RU")
+                    echo -e "${CYAN}│${NC}   ${YELLOW}⚠ High-risk country: Russia${NC}"
+                    log_warning "IP $ip is in high-risk country: Russia"
+                    asn_findings+=("high_risk_country:RU:$ip")
                     ((asn_score += 20))
+                    ;;
+                "CN")
+                    echo -e "${CYAN}│${NC}   ${YELLOW}⚠ High-risk country: China${NC}"
+                    log_warning "IP $ip is in high-risk country: China"
+                    asn_findings+=("high_risk_country:CN:$ip")
+                    ((asn_score += 20))
+                    ;;
+                "IR")
+                    echo -e "${CYAN}│${NC}   ${YELLOW}⚠ High-risk country: Iran${NC}"
+                    log_warning "IP $ip is in high-risk country: Iran"
+                    asn_findings+=("high_risk_country:IR:$ip")
+                    ((asn_score += 25))
+                    ;;
+                "KP")
+                    echo -e "${CYAN}│${NC}   ${RED}⚠ CRITICAL: North Korea${NC}"
+                    log_threat 50 "IP $ip is in DPRK (North Korea)"
+                    asn_findings+=("high_risk_country:KP:$ip")
+                    ((asn_score += 50))
+                    ;;
+                "SY")
+                    echo -e "${CYAN}│${NC}   ${YELLOW}⚠ High-risk country: Syria${NC}"
+                    log_warning "IP $ip is in high-risk country: Syria"
+                    asn_findings+=("high_risk_country:SY:$ip")
+                    ((asn_score += 25))
                     ;;
             esac
         fi
     done
     
+    if [ -n "$domains" ] || [ -n "$ips" ]; then
+        echo -e "${CYAN}│${NC}"
+        echo -e "${CYAN}│${NC} Analyzed: ${WHITE}$analyzed_count targets${NC}"
+        echo -e "${CYAN}└─────────────────────────────────────────────────────────────┘${NC}"
+        echo ""
+    fi
+    
     # Check registrar patterns in any WHOIS we've collected
-    for registrar in "${SUSPICIOUS_REGISTRARS[@]}"; do
-        if find "${EVIDENCE_DIR}" -name "whois_*" -exec grep -qil "$registrar" {} \; 2>/dev/null; then
-            log_warning "Domain registered with high-abuse registrar: $registrar"
-            asn_findings+=("suspicious_registrar:$registrar")
-            ((asn_score += 15))
-        fi
-    done
+    local whois_files=$(find "${EVIDENCE_DIR}" -name "whois_*" 2>/dev/null)
+    if [ -n "$whois_files" ]; then
+        for registrar in "${SUSPICIOUS_REGISTRARS[@]}"; do
+            # Skip empty patterns
+            [ -z "$registrar" ] && continue
+            local match=$(grep -il "$registrar" ${whois_files} 2>/dev/null | head -1)
+            if [ -n "$match" ]; then
+                log_warning "Domain registered with high-abuse registrar: $registrar (found in $(basename "$match"))"
+                asn_findings+=("suspicious_registrar:$registrar")
+                ((asn_score += 15))
+            fi
+        done
+    fi
     
     # Generate ASN report
     if [ ${#asn_findings[@]} -gt 0 ]; then
@@ -8161,6 +9237,10 @@ analyze_asn_infrastructure() {
         if [ $asn_score -ge 30 ]; then
             log_threat $((asn_score / 2)) "Suspicious network infrastructure detected"
         fi
+        
+        analysis_success_found "ASN-ANALYSIS" "${#asn_findings[@]}" "Score: $asn_score"
+    else
+        analysis_success_none "ASN-ANALYSIS"
     fi
 }
 
@@ -8495,6 +9575,10 @@ analyze_zero_day_anomalies() {
         if [ $anomaly_score -ge 30 ]; then
             log_threat $((anomaly_score / 2)) "Anomalous patterns detected - possible zero-day"
         fi
+        
+        analysis_success_found "ZERO-DAY" "${#anomaly_findings[@]}" "Score: $anomaly_score"
+    else
+        analysis_success_none "ZERO-DAY"
     fi
 }
 
@@ -8554,13 +9638,27 @@ analyze_parser_differentials() {
     
     # Check for parser confusion characters
     
-    # Unicode homoglyphs that might confuse parsers
-    if echo "$content" | grep -qP "[\x{00A0}\x{2000}-\x{200F}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}\x{FEFF}]" 2>/dev/null; then
+    # Unicode homoglyphs that might confuse parsers (check via Python or od)
+    if python3 -c "
+import sys
+content = '''$content'''
+special_chars = ['\u00A0', '\u2000', '\u2001', '\u2002', '\u2003', '\u2004', '\u2005',
+                 '\u2006', '\u2007', '\u2008', '\u2009', '\u200A', '\u200B', '\u200C',
+                 '\u200D', '\u200E', '\u200F', '\u2028', '\u2029', '\u202F', '\u205F',
+                 '\u3000', '\uFEFF']
+sys.exit(0 if any(c in content for c in special_chars) else 1)
+" 2>/dev/null; then
         log_warning "Unicode special characters detected - possible parser confusion"
     fi
     
-    # Mixed directional text
-    if echo "$content" | grep -qP "[\x{202A}-\x{202E}\x{2066}-\x{2069}]" 2>/dev/null; then
+    # Mixed directional text (RLO/LRO attack)
+    if python3 -c "
+import sys
+content = '''$content'''
+bidi_chars = ['\u202A', '\u202B', '\u202C', '\u202D', '\u202E',
+              '\u2066', '\u2067', '\u2068', '\u2069']
+sys.exit(0 if any(c in content for c in bidi_chars) else 1)
+" 2>/dev/null; then
         log_threat 45 "Bidirectional text override characters detected - RLO attack"
     fi
     
@@ -8746,6 +9844,9 @@ analyze_ml_heuristics() {
     
     if [ $ml_score -ge 40 ]; then
         log_threat $((ml_score / 3)) "ML heuristics indicate suspicious content"
+        analysis_success_found "ML-HEURISTICS" "${#ml_findings[@]}" "Score: $ml_score, Confidence: $ml_confidence%"
+    else
+        analysis_success_none "ML-HEURISTICS"
     fi
 }
 
@@ -8798,10 +9899,13 @@ calculate_brand_similarity() {
     
     # Check similarity to known brands
     for brand in "paypal" "amazon" "google" "microsoft" "apple" "facebook" "netflix" "bank" "chase" "wells"; do
-        if echo "$content" | grep -qiE "$brand"; then
-            # Check for typosquatting variations
-            local variations=$(echo "$content" | grep -oiE "${brand:0:3}[a-z]*${brand: -3}" | wc -l)
-            if [ $variations -gt 0 ]; then
+        if echo "$content" | grep -qiE "$brand" 2>/dev/null; then
+            # Check for typosquatting variations (use variables to avoid shell parsing issues)
+            local prefix="${brand:0:3}"
+            local suffix="${brand:${#brand}-3}"
+            local pattern="${prefix}[a-z]*${suffix}"
+            local variations=$(echo "$content" | grep -oiE "$pattern" 2>/dev/null | wc -l)
+            if [ "$variations" -gt 0 ] 2>/dev/null; then
                 max_similarity=80
             else
                 max_similarity=50
@@ -8890,6 +9994,8 @@ analyze_industry_threats() {
     
     log_info "Analyzing for industry-specific threats..."
     
+    local total_industry_threats=0
+    
     # Healthcare
     local healthcare_matches=0
     for pattern in "${HEALTHCARE_THREAT_PATTERNS[@]}"; do
@@ -8900,6 +10006,7 @@ analyze_industry_threats() {
     if [ $healthcare_matches -ge 2 ]; then
         log_warning "Healthcare-targeted content detected ($healthcare_matches indicators)"
         log_threat 30 "Potential healthcare phishing/fraud"
+        ((total_industry_threats++))
     fi
     
     # Financial
@@ -8912,6 +10019,7 @@ analyze_industry_threats() {
     if [ $financial_matches -ge 2 ]; then
         log_warning "Financial-targeted content detected ($financial_matches indicators)"
         log_threat 35 "Potential financial fraud/phishing"
+        ((total_industry_threats++))
     fi
     
     # Government
@@ -8924,6 +10032,7 @@ analyze_industry_threats() {
     if [ $government_matches -ge 2 ]; then
         log_warning "Government-impersonation content detected ($government_matches indicators)"
         log_threat 40 "Potential government impersonation scam"
+        ((total_industry_threats++))
     fi
     
     # Education
@@ -8936,6 +10045,7 @@ analyze_industry_threats() {
     if [ $education_matches -ge 2 ]; then
         log_warning "Education-targeted content detected ($education_matches indicators)"
         log_threat 25 "Potential education sector phishing"
+        ((total_industry_threats++))
     fi
     
     # E-commerce
@@ -8948,6 +10058,13 @@ analyze_industry_threats() {
     if [ $ecommerce_matches -ge 2 ]; then
         log_warning "E-commerce-targeted content detected ($ecommerce_matches indicators)"
         log_threat 25 "Potential e-commerce fraud"
+        ((total_industry_threats++))
+    fi
+    
+    if [ $total_industry_threats -gt 0 ]; then
+        analysis_success_found "INDUSTRY-THREATS" "$total_industry_threats" "Sector-specific threats detected"
+    else
+        analysis_success_none "INDUSTRY-THREATS"
     fi
 }
 
@@ -9025,6 +10142,9 @@ analyze_url_obfuscation() {
     # Report findings
     if [ $obfuscation_score -ge 30 ]; then
         log_threat $((obfuscation_score / 2)) "URL obfuscation techniques detected"
+        analysis_success_found "URL-OBFUSCATION" "${#obfuscation_findings[@]}" "Score: $obfuscation_score"
+    else
+        analysis_success_none "URL-OBFUSCATION"
     fi
 }
 
@@ -9073,6 +10193,9 @@ analyze_injection_attacks() {
     
     if [ $injection_score -ge 40 ]; then
         log_threat $((injection_score / 2)) "Injection attack patterns detected"
+        analysis_success_found "INJECTION" "${#injection_findings[@]}" "Score: $injection_score"
+    else
+        analysis_success_none "INJECTION"
     fi
 }
 
@@ -9121,6 +10244,9 @@ analyze_c2_beacons() {
     
     if [ $beacon_score -ge 35 ]; then
         log_threat $((beacon_score / 2)) "C2/Beacon communication patterns detected"
+        analysis_success_found "C2-BEACONS" "${#beacon_findings[@]}" "Score: $beacon_score"
+    else
+        analysis_success_none "C2-BEACONS"
     fi
 }
 
@@ -9162,6 +10288,9 @@ analyze_crypto_scams() {
     
     if [ $crypto_scam_score -ge 30 ]; then
         log_threat $((crypto_scam_score / 2)) "Cryptocurrency scam indicators detected"
+        analysis_success_found "CRYPTO-SCAMS" "1" "Score: $crypto_scam_score"
+    else
+        analysis_success_none "CRYPTO-SCAMS"
     fi
 }
 
@@ -9176,21 +10305,42 @@ analyze_decoded_qr_content() {
     
     log_info "Analyzing decoded QR content..."
     
+    # Display decoded content details
+    echo ""
+    echo -e "${WHITE}┌─────────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${WHITE}│                   DECODED QR CONTENT                        │${NC}"
+    echo -e "${WHITE}├─────────────────────────────────────────────────────────────┤${NC}"
+    echo -e "${WHITE}│${NC} Length:      ${CYAN}${#content} characters${NC}"
+    echo -e "${WHITE}│${NC} Preview:     ${CYAN}${content:0:60}${NC}"
+    if [ ${#content} -gt 60 ]; then
+        echo -e "${WHITE}│${NC}              ${CYAN}${content:60:60}...${NC}"
+    fi
+    echo -e "${WHITE}└─────────────────────────────────────────────────────────────┘${NC}"
+    echo ""
+    
     # Determine content type
     local content_type="unknown"
     
     if echo "$content" | grep -qE "^https?://"; then
         content_type="url"
         log_info "Content type: URL"
+        echo -e "  ${CYAN}├─${NC} Protocol: $(echo "$content" | sed -n 's/^\([a-z]*\):.*/\1/p')"
+        echo -e "  ${CYAN}└─${NC} Domain: $(echo "$content" | sed -E 's|^https?://||' | cut -d'/' -f1)"
     elif echo "$content" | grep -qE "^mailto:"; then
         content_type="email"
         log_info "Content type: Email link"
+        local email_addr=$(echo "$content" | sed 's/^mailto://' | cut -d'?' -f1)
+        echo -e "  ${CYAN}└─${NC} Email: $email_addr"
     elif echo "$content" | grep -qE "^tel:|^sms:"; then
         content_type="phone"
         log_info "Content type: Phone/SMS link"
+        local phone_num=$(echo "$content" | sed 's/^tel:\|^sms://' | cut -d'?' -f1)
+        echo -e "  ${CYAN}└─${NC} Number: $phone_num"
     elif echo "$content" | grep -qE "^WIFI:"; then
         content_type="wifi"
         log_info "Content type: WiFi configuration"
+        local wifi_ssid=$(echo "$content" | sed -n 's/.*S:\([^;]*\).*/\1/p')
+        echo -e "  ${CYAN}└─${NC} SSID: $wifi_ssid"
     elif echo "$content" | grep -qE "^BEGIN:VCARD"; then
         content_type="vcard"
         log_info "Content type: vCard contact"
@@ -9200,6 +10350,7 @@ analyze_decoded_qr_content() {
     elif echo "$content" | grep -qE "^otpauth://"; then
         content_type="otp"
         log_info "Content type: OTP/2FA code"
+        log_threat 30 "⚠️  2FA/OTP configuration exposed!"
     elif echo "$content" | grep -qE "^bitcoin:|^ethereum:|^litecoin:"; then
         content_type="crypto_payment"
         log_info "Content type: Cryptocurrency payment"
@@ -9210,8 +10361,12 @@ analyze_decoded_qr_content() {
         content_type="text"
         log_info "Content type: Plain text/other"
     fi
+    echo ""
     
     echo "Content Type: $content_type" >> "$report_file"
+    
+    # Extract and display any IP addresses in the content
+    extract_and_display_ips "$content" "QR content"
     
     # Type-specific analysis
     case "$content_type" in
@@ -9284,6 +10439,12 @@ analyze_decoded_qr_content() {
     if [ "$CLOUD_ABUSE_CHECK" = true ]; then
         analyze_cloud_service_abuse "$content"
     fi
+    
+    # Offensive Security Tools Detection
+    analyze_offensive_tools "$content"
+    
+    # Legitimate Service Abuse Detection
+    analyze_service_abuse "$content"
     
     # Mobile Deep Link Analysis
     if [ "$MOBILE_DEEPLINK_CHECK" = true ]; then
@@ -9376,13 +10537,13 @@ analyze_wifi_config() {
     
     log_info "Analyzing WiFi configuration..."
     
-    # Parse WIFI: format
+    # Parse WIFI: format (POSIX compatible)
     # WIFI:T:WPA;S:NetworkName;P:Password;;
     
-    local auth_type=$(echo "$content" | grep -oP 'T:[^;]+' | cut -d: -f2)
-    local ssid=$(echo "$content" | grep -oP 'S:[^;]+' | cut -d: -f2)
-    local password=$(echo "$content" | grep -oP 'P:[^;]+' | cut -d: -f2)
-    local hidden=$(echo "$content" | grep -oP 'H:[^;]+' | cut -d: -f2)
+    local auth_type=$(echo "$content" | sed -n 's/.*T:\([^;]*\).*/\1/p')
+    local ssid=$(echo "$content" | sed -n 's/.*S:\([^;]*\).*/\1/p')
+    local password=$(echo "$content" | sed -n 's/.*P:\([^;]*\).*/\1/p')
+    local hidden=$(echo "$content" | sed -n 's/.*H:\([^;]*\).*/\1/p')
     
     log_forensic "WiFi SSID: $ssid"
     log_forensic "Auth Type: $auth_type"
@@ -9416,11 +10577,11 @@ analyze_vcard() {
     
     log_info "Analyzing vCard content..."
     
-    # Extract fields
-    local name=$(echo "$content" | grep -oP 'FN:[^\n]+' | cut -d: -f2-)
-    local email=$(echo "$content" | grep -oP 'EMAIL[^:]*:[^\n]+' | cut -d: -f2-)
-    local phone=$(echo "$content" | grep -oP 'TEL[^:]*:[^\n]+' | cut -d: -f2-)
-    local url=$(echo "$content" | grep -oP 'URL[^:]*:[^\n]+' | cut -d: -f2-)
+    # Extract fields (POSIX compatible)
+    local name=$(echo "$content" | grep -i "^FN:" | cut -d: -f2- | head -1)
+    local email=$(echo "$content" | grep -i "^EMAIL" | cut -d: -f2- | head -1)
+    local phone=$(echo "$content" | grep -i "^TEL" | cut -d: -f2- | head -1)
+    local url=$(echo "$content" | grep -i "^URL" | cut -d: -f2- | head -1)
     
     [ -n "$name" ] && log_forensic "vCard Name: $name"
     [ -n "$email" ] && log_forensic "vCard Email: $email"
@@ -9443,11 +10604,11 @@ analyze_otp_uri() {
     
     log_info "Analyzing OTP URI..."
     
-    # Parse otpauth://totp/ISSUER:ACCOUNT?secret=SECRET&issuer=ISSUER
-    local otp_type=$(echo "$content" | grep -oP 'otpauth://[^/]+' | cut -d'/' -f3)
-    local label=$(echo "$content" | grep -oP 'otpauth://[^/]+/[^?]+' | cut -d'/' -f4)
-    local secret=$(echo "$content" | grep -oP 'secret=[^&]+' | cut -d'=' -f2)
-    local issuer=$(echo "$content" | grep -oP 'issuer=[^&]+' | cut -d'=' -f2)
+    # Parse otpauth://totp/ISSUER:ACCOUNT?secret=SECRET&issuer=ISSUER (POSIX compatible)
+    local otp_type=$(echo "$content" | sed -n 's|otpauth://\([^/]*\)/.*|\1|p')
+    local label=$(echo "$content" | sed -n 's|otpauth://[^/]*/\([^?]*\).*|\1|p')
+    local secret=$(echo "$content" | sed -n 's/.*secret=\([^&]*\).*/\1/p')
+    local issuer=$(echo "$content" | sed -n 's/.*issuer=\([^&]*\).*/\1/p')
     
     log_forensic "OTP Type: $otp_type"
     log_forensic "OTP Label: $label"
@@ -9696,39 +10857,6 @@ generate_forensic_timeline() {
 # INITIALIZATION
 ################################################################################
 
-initialize() {
-    log_info "Initializing QR Malware Scanner..."
-    
-    # Create output directories
-    mkdir -p "$OUTPUT_DIR" "$TEMP_DIR" "$EVIDENCE_DIR"
-    
-    # Initialize log file
-    echo "=== QR Malware Scanner Log ===" > "$LOG_FILE"
-    echo "Started: $(date)" >> "$LOG_FILE"
-    echo "" >> "$LOG_FILE"
-    
-    # Initialize report file
-    echo "╔═══════════════════════════════════════════════════════════════════════════╗" > "$REPORT_FILE"
-    echo "║           QR CODE MALWARE SCANNER - FORENSIC ANALYSIS REPORT              ║" >> "$REPORT_FILE"
-    echo "║                         Version: $VERSION                                   ║" >> "$REPORT_FILE"
-    echo "╚═══════════════════════════════════════════════════════════════════════════╝" >> "$REPORT_FILE"
-    echo "" >> "$REPORT_FILE"
-    echo "Analysis Date: $(date)" >> "$REPORT_FILE"
-    echo "Hostname: $(hostname)" >> "$REPORT_FILE"
-    echo "User: $(whoami)" >> "$REPORT_FILE"
-    echo "" >> "$REPORT_FILE"
-    
-    # Initialize IOC CSV
-    echo "type,value,context,timestamp,threat_score" > "$IOC_REPORT"
-    
-    # Initialize timeline
-    echo "timestamp,event_type,description,threat_level" > "$TIMELINE_FILE"
-    
-    # Initialize extended reports
-    initialize_extended_reports
-    
-    log_success "Initialization complete"
-}
 
 parse_arguments() {
     while [[ $# -gt 0 ]]; do
@@ -9967,36 +11095,88 @@ main() {
     # Calculate duration
     local duration=$((SECONDS - start_time))
     
+    # Count IOCs detected
+    local ioc_count=$(wc -l < "$IOC_REPORT" 2>/dev/null | tr -d ' ' || echo "0")
+    ((ioc_count--)) # Subtract header line
+    [ $ioc_count -lt 0 ] && ioc_count=0
+    
     # Print final summary
     echo ""
     log_success "════════════════════════════════════════════════════════════"
     log_success "ANALYSIS COMPLETE!"
     log_success "════════════════════════════════════════════════════════════"
-    log_info "Duration: ${duration} seconds"
-    log_info "Results saved to: $OUTPUT_DIR"
-    log_info ""
-    log_info "Key outputs:"
-    log_info "  → Main Report:  $REPORT_FILE"
-    log_info "  → JSON Report:  $JSON_REPORT"
-    log_info "  → IOC Report:   $IOC_REPORT"
-    log_info "  → Evidence:     $EVIDENCE_DIR"
+    echo ""
     
-    if [ "$SIEM_INTEGRATION" = true ]; then
-        log_info "  → SIEM Export:  $SIEM_EXPORT_FILE"
+    # Forensics Summary
+    echo -e "${CYAN}┌─────────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${CYAN}│                    FORENSIC SUMMARY                          │${NC}"
+    echo -e "${CYAN}├─────────────────────────────────────────────────────────────┤${NC}"
+    echo -e "${CYAN}│${NC} Analysis Duration:    ${WHITE}${duration} seconds${NC}"
+    echo -e "${CYAN}│${NC} Threat Score:         ${WHITE}${THREAT_SCORE}/${MAX_THREAT_SCORE}${NC}"
+    echo -e "${CYAN}│${NC} IOCs Detected:        ${WHITE}${ioc_count}${NC}"
+    echo -e "${CYAN}│${NC} Images Analyzed:      ${WHITE}${#images[@]}${NC}"
+    echo -e "${CYAN}└─────────────────────────────────────────────────────────────┘${NC}"
+    echo ""
+    
+    # Threat Level Indicator
+    echo -e "${WHITE}THREAT ASSESSMENT:${NC}"
+    if [ $THREAT_SCORE -ge $CRITICAL_THRESHOLD ]; then
+        echo -e "${RED}╔═════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${RED}║  ████  CRITICAL THREAT LEVEL  ████                          ║${NC}"
+        echo -e "${RED}║  Score: $THREAT_SCORE - IMMEDIATE ACTION REQUIRED             ${NC}"
+        echo -e "${RED}╚═════════════════════════════════════════════════════════════╝${NC}"
+        echo ""
+        echo -e "${RED}RECOMMENDED ACTIONS:${NC}"
+        echo "  1. DO NOT open any URLs from this QR code"
+        echo "  2. Report to security team immediately"
+        echo "  3. Preserve all evidence in the output directory"
+        echo "  4. Check IOC report for indicators to block"
+        echo "  5. Consider forensic investigation of the QR source"
+    elif [ $THREAT_SCORE -ge $HIGH_THRESHOLD ]; then
+        echo -e "${RED}╔═════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${RED}║  ▲▲▲  HIGH THREAT LEVEL  ▲▲▲                                ║${NC}"
+        echo -e "${RED}║  Score: $THREAT_SCORE - EXERCISE EXTREME CAUTION               ${NC}"
+        echo -e "${RED}╚═════════════════════════════════════════════════════════════╝${NC}"
+        echo ""
+        echo -e "${YELLOW}RECOMMENDED ACTIONS:${NC}"
+        echo "  1. Avoid interacting with the decoded content"
+        echo "  2. Review the detailed analysis report"
+        echo "  3. Cross-reference IOCs with threat intelligence"
+    elif [ $THREAT_SCORE -ge $MEDIUM_THRESHOLD ]; then
+        echo -e "${YELLOW}╔═════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${YELLOW}║  ⚡ MEDIUM THREAT LEVEL                                     ║${NC}"
+        echo -e "${YELLOW}║  Score: $THREAT_SCORE - REVIEW FINDINGS CAREFULLY              ${NC}"
+        echo -e "${YELLOW}╚═════════════════════════════════════════════════════════════╝${NC}"
+    elif [ $THREAT_SCORE -ge $LOW_THRESHOLD ]; then
+        echo -e "${BLUE}╔═════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${BLUE}║  ℹ️  LOW THREAT LEVEL                                        ║${NC}"
+        echo -e "${BLUE}║  Score: $THREAT_SCORE - Minor concerns detected                 ${NC}"
+        echo -e "${BLUE}╚═════════════════════════════════════════════════════════════╝${NC}"
+    else
+        echo -e "${GREEN}╔═════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${GREEN}║  ✓ MINIMAL THREAT LEVEL                                     ║${NC}"
+        echo -e "${GREEN}║  Score: $THREAT_SCORE - No significant threats detected        ${NC}"
+        echo -e "${GREEN}╚═════════════════════════════════════════════════════════════╝${NC}"
     fi
     echo ""
     
-    # Final threat level output
-    if [ $THREAT_SCORE -ge $CRITICAL_THRESHOLD ]; then
-        log_critical "⚠️  CRITICAL THREAT LEVEL - Immediate action required!"
-    elif [ $THREAT_SCORE -ge $HIGH_THRESHOLD ]; then
-        log_error "⚠️  HIGH THREAT LEVEL - Exercise extreme caution!"
-    elif [ $THREAT_SCORE -ge $MEDIUM_THRESHOLD ]; then
-        log_warning "⚡ MEDIUM THREAT LEVEL - Review findings carefully"
-    elif [ $THREAT_SCORE -ge $LOW_THRESHOLD ]; then
-        log_info "ℹ️  LOW THREAT LEVEL - Minor concerns detected"
-    else
-        log_success "✓ MINIMAL THREAT LEVEL - No significant threats detected"
+    # Output Files
+    echo -e "${WHITE}OUTPUT FILES:${NC}"
+    echo "  ├─ Main Report:     $REPORT_FILE"
+    echo "  ├─ JSON Report:     $JSON_REPORT"
+    echo "  ├─ IOC Report:      $IOC_REPORT (${ioc_count} indicators)"
+    echo "  ├─ Timeline:        $TIMELINE_FILE"
+    echo "  ├─ STIX Report:     $STIX_REPORT"
+    if [ -f "${OUTPUT_DIR}/offensive_tools_analysis.txt" ]; then
+        echo "  ├─ Offensive Tools: ${OUTPUT_DIR}/offensive_tools_analysis.txt"
+    fi
+    if [ -f "${OUTPUT_DIR}/service_abuse_analysis.txt" ]; then
+        echo "  ├─ Service Abuse:   ${OUTPUT_DIR}/service_abuse_analysis.txt"
+    fi
+    echo "  └─ Evidence:        $EVIDENCE_DIR"
+    
+    if [ "$SIEM_INTEGRATION" = true ]; then
+        echo "  └─ SIEM Export:     $SIEM_EXPORT_FILE"
     fi
     echo ""
 }
