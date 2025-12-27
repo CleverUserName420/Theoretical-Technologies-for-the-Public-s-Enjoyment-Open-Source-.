@@ -73,6 +73,14 @@ declare -A OPTIONAL_DEPS=(
     ["xxd"]="Hex viewing"
     ["strings"]="String extraction"
     ["openssl"]="Cryptographic operations"
+    ["quirc"]="Alternative QR decoder"
+    ["zxing"]="ZXing QR decoder"
+    ["qrdecode"]="libqrencode QR decoder"
+    ["steghide"]="Steganography detection"
+    ["zsteg"]="PNG steganography detection"
+    ["stegdetect"]="Steganography detection"
+    ["whois"]="Domain registration lookup"
+    ["identify"]="ImageMagick identify tool"
 )
 
 check_dependencies() {
@@ -104,6 +112,8 @@ check_dependencies() {
     if [ ${#missing_optional[@]} -ne 0 ]; then
         log_warning "Missing optional dependencies (reduced functionality):"
         printf '%s\n' "${missing_optional[@]}"
+        echo -e "\n${YELLOW}Install additional tools:${NC}"
+        echo "brew install qrencode quirc imagemagick tesseract exiftool ssdeep steghide zsteg whois"
     fi
     
     # Check Python modules
@@ -320,6 +330,30 @@ declare -a HOMOGRAPH_CHARS=(
     "ⅰ" "ⅼ" "ⅽ" "ⅾ" "ⅿ"  # Roman numerals
 )
 
+# Enhanced API Key and Secret Patterns
+declare -a API_KEY_PATTERNS=(
+    # AWS
+    "AKIA[0-9A-Z]{16}"
+    "aws.*secret.*key"
+    # GitHub
+    "ghp_[0-9a-zA-Z]{36}"
+    "github.*token"
+    # Google
+    "AIza[0-9A-Za-z_-]{35}"
+    # Stripe
+    "sk_live_[0-9a-zA-Z]{24,}"
+    "pk_live_[0-9a-zA-Z]{24,}"
+    # Generic patterns
+    "api[_-]?key['\"]?\s*[:=]\s*['\"]?[0-9a-zA-Z_-]{20,}"
+    "secret[_-]?key['\"]?\s*[:=]\s*['\"]?[0-9a-zA-Z_-]{20,}"
+    "access[_-]?token['\"]?\s*[:=]\s*['\"]?[0-9a-zA-Z_-]{20,}"
+    "auth[_-]?token['\"]?\s*[:=]\s*['\"]?[0-9a-zA-Z_-]{20,}"
+    # Private keys
+    "-----BEGIN.*PRIVATE KEY-----"
+    # JWT tokens
+    "eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+"
+)
+
 ################################################################################
 # THREAT INTELLIGENCE INTEGRATION
 ################################################################################
@@ -352,7 +386,75 @@ load_threat_intelligence() {
         done < "${SCRIPT_DIR}/ioc_crypto.txt"
     fi
     
+    # Load OpenPhish feed
+    load_openphish_feed
+    
+    # Load Abuse.ch feeds
+    load_abuseч_feeds
+    
+    # Load AlienVault OTX indicators
+    load_alienvault_otx
+    
     log_success "Threat intelligence loaded: ${#KNOWN_MALICIOUS_DOMAINS[@]} domains, ${#KNOWN_MALICIOUS_IPS[@]} IPs, ${#KNOWN_CRYPTO_SCAM_ADDRESSES[@]} crypto addresses"
+}
+
+load_openphish_feed() {
+    if [ "$NETWORK_CHECK" = false ]; then
+        return
+    fi
+    
+    log_info "Loading OpenPhish threat feed..."
+    local openphish_file="${TEMP_DIR}/openphish_feed.txt"
+    
+    if curl -sL --max-time 10 "https://openphish.com/feed.txt" -o "$openphish_file" 2>/dev/null; then
+        while IFS= read -r url; do
+            local domain=$(echo "$url" | awk -F/ '{print $3}')
+            [[ -n "$domain" ]] && KNOWN_MALICIOUS_DOMAINS["$domain"]=1
+        done < "$openphish_file"
+        log_success "OpenPhish feed loaded: $(wc -l < "$openphish_file") entries"
+    else
+        log_warning "Failed to load OpenPhish feed"
+    fi
+}
+
+load_abuseч_feeds() {
+    if [ "$NETWORK_CHECK" = false ]; then
+        return
+    fi
+    
+    log_info "Loading Abuse.ch threat feeds..."
+    
+    # URLhaus
+    local urlhaus_file="${TEMP_DIR}/urlhaus_feed.txt"
+    if curl -sL --max-time 10 "https://urlhaus.abuse.ch/downloads/text/" -o "$urlhaus_file" 2>/dev/null; then
+        while IFS= read -r line; do
+            [[ "$line" =~ ^# ]] && continue
+            local domain=$(echo "$line" | awk -F/ '{print $3}')
+            [[ -n "$domain" ]] && KNOWN_MALICIOUS_DOMAINS["$domain"]=1
+        done < "$urlhaus_file"
+        log_success "URLhaus feed loaded"
+    fi
+    
+    # SSL Blacklist
+    local sslbl_file="${TEMP_DIR}/sslbl_ips.txt"
+    if curl -sL --max-time 10 "https://sslbl.abuse.ch/blacklist/sslipblacklist.txt" -o "$sslbl_file" 2>/dev/null; then
+        while IFS= read -r line; do
+            [[ "$line" =~ ^# ]] && continue
+            [[ -n "$line" ]] && KNOWN_MALICIOUS_IPS["$line"]=1
+        done < "$sslbl_file"
+        log_success "SSL Blacklist loaded"
+    fi
+}
+
+load_alienvault_otx() {
+    if [ "$NETWORK_CHECK" = false ]; then
+        return
+    fi
+    
+    log_info "Loading AlienVault OTX indicators..."
+    # This would require API key and proper implementation
+    # Placeholder for future enhancement
+    log_warning "AlienVault OTX integration pending (requires API key)"
 }
 
 ################################################################################
@@ -508,7 +610,7 @@ decode_with_zxing() {
     local image="$1"
     local output_file="$2"
     
-    # ZXing decoder if available
+    # ZXing decoder if available (CLI)
     if command -v zxing &> /dev/null; then
         zxing "$image" 2>/dev/null > "$output_file"
         [ -s "$output_file" ]
@@ -517,13 +619,61 @@ decode_with_zxing() {
     fi
 }
 
+decode_with_qrdecode() {
+    local image="$1"
+    local output_file="$2"
+    
+    # qrdecode from libqrencode - can read damaged QRs
+    if command -v qrdecode &> /dev/null; then
+        qrdecode "$image" 2>/dev/null > "$output_file"
+        [ -s "$output_file" ]
+    else
+        return 1
+    fi
+}
+
+decode_with_opencv() {
+    local image="$1"
+    local output_file="$2"
+    
+    # OpenCV decoder for advanced geometric/denoising
+    python3 << EOF 2>/dev/null
+try:
+    import cv2
+    import numpy as np
+    
+    img = cv2.imread('$image')
+    detector = cv2.QRCodeDetector()
+    
+    # Try normal detection
+    data, bbox, _ = detector.detectAndDecode(img)
+    
+    if data:
+        with open('$output_file', 'w') as f:
+            f.write(data + '\n')
+    else:
+        # Try with preprocessing for damaged QRs
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        denoised = cv2.fastNlMeansDenoising(gray)
+        data, bbox, _ = detector.detectAndDecode(denoised)
+        
+        if data:
+            with open('$output_file', 'w') as f:
+                f.write(data + '\n')
+except Exception as e:
+    pass
+EOF
+    
+    [ -s "$output_file" ]
+}
+
 multi_decoder_analysis() {
     local image="$1"
     local base_output="$2"
     
     log_info "Attempting multi-decoder analysis on $image..."
     
-    local decoders=("zbar" "pyzbar" "quirc" "zxing")
+    local decoders=("zbar" "pyzbar" "quirc" "zxing" "qrdecode" "opencv")
     local success_count=0
     local all_decoded=""
     
@@ -542,6 +692,12 @@ multi_decoder_analysis() {
                 ;;
             "zxing")
                 decode_with_zxing "$image" "$decoder_output" && ((success_count++))
+                ;;
+            "qrdecode")
+                decode_with_qrdecode "$image" "$decoder_output" && ((success_count++))
+                ;;
+            "opencv")
+                decode_with_opencv "$image" "$decoder_output" && ((success_count++))
                 ;;
         esac
         
@@ -652,6 +808,9 @@ analyze_url_structure() {
         fi
     fi
     
+    # Perform WHOIS lookup for domain age
+    check_domain_whois "$clean_domain"
+    
     return $threats
 }
 
@@ -722,6 +881,38 @@ check_typosquatting() {
             fi
         fi
     done
+}
+
+check_domain_whois() {
+    local domain="$1"
+    
+    if ! command -v whois &> /dev/null; then
+        return
+    fi
+    
+    if [ "$NETWORK_CHECK" = false ]; then
+        return
+    fi
+    
+    log_info "Checking WHOIS information for: $domain"
+    
+    local whois_file="${TEMP_DIR}/whois_${domain}.txt"
+    whois "$domain" > "$whois_file" 2>/dev/null || return
+    
+    # Check domain age
+    local creation_date=$(grep -i "Creation Date\|Registered" "$whois_file" | head -1)
+    if [ -n "$creation_date" ]; then
+        log_info "  Domain registration: $creation_date"
+        
+        # Check if domain is very new (less than 30 days)
+        if echo "$creation_date" | grep -qE "$(date -v-30d +%Y-%m 2>/dev/null || date -d '30 days ago' +%Y-%m)"; then
+            log_threat 25 "Very recently registered domain (less than 30 days old)"
+        fi
+    fi
+    
+    # Check registrar
+    local registrar=$(grep -i "Registrar:" "$whois_file" | head -1)
+    [ -n "$registrar" ] && log_info "  $registrar"
 }
 
 ################################################################################
@@ -968,6 +1159,11 @@ analyze_steganography() {
         convert "$image" -contrast-stretch 0 "${EVIDENCE_DIR}/${base_name}_contrast.png" 2>/dev/null
     fi
     
+    # Advanced steganography detection
+    detect_steghide "$image" "$base_name"
+    detect_zsteg "$image" "$base_name"
+    detect_stegdetect "$image" "$base_name"
+    
     # Check for LSB steganography indicators
     if command -v xxd &> /dev/null; then
         local hex_analysis="${TEMP_DIR}/${base_name}_hex.txt"
@@ -987,8 +1183,111 @@ analyze_steganography() {
         log_threat 20 "Unusually large file size for QR code: ${file_size} bytes"
     fi
     
+    # Image entropy analysis
+    analyze_image_entropy "$image" "$base_name"
+    
     # Check for multiple embedded QR codes
     detect_multiple_qr_codes "$image"
+}
+
+detect_steghide() {
+    local image="$1"
+    local base_name="$2"
+    
+    if ! command -v steghide &> /dev/null; then
+        return
+    fi
+    
+    log_info "Running steghide analysis..."
+    local steg_report="${EVIDENCE_DIR}/${base_name}_steghide.txt"
+    
+    # Try to extract without password
+    steghide extract -sf "$image" -xf "${TEMP_DIR}/${base_name}_extracted.bin" -p "" 2>&1 | tee "$steg_report"
+    
+    if grep -q "extracted" "$steg_report"; then
+        log_threat 60 "STEGANOGRAPHY DETECTED: Hidden data extracted by steghide"
+    fi
+}
+
+detect_zsteg() {
+    local image="$1"
+    local base_name="$2"
+    
+    if ! command -v zsteg &> /dev/null; then
+        return
+    fi
+    
+    log_info "Running zsteg analysis (PNG)..."
+    local zsteg_report="${EVIDENCE_DIR}/${base_name}_zsteg.txt"
+    
+    zsteg "$image" --all 2>/dev/null > "$zsteg_report"
+    
+    if [ -s "$zsteg_report" ] && grep -q "text" "$zsteg_report"; then
+        log_threat 50 "STEGANOGRAPHY DETECTED: zsteg found hidden text"
+        log_info "See: $zsteg_report"
+    fi
+}
+
+detect_stegdetect() {
+    local image="$1"
+    local base_name="$2"
+    
+    if ! command -v stegdetect &> /dev/null; then
+        return
+    fi
+    
+    log_info "Running stegdetect analysis..."
+    local stegdetect_report="${EVIDENCE_DIR}/${base_name}_stegdetect.txt"
+    
+    stegdetect "$image" 2>/dev/null > "$stegdetect_report"
+    
+    if [ -s "$stegdetect_report" ] && ! grep -q "negative" "$stegdetect_report"; then
+        log_threat 55 "STEGANOGRAPHY DETECTED: stegdetect found indicators"
+        log_info "See: $stegdetect_report"
+    fi
+}
+
+analyze_image_entropy() {
+    local image="$1"
+    local base_name="$2"
+    
+    log_info "Analyzing image entropy..."
+    
+    python3 << EOF 2>/dev/null
+import numpy as np
+from PIL import Image
+from collections import Counter
+import math
+
+try:
+    img = Image.open('$image')
+    img_array = np.array(img)
+    
+    # Calculate entropy for each channel
+    if len(img_array.shape) == 3:
+        for i, channel in enumerate(['Red', 'Green', 'Blue']):
+            channel_data = img_array[:,:,i].flatten()
+            counter = Counter(channel_data)
+            total = len(channel_data)
+            entropy = -sum((count/total) * math.log2(count/total) for count in counter.values())
+            print(f"  {channel} channel entropy: {entropy:.2f}")
+            
+            if entropy > 7.5:
+                print(f"  [!] High entropy in {channel} channel - possible hidden data")
+    else:
+        # Grayscale
+        flat_data = img_array.flatten()
+        counter = Counter(flat_data)
+        total = len(flat_data)
+        entropy = -sum((count/total) * math.log2(count/total) for count in counter.values())
+        print(f"  Grayscale entropy: {entropy:.2f}")
+        
+        if entropy > 7.5:
+            print(f"  [!] High entropy - possible hidden data")
+            
+except Exception as e:
+    print(f"  Error analyzing image entropy: {e}")
+EOF
 }
 
 detect_multiple_qr_codes() {
@@ -1017,6 +1316,42 @@ detect_multiple_qr_codes() {
                 
                 if zbarimg "$quad_file" 2>/dev/null | grep -q "QR-Code"; then
                     log_info "QR code found in quadrant: $quad"
+                fi
+            done
+        fi
+    fi
+}
+
+################################################################################
+# OCR ANALYSIS
+################################################################################
+
+analyze_with_ocr() {
+    local image="$1"
+    local base_name="$2"
+    
+    if ! command -v tesseract &> /dev/null; then
+        return
+    fi
+    
+    log_info "Running OCR analysis (Tesseract)..."
+    local ocr_file="${EVIDENCE_DIR}/${base_name}_ocr.txt"
+    
+    tesseract "$image" "${ocr_file%.txt}" 2>/dev/null
+    
+    if [ -s "$ocr_file" ]; then
+        log_info "OCR text extracted to: $ocr_file"
+        
+        # Analyze OCR text for overlays/hidden text
+        local ocr_content=$(cat "$ocr_file")
+        
+        if [ -n "$ocr_content" ]; then
+            log_warning "Text overlay detected via OCR - analyzing..."
+            
+            # Check for phishing keywords in overlay
+            for keyword in "${SOCIAL_ENGINEERING_KEYWORDS[@]}"; do
+                if echo "$ocr_content" | grep -qiE "$keyword"; then
+                    log_threat 20 "Phishing keyword in text overlay: $keyword"
                 fi
             done
         fi
@@ -1093,6 +1428,11 @@ compute_hashes() {
     if [ -n "${KNOWN_MALICIOUS_HASHES[$sha256]}" ]; then
         log_threat 100 "KNOWN MALICIOUS FILE HASH DETECTED!"
     fi
+    
+    # Check file hash on VirusTotal
+    if [ "$VT_CHECK" = true ]; then
+        check_virustotal_file_hash "$sha256"
+    fi
 }
 
 ################################################################################
@@ -1155,6 +1495,27 @@ check_virustotal() {
     echo "$vt_result" | jq '.' > "${EVIDENCE_DIR}/virustotal_report.json" 2>/dev/null
 }
 
+check_virustotal_file_hash() {
+    local hash="$1"
+    
+    if [ -z "$VT_API_KEY" ]; then
+        return
+    fi
+    
+    log_info "Checking VirusTotal for file hash: $hash"
+    
+    local vt_result=$(curl -s --request GET \
+        --url "https://www.virustotal.com/api/v3/files/$hash" \
+        --header "x-apikey: $VT_API_KEY")
+    
+    local malicious=$(echo "$vt_result" | jq -r '.data.attributes.last_analysis_stats.malicious' 2>/dev/null)
+    
+    if [ "$malicious" != "null" ] && [ "$malicious" != "0" ]; then
+        log_threat 90 "VirusTotal FILE HASH: $malicious engines flagged as MALICIOUS"
+        echo "$vt_result" | jq '.' > "${EVIDENCE_DIR}/virustotal_file_hash.json" 2>/dev/null
+    fi
+}
+
 check_urlhaus() {
     local url="$1"
     
@@ -1174,11 +1535,179 @@ check_urlhaus() {
 check_phishtank() {
     local url="$1"
     
+    if [ "$NETWORK_CHECK" = false ]; then
+        return
+    fi
+    
     log_info "Checking PhishTank database..."
     
-    # PhishTank check would require API key and proper implementation
-    # This is a placeholder for the integration
-    log_warning "PhishTank integration pending (requires API key)"
+    # PhishTank requires API key
+    if [ -z "$PHISHTANK_API_KEY" ]; then
+        log_warning "PhishTank API key not set (set PHISHTANK_API_KEY environment variable)"
+        return
+    fi
+    
+    local encoded_url=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$url'))")
+    
+    local phishtank_response=$(curl -s -X POST "https://checkurl.phishtank.com/checkurl/" \
+        --data "url=${encoded_url}&format=json&app_key=${PHISHTANK_API_KEY}" 2>/dev/null)
+    
+    local in_database=$(echo "$phishtank_response" | jq -r '.results.in_database' 2>/dev/null)
+    local verified=$(echo "$phishtank_response" | jq -r '.results.verified' 2>/dev/null)
+    
+    if [ "$in_database" = "true" ] && [ "$verified" = "true" ]; then
+        log_threat 85 "URL found in PhishTank verified phishing database!"
+        echo "$phishtank_response" | jq '.' > "${EVIDENCE_DIR}/phishtank_report.json" 2>/dev/null
+    fi
+}
+
+check_openphish_direct() {
+    local url="$1"
+    
+    if [ "$NETWORK_CHECK" = false ]; then
+        return
+    fi
+    
+    log_info "Checking OpenPhish feed for URL..."
+    
+    if curl -sL --max-time 5 "https://openphish.com/feed.txt" 2>/dev/null | grep -qF "$url"; then
+        log_threat 85 "URL found in OpenPhish phishing feed!"
+    fi
+}
+
+check_alienvault_otx_domain() {
+    local domain="$1"
+    
+    if [ "$NETWORK_CHECK" = false ]; then
+        return
+    fi
+    
+    log_info "Checking AlienVault OTX for domain: $domain"
+    
+    local otx_response=$(curl -s --max-time 10 \
+        "https://otx.alienvault.com/api/v1/indicators/domain/${domain}/general" 2>/dev/null)
+    
+    if [ -n "$otx_response" ]; then
+        local pulse_count=$(echo "$otx_response" | jq -r '.pulse_info.count' 2>/dev/null)
+        
+        if [ "$pulse_count" != "null" ] && [ "$pulse_count" -gt 0 ]; then
+            log_threat 60 "Domain found in $pulse_count AlienVault OTX threat pulses"
+            echo "$otx_response" | jq '.' > "${EVIDENCE_DIR}/otx_report.json" 2>/dev/null
+        fi
+    fi
+}
+
+################################################################################
+# CONTENT-TYPE AND FILE DOWNLOAD ANALYSIS
+################################################################################
+
+analyze_url_content_type() {
+    local url="$1"
+    
+    if [ "$NETWORK_CHECK" = false ]; then
+        return
+    fi
+    
+    log_info "Checking Content-Type for URL: $url"
+    
+    local headers=$(curl -sI --max-time 5 "$url" 2>/dev/null)
+    local content_type=$(echo "$headers" | grep -i "^Content-Type:" | awk '{print $2}' | tr -d '\r')
+    
+    if [ -n "$content_type" ]; then
+        log_info "  Content-Type: $content_type"
+        
+        # Check for executable content types
+        if echo "$content_type" | grep -qiE "application/x-msdownload|application/x-msdos-program|application/exe|application/x-exe"; then
+            log_threat 70 "CRITICAL: Executable content type detected: $content_type"
+        fi
+        
+        # Check for APK
+        if echo "$content_type" | grep -qiE "application/vnd.android.package-archive"; then
+            log_threat 65 "CRITICAL: Android APK download detected"
+        fi
+        
+        # Check for mobile config
+        if echo "$content_type" | grep -qiE "application/x-apple-aspen-config"; then
+            log_threat 60 "CRITICAL: iOS configuration profile detected"
+        fi
+        
+        # Download and analyze file if suspicious
+        if echo "$content_type" | grep -qiE "application|octet-stream"; then
+            download_and_analyze_file "$url" "$content_type"
+        fi
+    fi
+}
+
+download_and_analyze_file() {
+    local url="$1"
+    local content_type="$2"
+    
+    log_warning "Downloading file for analysis..."
+    
+    local download_file="${TEMP_DIR}/downloaded_file"
+    
+    if curl -sL --max-time 15 "$url" -o "$download_file" 2>/dev/null; then
+        local file_size=$(stat -f%z "$download_file" 2>/dev/null || stat -c%s "$download_file" 2>/dev/null)
+        log_info "Downloaded file: $file_size bytes"
+        
+        # Analyze file type
+        local file_type=$(file -b "$download_file")
+        log_info "File type: $file_type"
+        
+        # Compute hashes
+        local md5=$(md5 -q "$download_file" 2>/dev/null || md5sum "$download_file" | awk '{print $1}')
+        local sha256=$(shasum -a 256 "$download_file" | awk '{print $1}')
+        
+        log_info "MD5: $md5"
+        log_info "SHA256: $sha256"
+        
+        # Check hash on VirusTotal
+        if [ "$VT_CHECK" = true ]; then
+            check_virustotal_file_hash "$sha256"
+        fi
+        
+        # Scan with strings for indicators
+        if command -v strings &> /dev/null; then
+            local strings_file="${EVIDENCE_DIR}/downloaded_file_strings.txt"
+            strings "$download_file" > "$strings_file"
+            
+            # Check for API keys/secrets in file
+            analyze_api_keys "$strings_file"
+        fi
+        
+        # Save as evidence
+        cp "$download_file" "${EVIDENCE_DIR}/downloaded_file_${sha256:0:16}"
+    else
+        log_error "Failed to download file"
+    fi
+}
+
+################################################################################
+# API KEY AND SECRET DETECTION
+################################################################################
+
+analyze_api_keys() {
+    local content_source="$1"
+    
+    log_info "Scanning for API keys and secrets..."
+    
+    local content
+    if [ -f "$content_source" ]; then
+        content=$(cat "$content_source")
+    else
+        content="$content_source"
+    fi
+    
+    for pattern in "${API_KEY_PATTERNS[@]}"; do
+        local matches=$(echo "$content" | grep -oE "$pattern")
+        
+        if [ -n "$matches" ]; then
+            echo "$matches" | while read -r key; do
+                log_threat 50 "POTENTIAL API KEY/SECRET DETECTED: ${key:0:50}..."
+                echo "API_KEY,${key:0:100},$(date -Iseconds)" >> "$IOC_REPORT"
+            done
+        fi
+    done
 }
 
 ################################################################################
@@ -1215,7 +1744,7 @@ analyze_entropy() {
     log_info "Content entropy: $entropy bits"
     
     # High entropy might indicate encryption/encoding
-    if (( $(echo "$entropy > 4.5" | bc -l) )); then
+    if (( $(echo "$entropy > 4.5" | bc -l 2>/dev/null || echo "0") )); then
         log_threat 20 "High entropy detected ($entropy) - possible encrypted/encoded content"
     fi
 }
@@ -1348,6 +1877,7 @@ analyze_decoded_content() {
     analyze_script_injection "$content"
     analyze_social_engineering "$content"
     detect_obfuscation "$content"  # Recursive deobfuscation
+    analyze_api_keys "$content"
 }
 
 ################################################################################
@@ -1426,53 +1956,59 @@ comprehensive_payload_analysis() {
     # 3. Entropy analysis
     analyze_entropy "$content"
     
-    # 4. URL analysis (if URL present)
+    # 4. API key/secret detection
+    analyze_api_keys "$content"
+    
+    # 5. URL analysis (if URL present)
     if echo "$content" | grep -qiE "^https?://"; then
         analyze_url_structure "$content"
+        
+        # Check content type for URLs
+        analyze_url_content_type "$content"
     fi
     
-    # 5. Deep link analysis
+    # 6. Deep link analysis
     analyze_deep_links "$content"
     
-    # 6. Cryptocurrency analysis
+    # 7. Cryptocurrency analysis
     analyze_crypto_addresses "$content"
     
-    # 7. WiFi payload analysis
+    # 8. WiFi payload analysis
     analyze_wifi_payload "$content"
     
-    # 8. Mobile config analysis
+    # 9. Mobile config analysis
     analyze_mobile_config "$content"
     
-    # 9. Script injection detection
+    # 10. Script injection detection
     analyze_script_injection "$content"
     
-    # 10. Social engineering detection
+    # 11. Social engineering detection
     analyze_social_engineering "$content"
     
-    # 11. Obfuscation detection
+    # 12. Obfuscation detection
     detect_obfuscation "$content"
     
-    # 12. APT indicators
+    # 13. APT indicators
     check_apt_indicators "$content"
     
-    # 13. Behavioral analysis
+    # 14. Behavioral analysis
     analyze_qr_behavior "$content"
     
-    # 14. YARA-style rule evaluation
+    # 15. YARA-style rule evaluation
     for rule in "${!YARA_RULES[@]}"; do
         if [ "$(evaluate_yara_rule "$content" "$rule")" = "true" ]; then
             log_threat 40 "YARA rule matched: $rule"
         fi
     done
     
-    # 15. Check for action prefixes
+    # 16. Check for action prefixes
     for prefix in "${QR_ACTION_PREFIXES[@]}"; do
         if echo "$content" | grep -qE "^$prefix"; then
             log_warning "Action prefix detected: $prefix"
         fi
     done
     
-    # 16. Check for dangerous file extensions
+    # 17. Check for dangerous file extensions
     for ext in "${DANGEROUS_EXTENSIONS[@]}"; do
         if echo "$content" | grep -qiE "$ext"; then
             log_threat 40 "Dangerous file extension detected: $ext"
@@ -1533,10 +2069,13 @@ analyze_qr_image() {
     # 3. Steganography analysis
     analyze_steganography "$image" "$base_name"
     
-    # 4. QR structure analysis
+    # 4. OCR analysis
+    analyze_with_ocr "$image" "$base_name"
+    
+    # 5. QR structure analysis
     analyze_qr_structure "$image" "$base_name"
     
-    # 5. Multi-decoder analysis
+    # 6. Multi-decoder analysis
     local decoded_base="${TEMP_DIR}/${base_name}_decoded"
     
     if ! multi_decoder_analysis "$image" "$decoded_base"; then
@@ -1544,7 +2083,7 @@ analyze_qr_image() {
         return 1
     fi
     
-    # 6. Analyze merged decoded content
+    # 7. Analyze merged decoded content
     local merged_content="${decoded_base}_merged.txt"
     
     if [ ! -s "$merged_content" ]; then
@@ -1554,10 +2093,10 @@ analyze_qr_image() {
     
     local content=$(cat "$merged_content")
     
-    # 7. Comprehensive payload analysis
+    # 8. Comprehensive payload analysis
     comprehensive_payload_analysis "$content" "$image" "$base_name"
     
-    # 8. Network-based checks (if enabled)
+    # 9. Network-based checks (if enabled)
     if [ "$NETWORK_CHECK" = true ]; then
         if echo "$content" | grep -qiE "^https?://"; then
             local url=$(echo "$content" | grep -oiE "^https?://[^ ]+")
@@ -1565,10 +2104,15 @@ analyze_qr_image() {
             check_virustotal "$url"
             check_urlhaus "$url"
             check_phishtank "$url"
+            check_openphish_direct "$url"
+            
+            # Extract domain for additional checks
+            local domain=$(echo "$url" | awk -F/ '{print $3}' | sed 's/:[0-9]*$//')
+            check_alienvault_otx_domain "$domain"
         fi
     fi
     
-    # 9. Generate threat assessment
+    # 10. Generate threat assessment
     generate_threat_assessment "$image" "$content"
     
     log_info "========================================="
@@ -1818,9 +2362,21 @@ EXAMPLES:
 
 ENVIRONMENT VARIABLES:
     VT_API_KEY          VirusTotal API key
+    PHISHTANK_API_KEY   PhishTank API key
 
 OUTPUT:
     All results are saved to: qr_analysis_TIMESTAMP/
+
+FEATURES:
+    - Multiple QR decoders (zbar, pyzbar, quirc, zxing, qrdecode, opencv)
+    - Steganography detection (steghide, zsteg, stegdetect)
+    - OCR analysis for text overlays
+    - Comprehensive threat intelligence (OpenPhish, URLhaus, PhishTank, OTX)
+    - API key and secret detection
+    - File download and analysis
+    - WHOIS and domain age checking
+    - Image entropy analysis
+    - Multi-layer obfuscation detection
 
 EOF
 }
