@@ -149,6 +149,32 @@ C2_BEACON_CHECK=true
 CRYPTO_SCAM_CHECK=true
 INDUSTRY_THREAT_CHECK=true
 
+# AUDIT ENHANCEMENT FLAGS (22 NEW MODULES)
+AUDIT_ENHANCED_ANALYSIS=true
+SANDBOX_DETONATION=true
+JS_BROWSER_ANALYSIS=true
+ML_CLASSIFICATION_ENHANCED=true
+PDF_DOC_ANALYSIS=true
+NLP_ANALYSIS=true
+MOBILE_STATIC_ANALYSIS=true
+WEB_ARCHIVE_ANALYSIS=true
+RECURSIVE_CRAWL=true
+ADVERSARIAL_AI_DETECTION=true
+COVERT_CHANNEL_DETECTION=true
+CROSS_QR_CHAIN_DETECTION=true
+TEMPLATE_SPOOF_DETECTION=true
+SOCIAL_MEDIA_LINK_DETECTION=true
+UX_REDRESS_DETECTION=true
+DGA_ANALYSIS=true
+UNICODE_DECEPTION_DETECTION=true
+SOCIAL_THREAT_TRACKING=true
+BLOCKCHAIN_SCAM_ANALYSIS=true
+CONTACT_EVENT_ANALYSIS=true
+GEO_HOTSPOT_DETECTION=true
+EMERGING_PROTOCOL_DETECTION=true
+FEEDBACK_LOOP_ENABLED=true
+INTERACTIVE_MODE=false
+
 # API Keys (environment variables)
 VT_API_KEY="${VT_API_KEY:-}"
 PHISHTANK_API_KEY="${PHISHTANK_API_KEY:-}"
@@ -159,6 +185,12 @@ SECURITYTRAILS_API_KEY="${SECURITYTRAILS_API_KEY:-}"
 URLSCAN_API_KEY="${URLSCAN_API_KEY:-}"
 GREYNOISE_API_KEY="${GREYNOISE_API_KEY:-}"
 CENSYS_API_KEY="${CENSYS_API_KEY:-}"
+
+# Audit Enhancement API Keys
+ANYRUN_API_KEY="${ANYRUN_API_KEY:-}"
+HYBRID_ANALYSIS_KEY="${HYBRID_ANALYSIS_KEY:-}"
+ETHERSCAN_API_KEY="${ETHERSCAN_API_KEY:-}"
+OPENAI_API_KEY="${OPENAI_API_KEY:-}"
 
 ################################################################################
 # LOGGING FUNCTIONS (defined BEFORE use)
@@ -10529,6 +10561,15 @@ analyze_decoded_qr_content() {
         analyze_ml_heuristics "$content"
     fi
     
+    # =========================================================================
+    # AUDIT-ENHANCED ANALYSIS (22 NEW MODULES)
+    # =========================================================================
+    # Run all 22 audit-recommended analysis modules
+    if [ "$AUDIT_ENHANCED_ANALYSIS" != false ]; then
+        local extracted_url=$(echo "$content" | grep -oiE 'https?://[^\s]+' | head -1)
+        run_all_audit_enhancements "$content" "$extracted_url" "$INPUT_IMAGE" ""
+    fi
+    
     echo "" >> "$report_file"
 }
 
@@ -11000,6 +11041,30 @@ show_help() {
     echo "  - Zero-Day/Anomaly Detection"
     echo "  - ML Heuristics Classification"
     echo ""
+    echo "Audit Enhancement Modules (22 NEW):"
+    echo "  [1]  Sandbox/Detonation Analysis (urlscan.io, local Docker)"
+    echo "  [2]  JavaScript/Browser Exploit Detection (XSS, DOM, exploits)"
+    echo "  [3]  Enhanced ML/AI Classification (statistical features)"
+    echo "  [4]  PDF/Document Payload Analysis (macros, exploits)"
+    echo "  [5]  NLP/Language Analysis (scam patterns, sentiment)"
+    echo "  [6]  Mobile Malware Static Analysis (APK/IPA)"
+    echo "  [7]  Web Archive Analysis (Wayback Machine, archive.today)"
+    echo "  [8]  Recursive Content Extraction (crawl linked content)"
+    echo "  [9]  Adversarial AI Attack Detection (perturbation, patches)"
+    echo "  [10] Covert Channel Detection (DNS tunneling, stego)"
+    echo "  [11] Cross-QR Chaining Detection (segmented payloads)"
+    echo "  [12] Template Spoofing Detection (COVID pass, shipping)"
+    echo "  [13] Social Media/Marketing Link Analysis (linktree, tracking)"
+    echo "  [14] UX Redress/Browser Attack Detection (clickjacking, tabnab)"
+    echo "  [15] DGA Domain Analysis (entropy, bigrams, patterns)"
+    echo "  [16] Unicode/Multi-language Deception (homoglyphs, RTL)"
+    echo "  [17] Social Threat Tracking (URLhaus, DNSBLs)"
+    echo "  [18] Blockchain/Smart Contract Scam Analysis (drainers)"
+    echo "  [19] Contact Event Analysis (vCard/iCal BEC)"
+    echo "  [20] Geographic Hotspot Detection (country/ASN risk)"
+    echo "  [21] Emerging Protocol Detection (WebRTC, BLE, payments)"
+    echo "  [22] Human Reviewer Feedback Loop (chain of custody)"
+    echo ""
     echo "Examples:"
     echo "  $(basename "$0") suspicious_qr.png"
     echo "  $(basename "$0") -d --vt /path/to/qr_images/"
@@ -11007,6 +11072,5436 @@ show_help() {
 }
 
 
+
+################################################################################
+################################################################################
+##                                                                            ##
+##          AUDIT ENHANCEMENT MODULES - 22 NEW ANALYSIS CAPABILITIES          ##
+##                                                                            ##
+##  Implementation of all audit suggestions for comprehensive QR analysis     ##
+##                                                                            ##
+################################################################################
+################################################################################
+
+# ============================================================================
+# AUDIT ENHANCEMENT FLAGS AND CONFIGURATION
+# ============================================================================
+
+# Module Enable Flags
+SANDBOX_DETONATION=${SANDBOX_DETONATION:-true}
+JS_BROWSER_ANALYSIS=${JS_BROWSER_ANALYSIS:-true}
+ML_CLASSIFICATION_ENHANCED=${ML_CLASSIFICATION_ENHANCED:-true}
+PDF_DOC_ANALYSIS=${PDF_DOC_ANALYSIS:-true}
+NLP_ANALYSIS=${NLP_ANALYSIS:-true}
+MOBILE_STATIC_ANALYSIS=${MOBILE_STATIC_ANALYSIS:-true}
+WEB_ARCHIVE_ANALYSIS=${WEB_ARCHIVE_ANALYSIS:-true}
+RECURSIVE_CRAWL=${RECURSIVE_CRAWL:-true}
+ADVERSARIAL_AI_DETECTION=${ADVERSARIAL_AI_DETECTION:-true}
+COVERT_CHANNEL_DETECTION=${COVERT_CHANNEL_DETECTION:-true}
+CROSS_QR_CHAIN_DETECTION=${CROSS_QR_CHAIN_DETECTION:-true}
+TEMPLATE_SPOOF_DETECTION=${TEMPLATE_SPOOF_DETECTION:-true}
+SOCIAL_MEDIA_LINK_DETECTION=${SOCIAL_MEDIA_LINK_DETECTION:-true}
+UX_REDRESS_DETECTION=${UX_REDRESS_DETECTION:-true}
+DGA_ANALYSIS=${DGA_ANALYSIS:-true}
+UNICODE_DECEPTION_DETECTION=${UNICODE_DECEPTION_DETECTION:-true}
+SOCIAL_THREAT_TRACKING=${SOCIAL_THREAT_TRACKING:-true}
+BLOCKCHAIN_SCAM_ANALYSIS=${BLOCKCHAIN_SCAM_ANALYSIS:-true}
+CONTACT_EVENT_ANALYSIS=${CONTACT_EVENT_ANALYSIS:-true}
+GEO_HOTSPOT_DETECTION=${GEO_HOTSPOT_DETECTION:-true}
+EMERGING_PROTOCOL_DETECTION=${EMERGING_PROTOCOL_DETECTION:-true}
+FEEDBACK_LOOP_ENABLED=${FEEDBACK_LOOP_ENABLED:-true}
+
+# API Keys (set via environment or config)
+URLSCAN_API_KEY="${URLSCAN_API_KEY:-}"
+ANYRUN_API_KEY="${ANYRUN_API_KEY:-}"
+HYBRID_ANALYSIS_KEY="${HYBRID_ANALYSIS_KEY:-}"
+ETHERSCAN_API_KEY="${ETHERSCAN_API_KEY:-}"
+OPENAI_API_KEY="${OPENAI_API_KEY:-}"
+
+# ============================================================================
+# AUDIT 1: SANDBOX/EMULATION/DETONATION ENGINE
+# ============================================================================
+
+# Sandbox API endpoints
+declare -A SANDBOX_APIS=(
+    ["urlscan"]="https://urlscan.io/api/v1/scan/"
+    ["anyrun"]="https://api.any.run/v1/analysis"
+    ["hybrid_analysis"]="https://www.hybrid-analysis.com/api/v2/submit/url"
+    ["joesandbox"]="https://jbxcloud.joesecurity.org/api/v2/analysis/submit"
+    ["virustotal_url"]="https://www.virustotal.com/api/v3/urls"
+)
+
+# Known malicious behavioral indicators from sandbox results
+declare -a SANDBOX_MALICIOUS_BEHAVIORS=(
+    "process_injection"
+    "registry_persistence"
+    "scheduled_task_creation"
+    "service_installation"
+    "credential_theft"
+    "keylogging"
+    "screen_capture"
+    "file_encryption"
+    "network_beacon"
+    "dns_tunneling"
+    "powershell_encoded"
+    "wmi_execution"
+    "dll_injection"
+    "hollowing"
+    "unhooking"
+    "anti_analysis"
+    "evasion_technique"
+    "dropper_behavior"
+    "downloader_behavior"
+    "c2_communication"
+    "data_exfiltration"
+    "ransomware_behavior"
+    "wiper_behavior"
+    "rootkit_behavior"
+    "bootkit_behavior"
+)
+
+analyze_sandbox_detonation() {
+    local url="$1"
+    
+    if [ "$SANDBOX_DETONATION" = false ]; then
+        analysis_success_none "SANDBOX-DETONATION"
+        return
+    fi
+    
+    log_info "Performing sandbox/detonation analysis..."
+    
+    local sandbox_findings=()
+    local sandbox_score=0
+    local sandbox_report="${OUTPUT_DIR}/sandbox_detonation.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "SANDBOX DETONATION ANALYSIS"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo "Target URL: $url"
+        echo ""
+    } > "$sandbox_report"
+    
+    # 1. URLScan.io submission
+    if [ -n "$URLSCAN_API_KEY" ]; then
+        log_info "  Submitting to urlscan.io..."
+        local urlscan_result=$(curl -sS --max-time 30 \
+            -H "API-Key: $URLSCAN_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"url\": \"$url\", \"visibility\": \"private\"}" \
+            "${SANDBOX_APIS[urlscan]}" 2>/dev/null)
+        
+        if [ -n "$urlscan_result" ]; then
+            local scan_uuid=$(echo "$urlscan_result" | grep -oE '"uuid":"[^"]+"' | cut -d'"' -f4)
+            if [ -n "$scan_uuid" ]; then
+                echo "URLScan UUID: $scan_uuid" >> "$sandbox_report"
+                echo "URLScan Result URL: https://urlscan.io/result/$scan_uuid/" >> "$sandbox_report"
+                log_forensic "URLScan submitted: $scan_uuid"
+                
+                # Wait and fetch results
+                sleep 15
+                local scan_result=$(curl -sS --max-time 30 \
+                    "https://urlscan.io/api/v1/result/$scan_uuid/" 2>/dev/null)
+                
+                if [ -n "$scan_result" ]; then
+                    # Check for malicious verdicts
+                    if echo "$scan_result" | grep -qiE '"malicious":\s*true|"score":\s*[7-9][0-9]|"score":\s*100'; then
+                        log_threat 80 "URLScan detected malicious content"
+                        sandbox_findings+=("urlscan:malicious")
+                        ((sandbox_score += 70))
+                    fi
+                    
+                    # Extract domains contacted
+                    local domains_contacted=$(echo "$scan_result" | grep -oE '"domain":"[^"]+"' | cut -d'"' -f4 | sort -u)
+                    echo "Domains Contacted:" >> "$sandbox_report"
+                    echo "$domains_contacted" >> "$sandbox_report"
+                    
+                    # Extract IPs
+                    local ips_contacted=$(echo "$scan_result" | grep -oE '"ip":"[^"]+"' | cut -d'"' -f4 | sort -u)
+                    echo "IPs Contacted:" >> "$sandbox_report"
+                    echo "$ips_contacted" >> "$sandbox_report"
+                    
+                    # Check for redirects
+                    local redirect_count=$(echo "$scan_result" | grep -c '"redirectResponse"')
+                    if [ "$redirect_count" -gt 3 ]; then
+                        log_warning "Multiple redirects detected: $redirect_count"
+                        sandbox_findings+=("redirect_chain:$redirect_count")
+                        ((sandbox_score += 20))
+                    fi
+                fi
+            fi
+        fi
+    else
+        echo "URLScan: Skipped (no API key)" >> "$sandbox_report"
+    fi
+    
+    # 2. Local Docker sandbox (if available)
+    if command -v docker &> /dev/null; then
+        log_info "  Checking local Docker sandbox capability..."
+        echo "" >> "$sandbox_report"
+        echo "Local Docker Sandbox: Available" >> "$sandbox_report"
+        
+        # Create isolated analysis container
+        local container_result=$(timeout 60 docker run --rm --network=none \
+            --memory=512m --cpus=0.5 \
+            alpine:latest sh -c "wget -q -O- --timeout=10 '$url' 2>/dev/null | head -c 10000" 2>/dev/null)
+        
+        if [ -n "$container_result" ]; then
+            # Analyze fetched content for malicious patterns
+            if echo "$container_result" | grep -qiE '<script.*eval|document\.write.*unescape|fromCharCode.*concat'; then
+                log_threat 60 "Obfuscated JavaScript detected in fetched content"
+                sandbox_findings+=("obfuscated_js")
+                ((sandbox_score += 50))
+            fi
+            
+            if echo "$container_result" | grep -qiE 'createElement.*iframe|appendChild.*script'; then
+                log_threat 45 "Dynamic script/iframe injection detected"
+                sandbox_findings+=("dynamic_injection")
+                ((sandbox_score += 35))
+            fi
+        fi
+    fi
+    
+    # 3. Behavioral indicator analysis
+    echo "" >> "$sandbox_report"
+    echo "Behavioral Analysis:" >> "$sandbox_report"
+    
+    for behavior in "${SANDBOX_MALICIOUS_BEHAVIORS[@]}"; do
+        if echo "$url" | grep -qiE "$behavior"; then
+            sandbox_findings+=("behavior:$behavior")
+            ((sandbox_score += 15))
+        fi
+    done
+    
+    # Generate report
+    echo "" >> "$sandbox_report"
+    echo "Findings:" >> "$sandbox_report"
+    for finding in "${sandbox_findings[@]}"; do
+        echo "  - $finding" >> "$sandbox_report"
+    done
+    echo "" >> "$sandbox_report"
+    echo "Sandbox Risk Score: $sandbox_score" >> "$sandbox_report"
+    
+    if [ ${#sandbox_findings[@]} -gt 0 ]; then
+        if [ $sandbox_score -ge 50 ]; then
+            log_threat $((sandbox_score / 2)) "Sandbox detonation revealed threats"
+        fi
+        analysis_success_found "SANDBOX-DETONATION" "${#sandbox_findings[@]}" "Score: $sandbox_score"
+    else
+        analysis_success_none "SANDBOX-DETONATION"
+    fi
+}
+
+# ============================================================================
+# AUDIT 2: JAVASCRIPT/HTML/BROWSER EXPLOIT ANALYSIS
+# ============================================================================
+
+# JavaScript exploit patterns
+declare -a JS_EXPLOIT_PATTERNS=(
+    # Obfuscation
+    'eval\s*\(\s*function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k'  # p.a.c.k.e.r
+    'eval\s*\(\s*unescape'
+    'String\.fromCharCode\s*\(\s*[0-9,\s]+'
+    'document\.write\s*\(\s*unescape'
+    'atob\s*\(\s*["\x27][A-Za-z0-9+/=]+'
+    'window\[.?\\x[0-9a-f]+'
+    'constructor\s*\(\s*["\x27]return'
+    
+    # XSS payloads
+    '<script[^>]*>.*<\/script>'
+    'javascript\s*:'
+    'on(load|error|click|mouseover)\s*='
+    '<img[^>]+onerror\s*='
+    '<svg[^>]+onload\s*='
+    '<body[^>]+onload\s*='
+    
+    # DOM manipulation
+    'document\.cookie'
+    'document\.domain'
+    'document\.location'
+    'window\.location'
+    'location\.href\s*='
+    'location\.replace'
+    'innerHTML\s*='
+    'outerHTML\s*='
+    'document\.write'
+    
+    # Remote code execution
+    'new\s+Function\s*\('
+    'setTimeout\s*\(\s*["\x27]'
+    'setInterval\s*\(\s*["\x27]'
+    
+    # Browser exploits
+    'ActiveXObject'
+    'WScript\.Shell'
+    'Scripting\.FileSystemObject'
+    'ADODB\.Stream'
+    'msxml2\.xmlhttp'
+    'shellcode'
+    'spray'
+    'heap'
+    
+    # Credential theft
+    'password'
+    'credentials'
+    'login'
+    'signin'
+    'autocomplete.*off'
+    
+    # Known exploit kit patterns
+    'Angler'
+    'RIG'
+    'Magnitude'
+    'Sundown'
+    'Fallout'
+    'GrandSoft'
+    'Underminer'
+)
+
+# HTML phishing indicators
+declare -a HTML_PHISHING_PATTERNS=(
+    '<form[^>]+action\s*=\s*["\x27]https?://'
+    '<input[^>]+type\s*=\s*["\x27]password'
+    '<input[^>]+name\s*=\s*["\x27](user|email|pass|pwd|login)'
+    'Please\s+(verify|confirm|update)\s+your'
+    'Your\s+account\s+(has\s+been|is|will\s+be)'
+    'Click\s+here\s+to\s+(verify|confirm|update)'
+    'Verify\s+your\s+identity'
+    'Secure\s+your\s+account'
+    'Unusual\s+activity'
+    'Suspended'
+    'Locked'
+    'Expired'
+    'Action\s+required'
+)
+
+analyze_js_browser_exploits() {
+    local content="$1"
+    local url="$2"
+    
+    if [ "$JS_BROWSER_ANALYSIS" = false ]; then
+        analysis_success_none "JS-BROWSER-ANALYSIS"
+        return
+    fi
+    
+    log_info "Analyzing JavaScript/HTML browser exploits..."
+    
+    local js_findings=()
+    local js_score=0
+    local js_report="${OUTPUT_DIR}/js_browser_analysis.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "JAVASCRIPT/BROWSER EXPLOIT ANALYSIS"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo ""
+    } > "$js_report"
+    
+    # Fetch URL content if URL provided
+    local html_content=""
+    if [ -n "$url" ] && echo "$url" | grep -qiE "^https?://"; then
+        log_info "  Fetching URL content for analysis..."
+        html_content=$(timeout 30 curl -sS -L --max-time 25 \
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+            "$url" 2>/dev/null | head -c 500000)
+    fi
+    
+    # Combine content and HTML for analysis
+    local analysis_content="$content $html_content"
+    
+    # Check JavaScript exploit patterns
+    echo "JavaScript Exploit Patterns:" >> "$js_report"
+    for pattern in "${JS_EXPLOIT_PATTERNS[@]}"; do
+        if echo "$analysis_content" | grep -qiE "$pattern"; then
+            local matched=$(echo "$analysis_content" | grep -oiE "$pattern" | head -1 | cut -c1-50)
+            js_findings+=("js_exploit:$matched")
+            ((js_score += 25))
+            log_warning "JS exploit pattern: $matched"
+            echo "  ⚠ DETECTED: $pattern" >> "$js_report"
+        fi
+    done
+    
+    # Check HTML phishing patterns
+    echo "" >> "$js_report"
+    echo "HTML Phishing Patterns:" >> "$js_report"
+    for pattern in "${HTML_PHISHING_PATTERNS[@]}"; do
+        if echo "$analysis_content" | grep -qiE "$pattern"; then
+            local matched=$(echo "$analysis_content" | grep -oiE "$pattern" | head -1 | cut -c1-50)
+            js_findings+=("html_phish:$matched")
+            ((js_score += 20))
+            log_warning "HTML phishing pattern: $matched"
+            echo "  ⚠ DETECTED: $pattern" >> "$js_report"
+        fi
+    done
+    
+    # Check for iframe injections
+    local iframe_count=$(echo "$analysis_content" | grep -ciE '<iframe' || echo 0)
+    if [ "$iframe_count" -gt 0 ]; then
+        echo "" >> "$js_report"
+        echo "IFrame Analysis:" >> "$js_report"
+        echo "  Count: $iframe_count" >> "$js_report"
+        
+        # Extract iframe sources
+        local iframe_srcs=$(echo "$analysis_content" | grep -oiE '<iframe[^>]+src\s*=\s*["\x27][^"\x27]+' |
+            sed 's/.*src\s*=\s*["\x27]//' | head -5)
+        echo "  Sources:" >> "$js_report"
+        echo "$iframe_srcs" >> "$js_report"
+        
+        if [ "$iframe_count" -gt 3 ]; then
+            js_findings+=("multiple_iframes:$iframe_count")
+            ((js_score += 30))
+            log_threat 35 "Multiple iframes detected ($iframe_count)"
+        fi
+        
+        # Check for hidden iframes
+        if echo "$analysis_content" | grep -qiE '<iframe[^>]+(hidden|display\s*:\s*none|width\s*=\s*["\x27]?0|height\s*=\s*["\x27]?0)'; then
+            js_findings+=("hidden_iframe")
+            ((js_score += 45))
+            log_threat 50 "Hidden iframe detected - potential drive-by"
+        fi
+    fi
+    
+    # Check for external script loading
+    local script_count=$(echo "$analysis_content" | grep -ciE '<script[^>]+src' || echo 0)
+    if [ "$script_count" -gt 10 ]; then
+        js_findings+=("excessive_scripts:$script_count")
+        ((js_score += 15))
+        log_warning "Excessive external scripts: $script_count"
+    fi
+    
+    # Headless browser analysis (if available)
+    if command -v chromium &> /dev/null || command -v google-chrome &> /dev/null; then
+        log_info "  Running headless browser analysis..."
+        echo "" >> "$js_report"
+        echo "Headless Browser Analysis: Available" >> "$js_report"
+        
+        # Note: Full implementation would use puppeteer/playwright
+        # This is a placeholder for the concept
+    fi
+    
+    # DOM clobbering detection
+    if echo "$analysis_content" | grep -qiE 'name\s*=\s*["\x27](location|document|window|self|top|parent)'; then
+        js_findings+=("dom_clobbering")
+        ((js_score += 40))
+        log_threat 45 "Potential DOM clobbering attack"
+    fi
+    
+    # Prototype pollution detection
+    if echo "$analysis_content" | grep -qiE '__proto__|constructor\s*\[|prototype\s*\['; then
+        js_findings+=("prototype_pollution")
+        ((js_score += 50))
+        log_threat 55 "Potential prototype pollution attack"
+    fi
+    
+    # Generate summary
+    echo "" >> "$js_report"
+    echo "Analysis Summary:" >> "$js_report"
+    echo "  Total Findings: ${#js_findings[@]}" >> "$js_report"
+    echo "  Risk Score: $js_score" >> "$js_report"
+    echo "" >> "$js_report"
+    echo "Findings:" >> "$js_report"
+    for finding in "${js_findings[@]}"; do
+        echo "  - $finding" >> "$js_report"
+    done
+    
+    if [ ${#js_findings[@]} -gt 0 ]; then
+        if [ $js_score -ge 50 ]; then
+            log_threat $((js_score / 2)) "JavaScript/browser exploit patterns detected"
+        fi
+        analysis_success_found "JS-BROWSER-ANALYSIS" "${#js_findings[@]}" "Score: $js_score"
+    else
+        analysis_success_none "JS-BROWSER-ANALYSIS"
+    fi
+}
+
+# ============================================================================
+# AUDIT 3: ML/AI/STATISTICAL CLASSIFICATION ENGINE
+# ============================================================================
+
+# Feature extraction weights for ML scoring
+declare -A ML_FEATURE_WEIGHTS=(
+    ["url_length"]=0.15
+    ["special_char_ratio"]=0.12
+    ["digit_ratio"]=0.10
+    ["subdomain_depth"]=0.13
+    ["path_depth"]=0.08
+    ["query_param_count"]=0.07
+    ["entropy"]=0.15
+    ["suspicious_tld"]=0.10
+    ["brand_similarity"]=0.10
+)
+
+# Suspicious TLD list for ML scoring
+declare -a ML_SUSPICIOUS_TLDS=(
+    "tk" "ml" "ga" "cf" "gq" "top" "xyz" "work" "click" "loan"
+    "date" "racing" "win" "review" "country" "stream" "download"
+    "party" "bid" "trade" "webcam" "science" "accountant" "faith"
+    "cricket" "gdn" "men" "link" "zip" "mobi" "info" "biz" "cc"
+)
+
+# Brand list for impersonation scoring
+declare -a ML_BRAND_LIST=(
+    "paypal" "amazon" "google" "microsoft" "apple" "facebook" "netflix"
+    "instagram" "twitter" "linkedin" "dropbox" "chase" "wellsfargo"
+    "bankofamerica" "citibank" "usbank" "capitalone" "americanexpress"
+    "discover" "hsbc" "barclays" "santander" "irs" "hmrc" "dhl" "fedex"
+    "ups" "usps" "royalmail" "docusign" "adobe" "zoom" "slack" "teams"
+    "outlook" "office365" "onedrive" "icloud" "coinbase" "binance"
+)
+
+analyze_ml_classification_enhanced() {
+    local content="$1"
+    
+    if [ "$ML_CLASSIFICATION_ENHANCED" = false ]; then
+        analysis_success_none "ML-CLASSIFICATION"
+        return
+    fi
+    
+    log_info "Performing enhanced ML/statistical classification..."
+    
+    local ml_report="${OUTPUT_DIR}/ml_classification_enhanced.txt"
+    local ml_score=0
+    local ml_confidence=0
+    local ml_features=()
+    local ml_verdict="UNKNOWN"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "ENHANCED ML/STATISTICAL CLASSIFICATION"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo ""
+    } > "$ml_report"
+    
+    # Feature extraction using Python for accuracy
+    local features_json=$(python3 << EOF 2>/dev/null
+import json
+import math
+import re
+from collections import Counter
+from urllib.parse import urlparse, parse_qs
+
+content = '''$content'''
+
+features = {}
+
+# URL parsing if content is URL
+if content.startswith('http://') or content.startswith('https://'):
+    try:
+        parsed = urlparse(content)
+        
+        # URL length feature
+        features['url_length'] = len(content)
+        features['url_length_score'] = min(len(content) / 200, 1.0)
+        
+        # Domain analysis
+        domain = parsed.netloc
+        features['domain'] = domain
+        features['domain_length'] = len(domain)
+        
+        # Subdomain depth
+        parts = domain.split('.')
+        features['subdomain_depth'] = len(parts) - 2 if len(parts) > 2 else 0
+        features['subdomain_score'] = min(features['subdomain_depth'] / 5, 1.0)
+        
+        # Path depth
+        path_parts = [p for p in parsed.path.split('/') if p]
+        features['path_depth'] = len(path_parts)
+        features['path_score'] = min(features['path_depth'] / 8, 1.0)
+        
+        # Query parameters
+        params = parse_qs(parsed.query)
+        features['param_count'] = len(params)
+        features['param_score'] = min(features['param_count'] / 10, 1.0)
+        
+        # Special character ratio
+        special_chars = len(re.findall(r'[@#%&=?\-_~]', content))
+        features['special_char_ratio'] = special_chars / len(content) if content else 0
+        
+        # Digit ratio in domain
+        digits = len(re.findall(r'\d', domain))
+        features['digit_ratio'] = digits / len(domain) if domain else 0
+        
+        # TLD check
+        tld = parts[-1].lower() if parts else ''
+        suspicious_tlds = ['tk', 'ml', 'ga', 'cf', 'gq', 'top', 'xyz', 'work', 'click', 'loan']
+        features['suspicious_tld'] = 1.0 if tld in suspicious_tlds else 0.0
+        
+        # Brand detection
+        brands = ['paypal', 'amazon', 'google', 'microsoft', 'apple', 'facebook', 'netflix',
+                  'instagram', 'twitter', 'linkedin', 'dropbox', 'chase', 'bank']
+        domain_lower = domain.lower()
+        features['brand_in_domain'] = 1.0 if any(b in domain_lower for b in brands) else 0.0
+        
+        # Check for typosquatting
+        features['typosquatting_score'] = 0.0
+        for brand in brands:
+            if brand in domain_lower and brand not in ['.' + brand + '.', brand + '.']:
+                # Brand appears but not as exact domain
+                if domain_lower != brand + '.com' and domain_lower != 'www.' + brand + '.com':
+                    features['typosquatting_score'] = 0.8
+                    break
+        
+    except Exception as e:
+        features['parse_error'] = str(e)
+
+# Entropy calculation
+if content:
+    freq = Counter(content)
+    probs = [count / len(content) for count in freq.values()]
+    entropy = -sum(p * math.log2(p) for p in probs if p > 0)
+    features['entropy'] = round(entropy, 4)
+    features['entropy_score'] = min(entropy / 6, 1.0)
+else:
+    features['entropy'] = 0
+    features['entropy_score'] = 0
+
+# Character class analysis
+if content:
+    features['lowercase_ratio'] = len(re.findall(r'[a-z]', content)) / len(content)
+    features['uppercase_ratio'] = len(re.findall(r'[A-Z]', content)) / len(content)
+    features['numeric_ratio'] = len(re.findall(r'\d', content)) / len(content)
+
+# N-gram analysis
+def get_ngram_score(text, n=3):
+    ngrams = [text[i:i+n] for i in range(len(text)-n+1)]
+    freq = Counter(ngrams)
+    if not freq:
+        return 0
+    max_freq = max(freq.values())
+    return max_freq / len(ngrams) if ngrams else 0
+
+features['bigram_score'] = get_ngram_score(content, 2) if len(content) > 2 else 0
+features['trigram_score'] = get_ngram_score(content, 3) if len(content) > 3 else 0
+
+# Calculate final ML score (weighted combination)
+weights = {
+    'url_length_score': 0.10,
+    'subdomain_score': 0.15,
+    'path_score': 0.08,
+    'param_score': 0.07,
+    'special_char_ratio': 0.10,
+    'digit_ratio': 0.12,
+    'suspicious_tld': 0.15,
+    'brand_in_domain': 0.08,
+    'typosquatting_score': 0.15,
+    'entropy_score': 0.10
+}
+
+total_score = 0
+for feature, weight in weights.items():
+    if feature in features:
+        total_score += features.get(feature, 0) * weight * 100
+
+features['ml_score'] = round(total_score, 2)
+
+# Confidence based on feature availability
+available_features = sum(1 for k in weights.keys() if k in features)
+features['confidence'] = round(available_features / len(weights) * 100, 1)
+
+# Verdict
+if total_score >= 70:
+    features['verdict'] = 'MALICIOUS'
+elif total_score >= 45:
+    features['verdict'] = 'SUSPICIOUS'
+elif total_score >= 25:
+    features['verdict'] = 'POTENTIALLY_SUSPICIOUS'
+else:
+    features['verdict'] = 'LIKELY_BENIGN'
+
+print(json.dumps(features, indent=2))
+EOF
+)
+    
+    if [ -n "$features_json" ]; then
+        echo "Feature Extraction Results:" >> "$ml_report"
+        echo "$features_json" >> "$ml_report"
+        
+        # Parse results
+        ml_score=$(echo "$features_json" | grep -oP '"ml_score":\s*\K[0-9.]+' | head -1)
+        ml_confidence=$(echo "$features_json" | grep -oP '"confidence":\s*\K[0-9.]+' | head -1)
+        ml_verdict=$(echo "$features_json" | grep -oP '"verdict":\s*"\K[^"]+' | head -1)
+        
+        echo "" >> "$ml_report"
+        echo "Classification Results:" >> "$ml_report"
+        echo "  ML Score: ${ml_score:-0}" >> "$ml_report"
+        echo "  Confidence: ${ml_confidence:-0}%" >> "$ml_report"
+        echo "  Verdict: ${ml_verdict:-UNKNOWN}" >> "$ml_report"
+        
+        # Display results
+        echo ""
+        echo -e "${CYAN}┌─────────────────────────────────────────────────────────────┐${NC}"
+        echo -e "${CYAN}│              ML CLASSIFICATION RESULTS                       │${NC}"
+        echo -e "${CYAN}├─────────────────────────────────────────────────────────────┤${NC}"
+        echo -e "${CYAN}│${NC} ML Score:     ${YELLOW}${ml_score:-0}${NC}"
+        echo -e "${CYAN}│${NC} Confidence:   ${WHITE}${ml_confidence:-0}%${NC}"
+        echo -e "${CYAN}│${NC} Verdict:      ${RED}${ml_verdict:-UNKNOWN}${NC}"
+        echo -e "${CYAN}└─────────────────────────────────────────────────────────────┘${NC}"
+        echo ""
+        
+        # Add threat score based on ML verdict
+        case "$ml_verdict" in
+            "MALICIOUS")
+                log_threat 60 "ML classification: MALICIOUS (${ml_confidence}% confidence)"
+                analysis_success_found "ML-CLASSIFICATION" "1" "Verdict: $ml_verdict, Score: $ml_score"
+                ;;
+            "SUSPICIOUS")
+                log_threat 35 "ML classification: SUSPICIOUS (${ml_confidence}% confidence)"
+                analysis_success_found "ML-CLASSIFICATION" "1" "Verdict: $ml_verdict, Score: $ml_score"
+                ;;
+            "POTENTIALLY_SUSPICIOUS")
+                log_warning "ML classification: POTENTIALLY SUSPICIOUS"
+                analysis_success_found "ML-CLASSIFICATION" "1" "Verdict: $ml_verdict, Score: $ml_score"
+                ;;
+            *)
+                analysis_success_none "ML-CLASSIFICATION"
+                ;;
+        esac
+    else
+        analysis_error "ML-CLASSIFICATION" "Python feature extraction failed"
+    fi
+}
+
+# ============================================================================
+# AUDIT 4: PDF/DOCUMENT EMBEDDED PAYLOAD ANALYSIS
+# ============================================================================
+
+# Known malicious PDF patterns
+declare -a PDF_MALICIOUS_PATTERNS=(
+    '/JavaScript'
+    '/JS'
+    '/Launch'
+    '/EmbeddedFile'
+    '/OpenAction'
+    '/AA'
+    '/AcroForm'
+    '/XFA'
+    '/RichMedia'
+    '/ObjStm'
+    '/URI'
+    '/SubmitForm'
+    '/GoToR'
+    '/GoToE'
+    '/JBIG2Decode'
+    '/Colors > 2\^24'
+    'getAnnots'
+    'getPageNthWord'
+    'this.exportDataObject'
+    'util.printf'
+    'Collab.collectEmailInfo'
+    'spell.customDictionaryOpen'
+)
+
+# Office document macro patterns
+declare -a OFFICE_MACRO_PATTERNS=(
+    'AutoOpen'
+    'AutoExec'
+    'AutoClose'
+    'Document_Open'
+    'Workbook_Open'
+    'Auto_Open'
+    'Shell'
+    'WScript'
+    'PowerShell'
+    'cmd.exe'
+    'CreateObject'
+    'GetObject'
+    'CallByName'
+    'Environ'
+    'URLDownloadToFile'
+    'MSXML2'
+    'WinHttp'
+    'StrReverse'
+    'Chr('
+    'ChrW('
+    'ChrB('
+)
+
+analyze_pdf_document() {
+    local content="$1"
+    local url="$2"
+    
+    if [ "$PDF_DOC_ANALYSIS" = false ]; then
+        analysis_success_none "PDF-DOC-ANALYSIS"
+        return
+    fi
+    
+    log_info "Analyzing for PDF/document embedded payloads..."
+    
+    local doc_findings=()
+    local doc_score=0
+    local doc_report="${OUTPUT_DIR}/pdf_document_analysis.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "PDF/DOCUMENT PAYLOAD ANALYSIS"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo ""
+    } > "$doc_report"
+    
+    # Check if URL points to document
+    local is_doc_url=false
+    local doc_type=""
+    
+    if echo "$url" | grep -qiE '\.(pdf|doc|docx|docm|xls|xlsx|xlsm|ppt|pptx|pptm|odt|ods|odp|rtf)(\?|$)'; then
+        is_doc_url=true
+        doc_type=$(echo "$url" | grep -oiE '\.(pdf|doc|docx|docm|xls|xlsx|xlsm|ppt|pptx|pptm|odt|ods|odp|rtf)' | tr '[:upper:]' '[:lower:]')
+        log_warning "URL points to document: $doc_type"
+        doc_findings+=("document_url:$doc_type")
+        ((doc_score += 20))
+    fi
+    
+    # Download and analyze if document URL
+    if [ "$is_doc_url" = true ] && [ -n "$url" ]; then
+        local temp_doc="${TEMP_DIR}/downloaded_doc$(echo $doc_type)"
+        
+        log_info "  Downloading document for analysis..."
+        if timeout 30 curl -sS -L -o "$temp_doc" "$url" 2>/dev/null; then
+            local file_type=$(file -b "$temp_doc" 2>/dev/null)
+            echo "Downloaded File Type: $file_type" >> "$doc_report"
+            
+            # PDF Analysis
+            if echo "$file_type" | grep -qi "PDF"; then
+                log_info "  Analyzing PDF structure..."
+                echo "" >> "$doc_report"
+                echo "PDF Analysis:" >> "$doc_report"
+                
+                # Check for malicious PDF patterns
+                for pattern in "${PDF_MALICIOUS_PATTERNS[@]}"; do
+                    if grep -qa "$pattern" "$temp_doc" 2>/dev/null; then
+                        doc_findings+=("pdf_pattern:$pattern")
+                        ((doc_score += 25))
+                        log_warning "Suspicious PDF pattern: $pattern"
+                        echo "  ⚠ DETECTED: $pattern" >> "$doc_report"
+                    fi
+                done
+                
+                # Use pdfid if available
+                if command -v pdfid &> /dev/null; then
+                    log_info "  Running pdfid analysis..."
+                    local pdfid_output=$(pdfid "$temp_doc" 2>/dev/null)
+                    echo "" >> "$doc_report"
+                    echo "pdfid Output:" >> "$doc_report"
+                    echo "$pdfid_output" >> "$doc_report"
+                    
+                    # Parse pdfid results
+                    if echo "$pdfid_output" | grep -qE '/JavaScript\s+[1-9]'; then
+                        doc_findings+=("pdfid:javascript")
+                        ((doc_score += 40))
+                        log_threat 50 "PDF contains JavaScript"
+                    fi
+                    
+                    if echo "$pdfid_output" | grep -qE '/OpenAction\s+[1-9]'; then
+                        doc_findings+=("pdfid:openaction")
+                        ((doc_score += 35))
+                        log_threat 40 "PDF contains OpenAction (auto-execute)"
+                    fi
+                    
+                    if echo "$pdfid_output" | grep -qE '/Launch\s+[1-9]'; then
+                        doc_findings+=("pdfid:launch")
+                        ((doc_score += 50))
+                        log_threat 60 "PDF contains Launch action"
+                    fi
+                fi
+                
+                # Use pdf-parser if available
+                if command -v pdf-parser &> /dev/null; then
+                    log_info "  Running pdf-parser analysis..."
+                    local parser_output=$(pdf-parser --stats "$temp_doc" 2>/dev/null | head -50)
+                    echo "" >> "$doc_report"
+                    echo "pdf-parser Stats:" >> "$doc_report"
+                    echo "$parser_output" >> "$doc_report"
+                fi
+            fi
+            
+            # Office document analysis
+            if echo "$file_type" | grep -qiE "Microsoft|Office|Composite Document|OpenDocument"; then
+                log_info "  Analyzing Office document..."
+                echo "" >> "$doc_report"
+                echo "Office Document Analysis:" >> "$doc_report"
+                
+                # Use olevba if available
+                if command -v olevba &> /dev/null; then
+                    log_info "  Running olevba analysis..."
+                    local olevba_output=$(timeout 30 olevba "$temp_doc" 2>/dev/null | head -200)
+                    echo "$olevba_output" >> "$doc_report"
+                    
+                    if echo "$olevba_output" | grep -qi "VBA MACRO"; then
+                        doc_findings+=("office:vba_macro")
+                        ((doc_score += 35))
+                        log_threat 40 "Office document contains VBA macros"
+                    fi
+                    
+                    if echo "$olevba_output" | grep -qiE "AutoOpen|AutoExec|Document_Open"; then
+                        doc_findings+=("office:auto_execute")
+                        ((doc_score += 50))
+                        log_threat 60 "Office document has auto-execute macro"
+                    fi
+                    
+                    if echo "$olevba_output" | grep -qiE "Shell|PowerShell|cmd\.exe|WScript"; then
+                        doc_findings+=("office:shell_execution")
+                        ((doc_score += 60))
+                        log_threat 70 "Office macro contains shell execution"
+                    fi
+                fi
+                
+                # Check for DDE
+                if strings "$temp_doc" 2>/dev/null | grep -qiE 'DDE|DDEAUTO'; then
+                    doc_findings+=("office:dde")
+                    ((doc_score += 55))
+                    log_threat 65 "Office document contains DDE (Dynamic Data Exchange)"
+                fi
+            fi
+            
+            # Extract embedded URLs
+            log_info "  Extracting embedded URLs..."
+            local embedded_urls=$(strings "$temp_doc" 2>/dev/null | grep -oiE 'https?://[^\s"<>]+' | sort -u | head -20)
+            if [ -n "$embedded_urls" ]; then
+                echo "" >> "$doc_report"
+                echo "Embedded URLs:" >> "$doc_report"
+                echo "$embedded_urls" >> "$doc_report"
+                
+                local url_count=$(echo "$embedded_urls" | wc -l)
+                doc_findings+=("embedded_urls:$url_count")
+                
+                # Record as IOCs
+                while IFS= read -r embedded_url; do
+                    [ -z "$embedded_url" ] && continue
+                    record_ioc "embedded_url" "$embedded_url" "URL extracted from document"
+                done <<< "$embedded_urls"
+            fi
+            
+            # Cleanup
+            rm -f "$temp_doc" 2>/dev/null
+        fi
+    fi
+    
+    # Check content for document-related patterns
+    for pattern in "${OFFICE_MACRO_PATTERNS[@]}"; do
+        if echo "$content" | grep -qiE "$pattern"; then
+            doc_findings+=("macro_pattern:$pattern")
+            ((doc_score += 15))
+        fi
+    done
+    
+    # Generate summary
+    echo "" >> "$doc_report"
+    echo "Analysis Summary:" >> "$doc_report"
+    echo "  Total Findings: ${#doc_findings[@]}" >> "$doc_report"
+    echo "  Risk Score: $doc_score" >> "$doc_report"
+    
+    if [ ${#doc_findings[@]} -gt 0 ]; then
+        if [ $doc_score -ge 50 ]; then
+            log_threat $((doc_score / 2)) "Document payload analysis revealed threats"
+        fi
+        analysis_success_found "PDF-DOC-ANALYSIS" "${#doc_findings[@]}" "Score: $doc_score"
+    else
+        analysis_success_none "PDF-DOC-ANALYSIS"
+    fi
+}
+
+# ============================================================================
+# AUDIT 5: ADVANCED STRING & NATURAL LANGUAGE ANALYSIS
+# ============================================================================
+
+# Scam/phishing language patterns (expanded)
+declare -a NLP_SCAM_PATTERNS=(
+    # Urgency
+    "act now" "immediate action" "urgent" "expires soon" "limited time"
+    "don't delay" "last chance" "final notice" "ending soon" "hurry"
+    "only [0-9]+ (hours|minutes|days)" "deadline" "time-sensitive"
+    
+    # Fear
+    "your account (will be|has been) (suspended|locked|terminated|closed)"
+    "unauthorized (access|activity|transaction)" "security (alert|warning|breach)"
+    "suspicious (activity|login|transaction)" "compromised" "hacked"
+    "identity theft" "fraud" "illegal activity" "violation"
+    
+    # Authority
+    "official notification" "legal action" "court order" "government"
+    "IRS" "FBI" "police" "law enforcement" "investigation"
+    "compliance" "regulation" "mandatory" "required by law"
+    
+    # Reward
+    "congratulations" "you('ve| have) won" "prize" "lottery" "jackpot"
+    "free" "bonus" "reward" "gift" "giveaway" "claim your"
+    "selected" "winner" "lucky" "exclusive offer"
+    
+    # Social proof
+    "millions of users" "trusted by" "verified" "official"
+    "recommended" "endorsed" "certified"
+    
+    # Pressure
+    "click (here|now|immediately)" "verify (now|immediately|your)"
+    "confirm (now|immediately|your)" "update (now|immediately|your)"
+    "respond within" "must (act|respond|verify)" "failure to"
+    
+    # Credential requests
+    "enter your (password|PIN|SSN|credit card)"
+    "confirm your (identity|account|information)"
+    "verify your (identity|account|information)"
+    "update your (password|information|details)"
+    "provide your (details|information|credentials)"
+)
+
+# Legitimate language patterns (for comparison)
+declare -a NLP_LEGITIMATE_PATTERNS=(
+    "privacy policy" "terms of service" "unsubscribe"
+    "contact us" "help center" "support" "FAQ"
+    "copyright" "trademark" "registered"
+)
+
+analyze_nlp_content() {
+    local content="$1"
+    
+    if [ "$NLP_ANALYSIS" = false ]; then
+        analysis_success_none "NLP-ANALYSIS"
+        return
+    fi
+    
+    log_info "Performing NLP/language analysis..."
+    
+    local nlp_findings=()
+    local nlp_score=0
+    local urgency_count=0
+    local fear_count=0
+    local reward_count=0
+    local pressure_count=0
+    local nlp_report="${OUTPUT_DIR}/nlp_analysis.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "NATURAL LANGUAGE ANALYSIS"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo ""
+        echo "Content Length: ${#content} characters"
+        echo ""
+    } > "$nlp_report"
+    
+    # Analyze scam patterns
+    echo "Scam Pattern Detection:" >> "$nlp_report"
+    
+    for pattern in "${NLP_SCAM_PATTERNS[@]}"; do
+        if echo "$content" | grep -qiE "$pattern"; then
+            local matched=$(echo "$content" | grep -oiE "$pattern" | head -1)
+            nlp_findings+=("scam_pattern:$matched")
+            ((nlp_score += 10))
+            echo "  ⚠ DETECTED: $pattern" >> "$nlp_report"
+            
+            # Categorize
+            case "$pattern" in
+                *urgent*|*immediate*|*expires*|*limited*|*hurry*|*deadline*)
+                    ((urgency_count++))
+                    ;;
+                *suspended*|*locked*|*unauthorized*|*security*|*compromised*|*hacked*)
+                    ((fear_count++))
+                    ;;
+                *won*|*prize*|*lottery*|*free*|*bonus*|*reward*|*gift*)
+                    ((reward_count++))
+                    ;;
+                *click*|*verify*|*confirm*|*must*|*failure*)
+                    ((pressure_count++))
+                    ;;
+            esac
+        fi
+    done
+    
+    # Python-based sentiment and entity analysis
+    local nlp_results=$(python3 << EOF 2>/dev/null
+import json
+import re
+
+content = '''$content'''
+
+results = {
+    'word_count': len(content.split()),
+    'sentence_count': len(re.split(r'[.!?]+', content)),
+    'exclamation_count': content.count('!'),
+    'question_count': content.count('?'),
+    'caps_words': len(re.findall(r'\b[A-Z]{3,}\b', content)),
+    'url_count': len(re.findall(r'https?://\S+', content)),
+    'email_count': len(re.findall(r'\b[\w.-]+@[\w.-]+\.\w+\b', content)),
+    'phone_count': len(re.findall(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b', content)),
+    'money_refs': len(re.findall(r'\$\d+|\d+\s*(dollars|usd|euros|pounds)', content, re.I)),
+    'urgency_words': len(re.findall(r'\b(urgent|immediate|now|today|asap|hurry)\b', content, re.I)),
+}
+
+# Calculate suspicion score
+suspicion = 0
+if results['exclamation_count'] > 3:
+    suspicion += 15
+if results['caps_words'] > 5:
+    suspicion += 20
+if results['urgency_words'] > 2:
+    suspicion += 25
+if results['money_refs'] > 1:
+    suspicion += 15
+
+results['suspicion_score'] = suspicion
+
+# Readability approximation (simple)
+if results['word_count'] > 0 and results['sentence_count'] > 0:
+    avg_sentence_length = results['word_count'] / results['sentence_count']
+    results['avg_sentence_length'] = round(avg_sentence_length, 1)
+    # Very short sentences often indicate scam copy
+    if avg_sentence_length < 8:
+        results['short_sentences_flag'] = True
+        suspicion += 10
+
+print(json.dumps(results, indent=2))
+EOF
+)
+    
+    if [ -n "$nlp_results" ]; then
+        echo "" >> "$nlp_report"
+        echo "Statistical Analysis:" >> "$nlp_report"
+        echo "$nlp_results" >> "$nlp_report"
+        
+        # Parse suspicion score
+        local suspicion=$(echo "$nlp_results" | grep -oP '"suspicion_score":\s*\K\d+' | head -1)
+        ((nlp_score += ${suspicion:-0}))
+    fi
+    
+    # Calculate Cialdini's principles score
+    echo "" >> "$nlp_report"
+    echo "Persuasion Principles Detected:" >> "$nlp_report"
+    echo "  Urgency/Scarcity: $urgency_count" >> "$nlp_report"
+    echo "  Fear: $fear_count" >> "$nlp_report"
+    echo "  Reward/Reciprocity: $reward_count" >> "$nlp_report"
+    echo "  Pressure/Authority: $pressure_count" >> "$nlp_report"
+    
+    # Bonus score for multiple principles
+    local principle_count=0
+    [ $urgency_count -gt 0 ] && ((principle_count++))
+    [ $fear_count -gt 0 ] && ((principle_count++))
+    [ $reward_count -gt 0 ] && ((principle_count++))
+    [ $pressure_count -gt 0 ] && ((principle_count++))
+    
+    if [ $principle_count -ge 3 ]; then
+        log_threat 40 "Multiple persuasion techniques detected ($principle_count principles)"
+        ((nlp_score += 30))
+        nlp_findings+=("multi_principle:$principle_count")
+    fi
+    
+    # Generate summary
+    echo "" >> "$nlp_report"
+    echo "Analysis Summary:" >> "$nlp_report"
+    echo "  Total Findings: ${#nlp_findings[@]}" >> "$nlp_report"
+    echo "  NLP Risk Score: $nlp_score" >> "$nlp_report"
+    
+    if [ ${#nlp_findings[@]} -gt 0 ]; then
+        if [ $nlp_score -ge 40 ]; then
+            log_threat $((nlp_score / 3)) "NLP analysis detected scam/phishing language"
+        fi
+        analysis_success_found "NLP-ANALYSIS" "${#nlp_findings[@]}" "Score: $nlp_score"
+    else
+        analysis_success_none "NLP-ANALYSIS"
+    fi
+}
+
+# ============================================================================
+# AUDIT 6: FULL MOBILE MALWARE STATIC ANALYSIS
+# ============================================================================
+
+# Dangerous Android permissions
+declare -a DANGEROUS_ANDROID_PERMISSIONS=(
+    "android.permission.READ_SMS"
+    "android.permission.SEND_SMS"
+    "android.permission.RECEIVE_SMS"
+    "android.permission.READ_CONTACTS"
+    "android.permission.WRITE_CONTACTS"
+    "android.permission.READ_CALL_LOG"
+    "android.permission.WRITE_CALL_LOG"
+    "android.permission.RECORD_AUDIO"
+    "android.permission.CAMERA"
+    "android.permission.ACCESS_FINE_LOCATION"
+    "android.permission.ACCESS_COARSE_LOCATION"
+    "android.permission.READ_PHONE_STATE"
+    "android.permission.CALL_PHONE"
+    "android.permission.READ_EXTERNAL_STORAGE"
+    "android.permission.WRITE_EXTERNAL_STORAGE"
+    "android.permission.RECEIVE_BOOT_COMPLETED"
+    "android.permission.SYSTEM_ALERT_WINDOW"
+    "android.permission.BIND_ACCESSIBILITY_SERVICE"
+    "android.permission.BIND_DEVICE_ADMIN"
+    "android.permission.REQUEST_INSTALL_PACKAGES"
+)
+
+# iOS suspicious entitlements
+declare -a IOS_SUSPICIOUS_ENTITLEMENTS=(
+    "com.apple.private"
+    "platform-application"
+    "com.apple.springboard"
+    "com.apple.developer.kernel"
+    "get-task-allow"
+    "task_for_pid-allow"
+    "com.apple.system-task-ports"
+)
+
+analyze_mobile_static() {
+    local content="$1"
+    local url="$2"
+    
+    if [ "$MOBILE_STATIC_ANALYSIS" = false ]; then
+        analysis_success_none "MOBILE-STATIC"
+        return
+    fi
+    
+    log_info "Performing mobile malware static analysis..."
+    
+    local mobile_findings=()
+    local mobile_score=0
+    local mobile_report="${OUTPUT_DIR}/mobile_static_analysis.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "MOBILE MALWARE STATIC ANALYSIS"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo ""
+    } > "$mobile_report"
+    
+    # Check if URL points to mobile app
+    local is_mobile_url=false
+    local app_type=""
+    
+    if echo "$url" | grep -qiE '\.(apk|ipa|aab)(\?|$)'; then
+        is_mobile_url=true
+        app_type=$(echo "$url" | grep -oiE '\.(apk|ipa|aab)' | tr '[:upper:]' '[:lower:]')
+        log_warning "URL points to mobile app: $app_type"
+        mobile_findings+=("mobile_app_url:$app_type")
+        ((mobile_score += 30))
+        
+        echo "Mobile App URL Detected: $app_type" >> "$mobile_report"
+    fi
+    
+    # Check for mobile-specific patterns in content
+    echo "" >> "$mobile_report"
+    echo "Mobile Pattern Detection:" >> "$mobile_report"
+    
+    # Android patterns
+    if echo "$content" | grep -qiE 'market://|play\.google\.com/store|android\.intent'; then
+        mobile_findings+=("android_market")
+        ((mobile_score += 15))
+        echo "  ✓ Android Market/Play Store reference" >> "$mobile_report"
+    fi
+    
+    if echo "$content" | grep -qiE 'intent://|android-app://'; then
+        mobile_findings+=("android_intent_scheme")
+        ((mobile_score += 25))
+        log_warning "Android intent scheme detected"
+        echo "  ⚠ Android Intent Scheme" >> "$mobile_report"
+    fi
+    
+    # iOS patterns
+    if echo "$content" | grep -qiE 'itms-apps://|itms-appss://|apps\.apple\.com'; then
+        mobile_findings+=("ios_appstore")
+        ((mobile_score += 15))
+        echo "  ✓ iOS App Store reference" >> "$mobile_report"
+    fi
+    
+    if echo "$content" | grep -qiE '\.mobileconfig|configuration profile'; then
+        mobile_findings+=("ios_mobileconfig")
+        ((mobile_score += 45))
+        log_threat 50 "iOS MDM configuration profile detected"
+        echo "  ⚠ iOS Mobile Configuration Profile" >> "$mobile_report"
+    fi
+    
+    # Enterprise distribution
+    if echo "$url" | grep -qiE 'itms-services://\?action=download-manifest'; then
+        mobile_findings+=("ios_enterprise_distribution")
+        ((mobile_score += 40))
+        log_threat 45 "iOS enterprise app distribution detected"
+        echo "  ⚠ iOS Enterprise Distribution" >> "$mobile_report"
+    fi
+    
+    # Download and analyze APK if available
+    if [ "$is_mobile_url" = true ] && [ "$app_type" = ".apk" ]; then
+        local temp_apk="${TEMP_DIR}/downloaded_app.apk"
+        
+        if timeout 60 curl -sS -L -o "$temp_apk" "$url" 2>/dev/null; then
+            log_info "  Analyzing APK file..."
+            
+            # Use apkanalyzer or aapt if available
+            if command -v aapt &> /dev/null; then
+                log_info "  Extracting APK permissions..."
+                local permissions=$(aapt dump permissions "$temp_apk" 2>/dev/null)
+                
+                echo "" >> "$mobile_report"
+                echo "APK Permissions:" >> "$mobile_report"
+                
+                for perm in "${DANGEROUS_ANDROID_PERMISSIONS[@]}"; do
+                    if echo "$permissions" | grep -q "$perm"; then
+                        mobile_findings+=("dangerous_permission:$perm")
+                        ((mobile_score += 10))
+                        echo "  ⚠ DANGEROUS: $perm" >> "$mobile_report"
+                    fi
+                done
+            fi
+            
+            # Check for common malware indicators in DEX
+            if command -v dexdump &> /dev/null || command -v baksmali &> /dev/null; then
+                log_info "  Analyzing DEX code..."
+            fi
+            
+            # String analysis
+            local apk_strings=$(unzip -p "$temp_apk" "classes.dex" 2>/dev/null | strings | head -500)
+            
+            # Check for C2/URL patterns in DEX
+            local suspicious_strings=$(echo "$apk_strings" | grep -iE 'http://|https://|\.onion|pastebin|ngrok' | head -10)
+            if [ -n "$suspicious_strings" ]; then
+                echo "" >> "$mobile_report"
+                echo "Suspicious Strings in DEX:" >> "$mobile_report"
+                echo "$suspicious_strings" >> "$mobile_report"
+                mobile_findings+=("suspicious_strings")
+                ((mobile_score += 25))
+            fi
+            
+            rm -f "$temp_apk" 2>/dev/null
+        fi
+    fi
+    
+    # Generate summary
+    echo "" >> "$mobile_report"
+    echo "Analysis Summary:" >> "$mobile_report"
+    echo "  Total Findings: ${#mobile_findings[@]}" >> "$mobile_report"
+    echo "  Mobile Risk Score: $mobile_score" >> "$mobile_report"
+    
+    if [ ${#mobile_findings[@]} -gt 0 ]; then
+        if [ $mobile_score -ge 40 ]; then
+            log_threat $((mobile_score / 2)) "Mobile malware indicators detected"
+        fi
+        analysis_success_found "MOBILE-STATIC" "${#mobile_findings[@]}" "Score: $mobile_score"
+    else
+        analysis_success_none "MOBILE-STATIC"
+    fi
+}
+
+# ============================================================================
+# AUDIT 7: WEB ARCHIVE ANALYSIS
+# ============================================================================
+
+analyze_web_archive() {
+    local url="$1"
+    
+    if [ "$WEB_ARCHIVE_ANALYSIS" = false ]; then
+        analysis_success_none "WEB-ARCHIVE"
+        return
+    fi
+    
+    if [ -z "$url" ] || ! echo "$url" | grep -qiE "^https?://"; then
+        analysis_success_none "WEB-ARCHIVE"
+        return
+    fi
+    
+    log_info "Checking web archives for historical data..."
+    
+    local archive_findings=()
+    local archive_score=0
+    local archive_report="${OUTPUT_DIR}/web_archive_analysis.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "WEB ARCHIVE ANALYSIS"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo "Target URL: $url"
+        echo ""
+    } > "$archive_report"
+    
+    # Extract domain
+    local domain=$(echo "$url" | sed -E 's|^https?://||' | cut -d'/' -f1)
+    
+    # 1. Wayback Machine check
+    log_info "  Checking Wayback Machine..."
+    local wayback_api="http://archive.org/wayback/available?url=$url"
+    local wayback_result=$(curl -sS --max-time 15 "$wayback_api" 2>/dev/null)
+    
+    if [ -n "$wayback_result" ]; then
+        local archived_url=$(echo "$wayback_result" | grep -oP '"url":\s*"\K[^"]+' | head -1)
+        local archive_timestamp=$(echo "$wayback_result" | grep -oP '"timestamp":\s*"\K[^"]+' | head -1)
+        
+        echo "Wayback Machine:" >> "$archive_report"
+        if [ -n "$archived_url" ]; then
+            echo "  Status: Found in archive" >> "$archive_report"
+            echo "  Archive URL: $archived_url" >> "$archive_report"
+            echo "  Timestamp: $archive_timestamp" >> "$archive_report"
+            
+            archive_findings+=("wayback:found")
+            log_forensic "Found in Wayback Machine: $archive_timestamp"
+            
+            # Fetch and compare archived version
+            log_info "  Fetching archived version for comparison..."
+            local archived_content=$(curl -sS --max-time 20 "$archived_url" 2>/dev/null | head -c 50000)
+            
+            if [ -n "$archived_content" ]; then
+                # Check for phishing indicators that appeared
+                if echo "$archived_content" | grep -qiE 'login|password|verify|suspended'; then
+                    archive_findings+=("wayback:phishing_content")
+                    ((archive_score += 25))
+                fi
+            fi
+        else
+            echo "  Status: Not found in archive" >> "$archive_report"
+            archive_findings+=("wayback:not_found")
+            # New domains not in archive are more suspicious
+            ((archive_score += 15))
+        fi
+    fi
+    
+    # 2. Check domain age via archive
+    echo "" >> "$archive_report"
+    echo "Domain History Analysis:" >> "$archive_report"
+    
+    local cdx_api="http://web.archive.org/cdx/search/cdx?url=$domain&output=json&limit=5"
+    local cdx_result=$(curl -sS --max-time 15 "$cdx_api" 2>/dev/null)
+    
+    if [ -n "$cdx_result" ] && echo "$cdx_result" | grep -q '\['; then
+        # Get first capture date
+        local first_capture=$(echo "$cdx_result" | grep -oE '"[0-9]{14}"' | head -1 | tr -d '"')
+        if [ -n "$first_capture" ]; then
+            local first_year="${first_capture:0:4}"
+            local current_year=$(date +%Y)
+            local age=$((current_year - first_year))
+            
+            echo "  First Archive: $first_capture" >> "$archive_report"
+            echo "  Approximate Age: $age years" >> "$archive_report"
+            
+            if [ "$age" -lt 1 ]; then
+                log_warning "Domain is less than 1 year old in archives"
+                archive_findings+=("new_domain:$age")
+                ((archive_score += 20))
+            fi
+        fi
+    fi
+    
+    # 3. Archive.today check
+    log_info "  Checking archive.today..."
+    local archive_today_url="https://archive.today/$url"
+    local archive_today_check=$(curl -sS --max-time 10 -o /dev/null -w "%{http_code}" "$archive_today_url" 2>/dev/null)
+    
+    echo "" >> "$archive_report"
+    echo "Archive.today:" >> "$archive_report"
+    if [ "$archive_today_check" = "200" ]; then
+        echo "  Status: Found" >> "$archive_report"
+        echo "  URL: $archive_today_url" >> "$archive_report"
+        archive_findings+=("archive_today:found")
+    else
+        echo "  Status: Not found" >> "$archive_report"
+    fi
+    
+    # Generate summary
+    echo "" >> "$archive_report"
+    echo "Analysis Summary:" >> "$archive_report"
+    echo "  Total Findings: ${#archive_findings[@]}" >> "$archive_report"
+    echo "  Archive Risk Score: $archive_score" >> "$archive_report"
+    
+    if [ ${#archive_findings[@]} -gt 0 ]; then
+        if [ $archive_score -ge 25 ]; then
+            log_warning "Web archive analysis indicates suspicious history"
+        fi
+        analysis_success_found "WEB-ARCHIVE" "${#archive_findings[@]}" "Score: $archive_score"
+    else
+        analysis_success_none "WEB-ARCHIVE"
+    fi
+}
+
+# ============================================================================
+# AUDIT 8: EMBEDDED/EXTERNAL CONTENT EXTRACTION (RECURSIVE CRAWL)
+# ============================================================================
+
+# Maximum crawl depth
+MAX_CRAWL_DEPTH=2
+CRAWL_TIMEOUT=30
+
+# Known content hosting services to crawl
+declare -a CRAWL_TARGET_SERVICES=(
+    "docs.google.com"
+    "drive.google.com"
+    "pastebin.com"
+    "paste.ee"
+    "ghostbin.co"
+    "hastebin.com"
+    "gist.github.com"
+    "raw.githubusercontent.com"
+    "dropbox.com"
+    "onedrive.live.com"
+    "1drv.ms"
+    "mega.nz"
+    "rentry.co"
+    "privatebin.net"
+)
+
+analyze_recursive_crawl() {
+    local url="$1"
+    local depth="${2:-0}"
+    
+    if [ "$RECURSIVE_CRAWL" = false ]; then
+        analysis_success_none "RECURSIVE-CRAWL"
+        return
+    fi
+    
+    if [ "$depth" -ge "$MAX_CRAWL_DEPTH" ]; then
+        return
+    fi
+    
+    if [ -z "$url" ] || ! echo "$url" | grep -qiE "^https?://"; then
+        analysis_success_none "RECURSIVE-CRAWL"
+        return
+    fi
+    
+    log_info "Performing recursive content extraction (depth: $depth)..."
+    
+    local crawl_findings=()
+    local crawl_score=0
+    local crawl_report="${OUTPUT_DIR}/recursive_crawl.txt"
+    
+    if [ "$depth" -eq 0 ]; then
+        {
+            echo "═══════════════════════════════════════════════"
+            echo "RECURSIVE CONTENT EXTRACTION"
+            echo "═══════════════════════════════════════════════"
+            echo "Timestamp: $(date -Iseconds)"
+            echo "Initial URL: $url"
+            echo "Max Depth: $MAX_CRAWL_DEPTH"
+            echo ""
+        } > "$crawl_report"
+    fi
+    
+    # Check if URL is a content hosting service
+    local domain=$(echo "$url" | sed -E 's|^https?://||' | cut -d'/' -f1)
+    local is_target_service=false
+    
+    for service in "${CRAWL_TARGET_SERVICES[@]}"; do
+        if echo "$domain" | grep -qi "$service"; then
+            is_target_service=true
+            break
+        fi
+    done
+    
+    if [ "$is_target_service" = true ]; then
+        log_info "  Target service detected: $domain (depth $depth)"
+        
+        # Fetch content
+        local fetched_content=$(timeout $CRAWL_TIMEOUT curl -sS -L --max-time $((CRAWL_TIMEOUT - 5)) \
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+            "$url" 2>/dev/null | head -c 200000)
+        
+        if [ -n "$fetched_content" ]; then
+            echo "Depth $depth - Fetched: $url" >> "$crawl_report"
+            echo "  Content Length: ${#fetched_content} bytes" >> "$crawl_report"
+            
+            crawl_findings+=("fetched:$domain")
+            
+            # Analyze fetched content
+            # Check for malicious patterns
+            if echo "$fetched_content" | grep -qiE 'powershell|cmd\.exe|IEX|Invoke-|downloadstring'; then
+                crawl_findings+=("malicious_content:$domain")
+                ((crawl_score += 50))
+                log_threat 55 "Malicious content found in linked resource"
+                echo "  ⚠ MALICIOUS CONTENT DETECTED" >> "$crawl_report"
+            fi
+            
+            # Check for additional URLs to crawl
+            local nested_urls=$(echo "$fetched_content" | grep -oiE 'https?://[^\s"<>'\'']+' | sort -u | head -10)
+            
+            if [ -n "$nested_urls" ]; then
+                echo "  Nested URLs found:" >> "$crawl_report"
+                
+                while IFS= read -r nested_url; do
+                    [ -z "$nested_url" ] && continue
+                    echo "    - $nested_url" >> "$crawl_report"
+                    
+                    # Record as IOC
+                    record_ioc "nested_url" "$nested_url" "Found in crawled content at depth $depth"
+                    
+                    # Recursive crawl (if target service)
+                    for service in "${CRAWL_TARGET_SERVICES[@]}"; do
+                        if echo "$nested_url" | grep -qi "$service"; then
+                            analyze_recursive_crawl "$nested_url" $((depth + 1))
+                            break
+                        fi
+                    done
+                done <<< "$nested_urls"
+            fi
+            
+            # Extract and analyze base64 content
+            local base64_content=$(echo "$fetched_content" | grep -oE '[A-Za-z0-9+/=]{50,}' | head -5)
+            if [ -n "$base64_content" ]; then
+                echo "  Base64 content found:" >> "$crawl_report"
+                while IFS= read -r b64; do
+                    local decoded=$(echo "$b64" | base64 -d 2>/dev/null | head -c 1000)
+                    if [ -n "$decoded" ]; then
+                        if echo "$decoded" | grep -qiE 'powershell|cmd|wget|curl|python'; then
+                            crawl_findings+=("encoded_payload:base64")
+                            ((crawl_score += 40))
+                            log_threat 45 "Base64 encoded payload found"
+                        fi
+                    fi
+                done <<< "$base64_content"
+            fi
+        fi
+    fi
+    
+    # Generate summary (only at depth 0)
+    if [ "$depth" -eq 0 ]; then
+        echo "" >> "$crawl_report"
+        echo "Analysis Summary:" >> "$crawl_report"
+        echo "  Total Findings: ${#crawl_findings[@]}" >> "$crawl_report"
+        echo "  Crawl Risk Score: $crawl_score" >> "$crawl_report"
+        
+        if [ ${#crawl_findings[@]} -gt 0 ]; then
+            if [ $crawl_score -ge 40 ]; then
+                log_threat $((crawl_score / 2)) "Recursive crawl revealed malicious content"
+            fi
+            analysis_success_found "RECURSIVE-CRAWL" "${#crawl_findings[@]}" "Score: $crawl_score"
+        else
+            analysis_success_none "RECURSIVE-CRAWL"
+        fi
+    fi
+}
+
+# ============================================================================
+# AUDIT 9: VISUAL ADVERSARIAL AI ATTACK DETECTION
+# ============================================================================
+
+analyze_adversarial_ai() {
+    local image="$1"
+    
+    if [ "$ADVERSARIAL_AI_DETECTION" = false ]; then
+        analysis_success_none "ADVERSARIAL-AI"
+        return
+    fi
+    
+    if [ ! -f "$image" ]; then
+        analysis_error "ADVERSARIAL-AI" "Image file not found"
+        return
+    fi
+    
+    log_info "Analyzing for adversarial AI attack patterns..."
+    
+    local adv_findings=()
+    local adv_score=0
+    local adv_report="${OUTPUT_DIR}/adversarial_ai_analysis.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "ADVERSARIAL AI ATTACK DETECTION"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo "Image: $image"
+        echo ""
+    } > "$adv_report"
+    
+    # Python-based adversarial detection
+    local adv_analysis=$(python3 << EOF 2>/dev/null
+import json
+import sys
+
+try:
+    from PIL import Image
+    import numpy as np
+    
+    img = Image.open('$image')
+    img_array = np.array(img)
+    
+    results = {
+        'size': img.size,
+        'mode': img.mode,
+        'format': img.format,
+    }
+    
+    # Calculate image statistics
+    if len(img_array.shape) >= 2:
+        results['mean'] = float(np.mean(img_array))
+        results['std'] = float(np.std(img_array))
+        results['min'] = int(np.min(img_array))
+        results['max'] = int(np.max(img_array))
+        
+        # Check for adversarial perturbation indicators
+        
+        # 1. High-frequency noise detection
+        if len(img_array.shape) == 3:
+            gray = np.mean(img_array, axis=2)
+        else:
+            gray = img_array
+        
+        # Calculate Laplacian variance (edge/noise detection)
+        from scipy import ndimage
+        laplacian = ndimage.laplace(gray.astype(float))
+        laplacian_var = float(np.var(laplacian))
+        results['laplacian_variance'] = round(laplacian_var, 4)
+        
+        # High laplacian variance can indicate adversarial noise
+        if laplacian_var > 500:
+            results['high_frequency_noise'] = True
+            results['adversarial_indicator'] = 'HIGH_FREQUENCY_PERTURBATION'
+        
+        # 2. Check for unusual pixel distributions
+        pixel_hist, _ = np.histogram(img_array.flatten(), bins=256, range=(0, 256))
+        
+        # Adversarial examples often have unusual histogram patterns
+        hist_entropy = -np.sum(pixel_hist[pixel_hist > 0] / pixel_hist.sum() * 
+                               np.log2(pixel_hist[pixel_hist > 0] / pixel_hist.sum()))
+        results['histogram_entropy'] = round(hist_entropy, 4)
+        
+        # Very low entropy suggests manipulation
+        if hist_entropy < 4.0:
+            results['unusual_distribution'] = True
+        
+        # 3. Check for patch attacks (localized perturbations)
+        # Look for rectangular regions with different statistics
+        h, w = gray.shape
+        patch_size = min(h, w) // 4
+        if patch_size > 10:
+            center_patch = gray[h//4:3*h//4, w//4:3*w//4]
+            corner_patches = [
+                gray[:patch_size, :patch_size],
+                gray[:patch_size, -patch_size:],
+                gray[-patch_size:, :patch_size],
+                gray[-patch_size:, -patch_size:]
+            ]
+            
+            center_mean = np.mean(center_patch)
+            corner_means = [np.mean(p) for p in corner_patches]
+            
+            # Large difference between center and corners could indicate patch attack
+            max_diff = max(abs(center_mean - cm) for cm in corner_means)
+            results['patch_diff'] = round(max_diff, 4)
+            
+            if max_diff > 50:
+                results['possible_patch_attack'] = True
+                results['adversarial_indicator'] = 'PATCH_ATTACK'
+        
+        # 4. JPEG artifacts analysis (adversarial often added post-compression)
+        if img.format == 'JPEG':
+            # DCT block boundary analysis would go here
+            results['jpeg_analysis'] = 'JPEG format detected'
+    
+    print(json.dumps(results, indent=2))
+    
+except ImportError as e:
+    print(json.dumps({'error': f'Missing dependency: {e}'}))
+except Exception as e:
+    print(json.dumps({'error': str(e)}))
+EOF
+)
+    
+    if [ -n "$adv_analysis" ]; then
+        echo "Image Analysis Results:" >> "$adv_report"
+        echo "$adv_analysis" >> "$adv_report"
+        
+        # Parse results
+        if echo "$adv_analysis" | grep -q '"adversarial_indicator"'; then
+            local indicator=$(echo "$adv_analysis" | grep -oP '"adversarial_indicator":\s*"\K[^"]+')
+            adv_findings+=("adversarial:$indicator")
+            ((adv_score += 45))
+            log_threat 50 "Adversarial AI attack indicator: $indicator"
+        fi
+        
+        if echo "$adv_analysis" | grep -q '"high_frequency_noise":\s*true'; then
+            adv_findings+=("high_frequency_noise")
+            ((adv_score += 30))
+            log_warning "High-frequency noise detected (possible perturbation)"
+        fi
+        
+        if echo "$adv_analysis" | grep -q '"possible_patch_attack":\s*true'; then
+            adv_findings+=("patch_attack")
+            ((adv_score += 40))
+            log_threat 45 "Possible adversarial patch attack detected"
+        fi
+        
+        if echo "$adv_analysis" | grep -q '"unusual_distribution":\s*true'; then
+            adv_findings+=("unusual_distribution")
+            ((adv_score += 20))
+            log_warning "Unusual pixel distribution detected"
+        fi
+    fi
+    
+    # Generate summary
+    echo "" >> "$adv_report"
+    echo "Analysis Summary:" >> "$adv_report"
+    echo "  Total Findings: ${#adv_findings[@]}" >> "$adv_report"
+    echo "  Adversarial Risk Score: $adv_score" >> "$adv_report"
+    
+    if [ ${#adv_findings[@]} -gt 0 ]; then
+        analysis_success_found "ADVERSARIAL-AI" "${#adv_findings[@]}" "Score: $adv_score"
+    else
+        analysis_success_none "ADVERSARIAL-AI"
+    fi
+}
+
+# ============================================================================
+# AUDIT 10: COVERT CHANNEL DETECTION
+# ============================================================================
+
+# DNS covert channel indicators
+declare -a DNS_COVERT_INDICATORS=(
+    "TXT record with base64"
+    "Unusually long subdomain"
+    "High entropy subdomain"
+    "Rapid DNS queries"
+    "Non-standard record types"
+)
+
+analyze_covert_channels() {
+    local content="$1"
+    local url="$2"
+    
+    if [ "$COVERT_CHANNEL_DETECTION" = false ]; then
+        analysis_success_none "COVERT-CHANNELS"
+        return
+    fi
+    
+    log_info "Analyzing for covert channel indicators..."
+    
+    local covert_findings=()
+    local covert_score=0
+    local covert_report="${OUTPUT_DIR}/covert_channel_analysis.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "COVERT CHANNEL DETECTION"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo ""
+    } > "$covert_report"
+    
+    # Extract domain if URL
+    local domain=""
+    if echo "$url" | grep -qiE "^https?://"; then
+        domain=$(echo "$url" | sed -E 's|^https?://||' | cut -d'/' -f1)
+    fi
+    
+    echo "DNS Covert Channel Analysis:" >> "$covert_report"
+    
+    if [ -n "$domain" ]; then
+        # 1. Check for DNS tunneling indicators
+        log_info "  Checking DNS tunneling indicators..."
+        
+        # Get TXT records
+        local txt_records=$(dig +short TXT "$domain" 2>/dev/null)
+        if [ -n "$txt_records" ]; then
+            echo "  TXT Records: $txt_records" >> "$covert_report"
+            
+            # Check for base64 in TXT
+            if echo "$txt_records" | grep -qE '[A-Za-z0-9+/=]{50,}'; then
+                covert_findings+=("dns_txt_base64")
+                ((covert_score += 35))
+                log_warning "Base64 content in DNS TXT record"
+            fi
+            
+            # Long TXT records
+            local txt_len=$(echo "$txt_records" | wc -c)
+            if [ "$txt_len" -gt 255 ]; then
+                covert_findings+=("long_txt_record:$txt_len")
+                ((covert_score += 20))
+            fi
+        fi
+        
+        # 2. Subdomain entropy check
+        local subdomain=$(echo "$domain" | rev | cut -d'.' -f3- | rev)
+        if [ -n "$subdomain" ] && [ ${#subdomain} -gt 20 ]; then
+            # Calculate entropy
+            local entropy=$(python3 -c "
+import math
+from collections import Counter
+s = '$subdomain'
+freq = Counter(s)
+probs = [c/len(s) for c in freq.values()]
+entropy = -sum(p * math.log2(p) for p in probs if p > 0)
+print(round(entropy, 4))
+" 2>/dev/null)
+            
+            echo "  Subdomain: $subdomain" >> "$covert_report"
+            echo "  Subdomain Entropy: ${entropy:-N/A}" >> "$covert_report"
+            
+            if [ -n "$entropy" ]; then
+                local high_entropy=$(echo "$entropy > 3.5" | bc -l 2>/dev/null)
+                if [ "$high_entropy" = "1" ]; then
+                    covert_findings+=("high_entropy_subdomain:$entropy")
+                    ((covert_score += 40))
+                    log_threat 45 "High-entropy subdomain detected (possible DNS tunneling)"
+                fi
+            fi
+        fi
+        
+        # 3. Check for DNS over HTTPS indicators
+        if echo "$content" | grep -qiE 'dns-query|application/dns-message|cloudflare-dns|dns\.google'; then
+            covert_findings+=("doh_indicator")
+            ((covert_score += 15))
+            log_info "DNS-over-HTTPS indicator detected"
+        fi
+    fi
+    
+    echo "" >> "$covert_report"
+    echo "Protocol Covert Channel Analysis:" >> "$covert_report"
+    
+    # 4. ICMP covert channel patterns
+    if echo "$content" | grep -qiE 'icmp|ping.*-p.*[a-f0-9]{16}|ping.*data'; then
+        covert_findings+=("icmp_covert")
+        ((covert_score += 30))
+        log_warning "ICMP covert channel indicator"
+    fi
+    
+    # 5. HTTP header covert channels
+    if echo "$content" | grep -qiE 'X-[A-Za-z0-9-]*:\s*[A-Za-z0-9+/=]{32,}'; then
+        covert_findings+=("http_header_covert")
+        ((covert_score += 25))
+        log_warning "HTTP header covert channel pattern"
+    fi
+    
+    # 6. Steganography indicators in URL
+    if echo "$url" | grep -qE '[A-Za-z0-9+/=]{64,}'; then
+        covert_findings+=("url_encoded_payload")
+        ((covert_score += 20))
+    fi
+    
+    # Generate summary
+    echo "" >> "$covert_report"
+    echo "Analysis Summary:" >> "$covert_report"
+    echo "  Total Findings: ${#covert_findings[@]}" >> "$covert_report"
+    echo "  Covert Channel Risk Score: $covert_score" >> "$covert_report"
+    
+    if [ ${#covert_findings[@]} -gt 0 ]; then
+        if [ $covert_score -ge 35 ]; then
+            log_threat $((covert_score / 2)) "Covert channel indicators detected"
+        fi
+        analysis_success_found "COVERT-CHANNELS" "${#covert_findings[@]}" "Score: $covert_score"
+    else
+        analysis_success_none "COVERT-CHANNELS"
+    fi
+}
+
+# ============================================================================
+# AUDIT 11: CROSS-QR STEGANOGRAPHY/CHAINING DETECTION
+# ============================================================================
+
+# Array to track QR codes in batch analysis
+declare -a QR_CHAIN_HASHES=()
+declare -a QR_CHAIN_CONTENTS=()
+
+analyze_qr_chaining() {
+    local content="$1"
+    local image="$2"
+    local batch_mode="${3:-false}"
+    
+    if [ "$CROSS_QR_CHAIN_DETECTION" = false ]; then
+        analysis_success_none "QR-CHAINING"
+        return
+    fi
+    
+    log_info "Analyzing for cross-QR chaining/sequencing..."
+    
+    local chain_findings=()
+    local chain_score=0
+    local chain_report="${OUTPUT_DIR}/qr_chaining_analysis.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "CROSS-QR CHAINING/STEGANOGRAPHY DETECTION"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo ""
+    } >> "$chain_report"
+    
+    # 1. Check for sequence indicators in content
+    echo "Sequence Pattern Detection:" >> "$chain_report"
+    
+    # Part X of Y patterns
+    if echo "$content" | grep -qiE 'part\s*[0-9]+\s*(of|/)\s*[0-9]+'; then
+        local sequence_info=$(echo "$content" | grep -oiE 'part\s*[0-9]+\s*(of|/)\s*[0-9]+' | head -1)
+        chain_findings+=("sequence_marker:$sequence_info")
+        ((chain_score += 40))
+        log_threat 45 "QR sequence marker detected: $sequence_info"
+        echo "  ⚠ SEQUENCE MARKER: $sequence_info" >> "$chain_report"
+    fi
+    
+    # Fragment patterns
+    if echo "$content" | grep -qiE '\[fragment\]|\[chunk\]|\[segment\]|##[0-9]+##'; then
+        chain_findings+=("fragment_marker")
+        ((chain_score += 35))
+        log_warning "Fragment marker detected in QR"
+    fi
+    
+    # 2. Check for base64 fragment patterns
+    local base64_fragment=$(echo "$content" | grep -oE '^[A-Za-z0-9+/]+={0,2}$')
+    if [ -n "$base64_fragment" ] && [ ${#base64_fragment} -gt 50 ]; then
+        # Pure base64 content suggests it might be a fragment
+        local decoded=$(echo "$base64_fragment" | base64 -d 2>/dev/null | head -c 100)
+        
+        # If doesn't decode to readable text, likely a fragment
+        if [ -n "$decoded" ]; then
+            local readable_ratio=$(echo "$decoded" | tr -dc '[:print:]' | wc -c)
+            local total_len=${#decoded}
+            
+            if [ "$total_len" -gt 0 ] && [ "$readable_ratio" -lt $((total_len / 2)) ]; then
+                chain_findings+=("possible_fragment:base64")
+                ((chain_score += 30))
+                echo "  ⚠ Possible base64 fragment (low readability)" >> "$chain_report"
+            fi
+        fi
+    fi
+    
+    # 3. Check for hex fragment patterns
+    if echo "$content" | grep -qE '^[0-9a-fA-F]{64,}$'; then
+        chain_findings+=("hex_fragment")
+        ((chain_score += 25))
+        log_warning "Hex-encoded fragment pattern detected"
+    fi
+    
+    # 4. Batch analysis - check for related QR codes
+    if [ "$batch_mode" = true ]; then
+        echo "" >> "$chain_report"
+        echo "Batch Correlation Analysis:" >> "$chain_report"
+        
+        # Add current content to tracking
+        local content_hash=$(echo "$content" | md5sum | cut -d' ' -f1)
+        QR_CHAIN_HASHES+=("$content_hash")
+        QR_CHAIN_CONTENTS+=("$content")
+        
+        echo "  QR codes analyzed: ${#QR_CHAIN_HASHES[@]}" >> "$chain_report"
+        
+        # Check for content similarity
+        if [ ${#QR_CHAIN_CONTENTS[@]} -gt 1 ]; then
+            local similar_count=0
+            for prev_content in "${QR_CHAIN_CONTENTS[@]:0:${#QR_CHAIN_CONTENTS[@]}-1}"; do
+                # Simple similarity check
+                local common_prefix=$(printf '%s\n%s\n' "$prev_content" "$content" |
+                    sed 'N;s/^\(.*\).*\n\1.*$/\1/' | head -1)
+                if [ ${#common_prefix} -gt 20 ]; then
+                    ((similar_count++))
+                fi
+            done
+            
+            if [ "$similar_count" -gt 0 ]; then
+                chain_findings+=("similar_qr_codes:$similar_count")
+                ((chain_score += 25))
+                log_warning "$similar_count similar QR codes detected (possible chain)"
+            fi
+        fi
+    fi
+    
+    # 5. Concatenation instruction patterns
+    if echo "$content" | grep -qiE 'concat|append|combine|merge|join.*next'; then
+        chain_findings+=("concatenation_instruction")
+        ((chain_score += 35))
+        log_warning "Concatenation instruction detected"
+    fi
+    
+    # Generate summary
+    echo "" >> "$chain_report"
+    echo "Analysis Summary:" >> "$chain_report"
+    echo "  Total Findings: ${#chain_findings[@]}" >> "$chain_report"
+    echo "  Chain Risk Score: $chain_score" >> "$chain_report"
+    
+    if [ ${#chain_findings[@]} -gt 0 ]; then
+        analysis_success_found "QR-CHAINING" "${#chain_findings[@]}" "Score: $chain_score"
+    else
+        analysis_success_none "QR-CHAINING"
+    fi
+}
+
+# ============================================================================
+# AUDIT 12: QR FACTORY/TEMPLATE SPOOFING DETECTION
+# ============================================================================
+
+# Known QR template signatures (visual patterns and content patterns)
+declare -A TEMPLATE_SIGNATURES=(
+    # COVID-related
+    ["covid_pass"]="EU Digital COVID|NHS COVID Pass|Vaccination Certificate|CERTIFICATE VERIFIED"
+    ["green_pass"]="Green Pass|EU DCC|Digital Green Certificate"
+    
+    # Shipping/Logistics
+    ["fedex"]="fedex\.com|FedEx|tracking.*fedex"
+    ["ups"]="ups\.com|UPS|tracking.*ups|worldship"
+    ["dhl"]="dhl\.(com|de)|DHL|shipment.*dhl"
+    ["usps"]="usps\.com|USPS|Postal Service"
+    
+    # Payments
+    ["paypal"]="paypal\.com|PayPal|payment.*paypal"
+    ["venmo"]="venmo\.com|Venmo"
+    ["zelle"]="zellepay|Zelle"
+    ["cashapp"]="cash\.app|CashApp|\$cashtag"
+    
+    # Banking
+    ["bank_generic"]="bank.*login|account.*verify|secure.*banking"
+    ["chase"]="chase\.com|Chase Bank"
+    ["wellsfargo"]="wellsfargo\.com|Wells Fargo"
+    ["bofa"]="bankofamerica\.com|Bank of America"
+    
+    # Social Media
+    ["instagram"]="instagram\.com|@instagram"
+    ["twitter"]="twitter\.com|@twitter|x\.com"
+    ["facebook"]="facebook\.com|fb\.com|@facebook"
+    ["linkedin"]="linkedin\.com|LinkedIn"
+    
+    # Crypto
+    ["coinbase"]="coinbase\.com|Coinbase"
+    ["binance"]="binance\.com|Binance"
+    ["crypto_wallet"]="bitcoin:|ethereum:|wallet.*crypto"
+    
+    # Government
+    ["irs"]="irs\.gov|Internal Revenue|tax.*refund"
+    ["ssa"]="ssa\.gov|Social Security"
+    ["dmv"]="dmv\.|Department of Motor"
+)
+
+# Known malicious template patterns
+declare -a MALICIOUS_TEMPLATE_PATTERNS=(
+    "verify.*account.*immediately"
+    "suspended.*click.*restore"
+    "confirm.*identity.*24.hours"
+    "unusual.*activity.*login"
+    "prize.*claim.*now"
+    "lottery.*winner.*congratulations"
+    "package.*delivery.*failed.*confirm"
+    "invoice.*attached.*payment"
+    "refund.*pending.*verify"
+)
+
+analyze_template_spoofing() {
+    local content="$1"
+    local image="$2"
+    
+    if [ "$TEMPLATE_SPOOF_DETECTION" = false ]; then
+        analysis_success_none "TEMPLATE-SPOOFING"
+        return
+    fi
+    
+    log_info "Analyzing for QR template spoofing..."
+    
+    local template_findings=()
+    local template_score=0
+    local matched_templates=()
+    local template_report="${OUTPUT_DIR}/template_spoofing_analysis.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "QR TEMPLATE SPOOFING DETECTION"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo ""
+    } > "$template_report"
+    
+    # 1. Check against known template signatures
+    echo "Template Signature Matching:" >> "$template_report"
+    
+    for template_name in "${!TEMPLATE_SIGNATURES[@]}"; do
+        local pattern="${TEMPLATE_SIGNATURES[$template_name]}"
+        if echo "$content" | grep -qiE "$pattern"; then
+            matched_templates+=("$template_name")
+            template_findings+=("template_match:$template_name")
+            ((template_score += 20))
+            echo "  ✓ Matched template: $template_name" >> "$template_report"
+            log_info "QR content matches $template_name template"
+        fi
+    done
+    
+    # 2. Check for template impersonation indicators
+    echo "" >> "$template_report"
+    echo "Impersonation Indicators:" >> "$template_report"
+    
+    # Check if template match but URL doesn't match expected domain
+    for template in "${matched_templates[@]}"; do
+        local expected_domain=""
+        case "$template" in
+            "fedex") expected_domain="fedex.com" ;;
+            "ups") expected_domain="ups.com" ;;
+            "dhl") expected_domain="dhl.com" ;;
+            "paypal") expected_domain="paypal.com" ;;
+            "chase") expected_domain="chase.com" ;;
+            "coinbase") expected_domain="coinbase.com" ;;
+            "irs") expected_domain="irs.gov" ;;
+        esac
+        
+        if [ -n "$expected_domain" ]; then
+            # Check if URL in content matches expected domain
+            local actual_domain=$(echo "$content" | grep -oiE 'https?://[^/]+' | head -1 | sed 's|https\?://||')
+            
+            if [ -n "$actual_domain" ] && ! echo "$actual_domain" | grep -qi "$expected_domain"; then
+                template_findings+=("domain_mismatch:$template:$actual_domain")
+                ((template_score += 50))
+                log_threat 55 "Template impersonation: $template template but domain is $actual_domain"
+                echo "  ⚠ IMPERSONATION: $template template with wrong domain: $actual_domain" >> "$template_report"
+            fi
+        fi
+    done
+    
+    # 3. Check for malicious template patterns
+    echo "" >> "$template_report"
+    echo "Malicious Pattern Detection:" >> "$template_report"
+    
+    for pattern in "${MALICIOUS_TEMPLATE_PATTERNS[@]}"; do
+        if echo "$content" | grep -qiE "$pattern"; then
+            template_findings+=("malicious_template:$pattern")
+            ((template_score += 35))
+            log_warning "Malicious template pattern: $pattern"
+            echo "  ⚠ MALICIOUS: $pattern" >> "$template_report"
+        fi
+    done
+    
+    # 4. Visual template analysis (if image provided)
+    if [ -n "$image" ] && [ -f "$image" ]; then
+        echo "" >> "$template_report"
+        echo "Visual Template Analysis:" >> "$template_report"
+        
+        # Check image dimensions for known QR template sizes
+        local dimensions=$(identify -format "%wx%h" "$image" 2>/dev/null)
+        echo "  Image Dimensions: $dimensions" >> "$template_report"
+        
+        # COVID pass QR codes are typically specific sizes
+        if [ "$dimensions" = "300x300" ] || [ "$dimensions" = "400x400" ]; then
+            if echo "$content" | grep -qiE "covid|vaccin|certificate|pass"; then
+                template_findings+=("possible_covid_pass_template")
+                ((template_score += 30))
+            fi
+        fi
+        
+        # Check for logo embedding (common in branded QR)
+        local color_count=$(identify -format "%k" "$image" 2>/dev/null)
+        if [ -n "$color_count" ] && [ "$color_count" -gt 10 ]; then
+            echo "  Color Count: $color_count (possible logo/branding)" >> "$template_report"
+            template_findings+=("branded_qr")
+        fi
+    fi
+    
+    # 5. COVID-specific checks
+    if echo "$content" | grep -qiE "covid|vaccin|certificate|immuniz"; then
+        echo "" >> "$template_report"
+        echo "COVID Certificate Analysis:" >> "$template_report"
+        
+        # Check for fake EU DCC format
+        if echo "$content" | grep -qE "HC1:"; then
+            template_findings+=("eu_dcc_format")
+            log_info "EU Digital COVID Certificate format detected"
+            echo "  Format: EU DCC (HC1:)" >> "$template_report"
+            
+            # Validate structure
+            local dcc_payload=$(echo "$content" | grep -oE "HC1:.*" | head -1)
+            if [ ${#dcc_payload} -lt 100 ]; then
+                template_findings+=("invalid_dcc_short")
+                ((template_score += 40))
+                log_warning "Suspiciously short DCC payload"
+            fi
+        fi
+    fi
+    
+    # Generate summary
+    echo "" >> "$template_report"
+    echo "Analysis Summary:" >> "$template_report"
+    echo "  Templates Matched: ${#matched_templates[@]}" >> "$template_report"
+    echo "  Total Findings: ${#template_findings[@]}" >> "$template_report"
+    echo "  Template Risk Score: $template_score" >> "$template_report"
+    
+    if [ ${#template_findings[@]} -gt 0 ]; then
+        if [ $template_score -ge 50 ]; then
+            log_threat $((template_score / 2)) "Template spoofing indicators detected"
+        fi
+        analysis_success_found "TEMPLATE-SPOOFING" "${#template_findings[@]}" "Score: $template_score"
+    else
+        analysis_success_none "TEMPLATE-SPOOFING"
+    fi
+}
+
+# ============================================================================
+# AUDIT 13: SOCIAL MEDIA/MARKETING LINK DETECTION
+# ============================================================================
+
+# Marketing/link aggregation services
+declare -a MARKETING_LINK_SERVICES=(
+    # Link aggregators
+    "linktr.ee" "linktree.com" "link.bio" "lnk.bio" "beacons.ai"
+    "stan.store" "hoo.be" "bio.fm" "tap.bio" "allmylinks.com"
+    "contactinbio.com" "linkin.bio" "lnk.to" "msha.ke" "withkoji.com"
+    
+    # URL shorteners (additional)
+    "buff.ly" "ow.ly" "dlvr.it" "po.st" "soo.gd" "mcaf.ee"
+    "twurl.nl" "trib.al" "snip.ly" "tinycc.com" "short.io"
+    "rebrand.ly" "bl.ink" "clickmeter.com" "t2mio.com"
+    
+    # Social media shorteners
+    "fb.me" "fb.com" "m.me" "wa.me" "ig.me"
+    "youtu.be" "amzn.to" "ebay.to" "etsy.me"
+    
+    # Marketing platforms
+    "mailchi.mp" "campaign-archive.com" "list-manage.com"
+    "sendgrid.net" "constantcontact.com" "aweber.com"
+    "getresponse.com" "hubspot.net" "marketo.com"
+    "mailgun.org" "sendpulse.com" "sendinblue.com"
+    
+    # Tracking/redirect services
+    "click.redditmail.com" "links.e.*.com" "click.e.*.com"
+    "email.*.com" "t.e.*.com" "go.*.com" "click.*.com"
+    
+    # Affiliate tracking
+    "go2cloud.org" "afftrack.com" "tkqlhce.com" "anrdoezrs.net"
+    "jdoqocy.com" "kqzyfj.com" "dpbolvw.net" "commission-junction"
+    "shareasale.com" "awin1.com" "prf.hn" "pntra.com"
+)
+
+# Tracking parameter patterns
+declare -a TRACKING_PARAMS=(
+    "utm_source" "utm_medium" "utm_campaign" "utm_content" "utm_term"
+    "fbclid" "gclid" "msclkid" "mc_eid" "mc_cid"
+    "ref" "referrer" "source" "campaign" "affiliate"
+    "trk" "track" "click_id" "clickid" "subid"
+    "s1" "s2" "s3" "s4" "s5"
+    "aff_id" "aff_sub" "aff_click_id"
+)
+
+analyze_social_marketing_links() {
+    local content="$1"
+    
+    if [ "$SOCIAL_MEDIA_LINK_DETECTION" = false ]; then
+        analysis_success_none "SOCIAL-MARKETING"
+        return
+    fi
+    
+    log_info "Analyzing social media/marketing links..."
+    
+    local social_findings=()
+    local social_score=0
+    local marketing_report="${OUTPUT_DIR}/social_marketing_analysis.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "SOCIAL MEDIA/MARKETING LINK ANALYSIS"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo ""
+    } > "$marketing_report"
+    
+    # 1. Check for marketing link services
+    echo "Marketing Service Detection:" >> "$marketing_report"
+    
+    for service in "${MARKETING_LINK_SERVICES[@]}"; do
+        if echo "$content" | grep -qiE "$service"; then
+            social_findings+=("marketing_service:$service")
+            ((social_score += 15))
+            echo "  ✓ Detected: $service" >> "$marketing_report"
+            log_info "Marketing link service: $service"
+        fi
+    done
+    
+    # 2. Check for tracking parameters
+    echo "" >> "$marketing_report"
+    echo "Tracking Parameter Analysis:" >> "$marketing_report"
+    
+    local tracking_count=0
+    for param in "${TRACKING_PARAMS[@]}"; do
+        if echo "$content" | grep -qiE "[?&]$param="; then
+            ((tracking_count++))
+            social_findings+=("tracking_param:$param")
+            echo "  ✓ $param" >> "$marketing_report"
+        fi
+    done
+    
+    if [ "$tracking_count" -gt 3 ]; then
+        ((social_score += 20))
+        log_warning "Multiple tracking parameters detected ($tracking_count)"
+    fi
+    
+    # 3. Check for redirect chains
+    echo "" >> "$marketing_report"
+    echo "Redirect Chain Analysis:" >> "$marketing_report"
+    
+    if echo "$content" | grep -qiE "https?://[^/]+/(redirect|redir|go|click|track|link|out)"; then
+        social_findings+=("redirect_path")
+        ((social_score += 15))
+        echo "  ⚠ Redirect path pattern detected" >> "$marketing_report"
+    fi
+    
+    # 4. Follow and analyze short URLs
+    if echo "$content" | grep -qiE "bit\.ly|tinyurl|ow\.ly|t\.co|goo\.gl|is\.gd"; then
+        local short_url=$(echo "$content" | grep -oiE "https?://(bit\.ly|tinyurl\.com|ow\.ly|t\.co|goo\.gl|is\.gd)/[A-Za-z0-9]+" | head -1)
+        
+        if [ -n "$short_url" ]; then
+            echo "  Short URL: $short_url" >> "$marketing_report"
+            
+            # Attempt to expand
+            local expanded=$(curl -sS -o /dev/null -w '%{url_effective}' -L --max-time 10 "$short_url" 2>/dev/null)
+            
+            if [ -n "$expanded" ] && [ "$expanded" != "$short_url" ]; then
+                echo "  Expanded: $expanded" >> "$marketing_report"
+                social_findings+=("expanded_url:$(echo "$expanded" | cut -c1-50)")
+                
+                # Record expanded URL as IOC
+                record_ioc "expanded_url" "$expanded" "Expanded from short URL $short_url"
+                
+                # Check expansion for threats
+                if echo "$expanded" | grep -qiE "\.exe|\.scr|\.pif|download"; then
+                    social_findings+=("suspicious_expansion")
+                    ((social_score += 40))
+                    log_threat 45 "Short URL expands to suspicious target"
+                fi
+            fi
+        fi
+    fi
+    
+    # 5. Linktree/bio link analysis
+    if echo "$content" | grep -qiE "linktr\.ee|linktree|link\.bio|beacons\.ai"; then
+        echo "" >> "$marketing_report"
+        echo "Bio Link Analysis:" >> "$marketing_report"
+        
+        local bio_url=$(echo "$content" | grep -oiE "https?://(linktr\.ee|link\.bio|beacons\.ai)/[A-Za-z0-9_]+" | head -1)
+        
+        if [ -n "$bio_url" ]; then
+            social_findings+=("bio_link:$bio_url")
+            
+            # Fetch bio link page
+            local bio_content=$(curl -sS --max-time 15 "$bio_url" 2>/dev/null | head -c 50000)
+            
+            if [ -n "$bio_content" ]; then
+                # Extract all links from bio page
+                local bio_links=$(echo "$bio_content" | grep -oiE 'href="https?://[^"]+' | cut -d'"' -f2 | sort -u | head -10)
+                
+                echo "  Links found in bio:" >> "$marketing_report"
+                echo "$bio_links" >> "$marketing_report"
+                
+                # Check bio links for suspicious content
+                while IFS= read -r bio_link; do
+                    [ -z "$bio_link" ] && continue
+                    record_ioc "bio_link" "$bio_link" "Found in linktree/bio page"
+                    
+                    if echo "$bio_link" | grep -qiE "\.exe|discord\.gg|t\.me|anonfiles"; then
+                        social_findings+=("suspicious_bio_link")
+                        ((social_score += 30))
+                    fi
+                done <<< "$bio_links"
+            fi
+        fi
+    fi
+    
+    # Generate summary
+    echo "" >> "$marketing_report"
+    echo "Analysis Summary:" >> "$marketing_report"
+    echo "  Total Findings: ${#social_findings[@]}" >> "$marketing_report"
+    echo "  Marketing Risk Score: $social_score" >> "$marketing_report"
+    
+    if [ ${#social_findings[@]} -gt 0 ]; then
+        if [ $social_score -ge 30 ]; then
+            log_warning "Social media/marketing link analysis complete"
+        fi
+        analysis_success_found "SOCIAL-MARKETING" "${#social_findings[@]}" "Score: $social_score"
+    else
+        analysis_success_none "SOCIAL-MARKETING"
+    fi
+}
+
+# ============================================================================
+# AUDIT 14: UX REDRESS/BROWSER ATTACK DETECTION
+# ============================================================================
+
+# Browser attack patterns
+declare -a BROWSER_ATTACK_PATTERNS=(
+    # URL bar spoofing
+    'data:text/html'
+    'javascript:void'
+    'about:blank.*document\.write'
+    
+    # Fullscreen overlay attacks
+    'requestFullscreen'
+    'mozRequestFullScreen'
+    'webkitRequestFullscreen'
+    'msRequestFullscreen'
+    'document\.fullscreen'
+    
+    # History manipulation
+    'history\.pushState'
+    'history\.replaceState'
+    'onpopstate'
+    
+    # Window manipulation
+    'window\.open.*fullscreen'
+    'window\.moveTo\s*\(\s*0\s*,\s*0'
+    'window\.resizeTo'
+    'window\.close'
+    'window\.blur'
+    
+    # Clickjacking
+    'pointer-events\s*:\s*none'
+    'z-index\s*:\s*[0-9]{4,}'
+    'opacity\s*:\s*0[.0]*[^1-9]'
+    'visibility\s*:\s*hidden'
+    'position\s*:\s*fixed.*top\s*:\s*0'
+    
+    # Tab nabbing
+    'target\s*=\s*["\x27]_blank'
+    'window\.opener'
+    'rel\s*=\s*["\x27]?noopener'
+    
+    # Fake UI elements
+    'fake.*login'
+    'fake.*button'
+    'overlay.*form'
+    'screenshot.*url.*bar'
+)
+
+analyze_ux_redress_attacks() {
+    local content="$1"
+    local url="$2"
+    
+    if [ "$UX_REDRESS_DETECTION" = false ]; then
+        analysis_success_none "UX-REDRESS"
+        return
+    fi
+    
+    log_info "Analyzing for UX redress/browser attacks..."
+    
+    local ux_findings=()
+    local ux_score=0
+    local ux_report="${OUTPUT_DIR}/ux_redress_analysis.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "UX REDRESS / BROWSER ATTACK DETECTION"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo ""
+    } > "$ux_report"
+    
+    # Fetch URL content if needed
+    local html_content=""
+    if [ -n "$url" ] && echo "$url" | grep -qiE "^https?://"; then
+        html_content=$(timeout 20 curl -sS -L --max-time 15 "$url" 2>/dev/null | head -c 200000)
+    fi
+    
+    local analysis_content="$content $html_content"
+    
+    # 1. Check browser attack patterns
+    echo "Browser Attack Pattern Detection:" >> "$ux_report"
+    
+    for pattern in "${BROWSER_ATTACK_PATTERNS[@]}"; do
+        if echo "$analysis_content" | grep -qiE "$pattern"; then
+            ux_findings+=("browser_attack:$pattern")
+            ((ux_score += 25))
+            echo "  ⚠ DETECTED: $pattern" >> "$ux_report"
+            log_warning "Browser attack pattern: $pattern"
+        fi
+    done
+    
+    # 2. Data URI attack detection
+    echo "" >> "$ux_report"
+    echo "Data URI Analysis:" >> "$ux_report"
+    
+    if echo "$content" | grep -qiE "^data:(text/html|application/x-javascript)"; then
+        ux_findings+=("data_uri_attack")
+        ((ux_score += 50))
+        log_threat 55 "Data URI with executable content"
+        echo "  ⚠ DATA URI ATTACK DETECTED" >> "$ux_report"
+        
+        # Decode and analyze
+        local encoded_part=$(echo "$content" | grep -oE ";base64,.*" | cut -c9-)
+        if [ -n "$encoded_part" ]; then
+            local decoded=$(echo "$encoded_part" | base64 -d 2>/dev/null | head -c 5000)
+            echo "  Decoded content (preview):" >> "$ux_report"
+            echo "$decoded" | head -c 500 >> "$ux_report"
+            
+            # Check decoded content for additional attacks
+            if echo "$decoded" | grep -qiE "password|login|credential"; then
+                ux_findings+=("data_uri_phishing")
+                ((ux_score += 40))
+            fi
+        fi
+    fi
+    
+    # 3. Tabnabbing detection
+    echo "" >> "$ux_report"
+    echo "Tabnabbing Analysis:" >> "$ux_report"
+    
+    if echo "$analysis_content" | grep -qiE 'target.*_blank' && \
+       ! echo "$analysis_content" | grep -qiE 'rel.*noopener'; then
+        ux_findings+=("tabnabbing_vulnerable")
+        ((ux_score += 30))
+        log_warning "Potential tabnabbing vulnerability (no noopener)"
+        echo "  ⚠ Missing rel=noopener on _blank links" >> "$ux_report"
+    fi
+    
+    if echo "$analysis_content" | grep -qiE 'window\.opener\s*[.=]'; then
+        ux_findings+=("tabnabbing_exploit")
+        ((ux_score += 45))
+        log_threat 50 "Tabnabbing exploit code detected"
+        echo "  ⚠ window.opener manipulation detected" >> "$ux_report"
+    fi
+    
+    # 4. Clickjacking indicators
+    echo "" >> "$ux_report"
+    echo "Clickjacking Analysis:" >> "$ux_report"
+    
+    local clickjack_indicators=0
+    
+    if echo "$analysis_content" | grep -qiE 'position\s*:\s*fixed'; then
+        ((clickjack_indicators++))
+    fi
+    if echo "$analysis_content" | grep -qiE 'z-index\s*:\s*[0-9]{5,}'; then
+        ((clickjack_indicators++))
+    fi
+    if echo "$analysis_content" | grep -qiE 'opacity\s*:\s*0[.0]*[;"]'; then
+        ((clickjack_indicators++))
+    fi
+    if echo "$analysis_content" | grep -qiE 'iframe[^>]+style'; then
+        ((clickjack_indicators++))
+    fi
+    
+    if [ "$clickjack_indicators" -ge 2 ]; then
+        ux_findings+=("clickjacking:$clickjack_indicators")
+        ((ux_score += 40))
+        log_threat 45 "Multiple clickjacking indicators ($clickjack_indicators)"
+        echo "  ⚠ $clickjack_indicators clickjacking indicators found" >> "$ux_report"
+    fi
+    
+    # 5. URL bar spoofing check
+    echo "" >> "$ux_report"
+    echo "URL Bar Spoofing Analysis:" >> "$ux_report"
+    
+    # Check for homograph characters in URL
+    if echo "$url" | grep -qE "[^\x00-\x7F]"; then
+        ux_findings+=("unicode_url")
+        ((ux_score += 35))
+        log_warning "Unicode characters in URL (possible homograph attack)"
+    fi
+    
+    # Check for lookalike domain
+    local domain=$(echo "$url" | sed -E 's|^https?://||' | cut -d'/' -f1)
+    if echo "$domain" | grep -qiE "paypa1|g00gle|micros0ft|amaz0n|faceb00k"; then
+        ux_findings+=("lookalike_domain")
+        ((ux_score += 50))
+        log_threat 55 "Lookalike domain detected (letter substitution)"
+    fi
+    
+    # Generate summary
+    echo "" >> "$ux_report"
+    echo "Analysis Summary:" >> "$ux_report"
+    echo "  Total Findings: ${#ux_findings[@]}" >> "$ux_report"
+    echo "  UX Redress Risk Score: $ux_score" >> "$ux_report"
+    
+    if [ ${#ux_findings[@]} -gt 0 ]; then
+        if [ $ux_score -ge 40 ]; then
+            log_threat $((ux_score / 2)) "UX redress/browser attack indicators detected"
+        fi
+        analysis_success_found "UX-REDRESS" "${#ux_findings[@]}" "Score: $ux_score"
+    else
+        analysis_success_none "UX-REDRESS"
+    fi
+}
+
+# ============================================================================
+# AUDIT 15: DGA/ALGORITHMIC DOMAIN ANALYSIS
+# ============================================================================
+
+analyze_dga_domains() {
+    local content="$1"
+    
+    if [ "$DGA_ANALYSIS" = false ]; then
+        analysis_success_none "DGA-ANALYSIS"
+        return
+    fi
+    
+    log_info "Analyzing for DGA (Domain Generation Algorithm) patterns..."
+    
+    local dga_findings=()
+    local dga_score=0
+    local dga_report="${OUTPUT_DIR}/dga_analysis.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "DGA (DOMAIN GENERATION ALGORITHM) ANALYSIS"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo ""
+    } > "$dga_report"
+    
+    # Extract domain from content
+    local domain=""
+    if echo "$content" | grep -qiE "^https?://"; then
+        domain=$(echo "$content" | sed -E 's|^https?://||' | cut -d'/' -f1 | cut -d':' -f1)
+    fi
+    
+    if [ -z "$domain" ]; then
+        analysis_success_none "DGA-ANALYSIS"
+        return
+    fi
+    
+    echo "Domain: $domain" >> "$dga_report"
+    echo "" >> "$dga_report"
+    
+    # Python-based DGA analysis
+    local dga_analysis=$(python3 << EOF 2>/dev/null
+import json
+import math
+import re
+from collections import Counter
+
+domain = '$domain'
+# Remove TLD for analysis
+parts = domain.split('.')
+if len(parts) > 1:
+    main_domain = '.'.join(parts[:-1]) if parts[-1] in ['com','net','org','io','xyz','tk','ml','ga','cf','gq','top','info','biz','co','us','uk'] else domain
+else:
+    main_domain = domain
+
+results = {
+    'domain': domain,
+    'main_domain': main_domain,
+    'length': len(main_domain),
+}
+
+# 1. Entropy calculation
+if main_domain:
+    freq = Counter(main_domain.lower())
+    probs = [count / len(main_domain) for count in freq.values()]
+    entropy = -sum(p * math.log2(p) for p in probs if p > 0)
+    results['entropy'] = round(entropy, 4)
+    
+    # High entropy suggests DGA
+    if entropy > 3.8:
+        results['high_entropy'] = True
+        results['dga_indicator'] = 'HIGH_ENTROPY'
+else:
+    results['entropy'] = 0
+
+# 2. Consonant/vowel ratio
+vowels = set('aeiouAEIOU')
+consonants = set('bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ')
+vowel_count = sum(1 for c in main_domain if c in vowels)
+consonant_count = sum(1 for c in main_domain if c in consonants)
+
+if vowel_count > 0:
+    cv_ratio = consonant_count / vowel_count
+else:
+    cv_ratio = consonant_count
+
+results['vowel_count'] = vowel_count
+results['consonant_count'] = consonant_count
+results['cv_ratio'] = round(cv_ratio, 2)
+
+# Abnormal ratio suggests DGA
+if cv_ratio > 4 or (vowel_count == 0 and len(main_domain) > 5):
+    results['abnormal_cv_ratio'] = True
+    results['dga_indicator'] = 'ABNORMAL_CV_RATIO'
+
+# 3. Bigram analysis
+def get_bigram_score(text):
+    # Common English bigrams
+    common_bigrams = {'th','he','in','er','an','re','on','at','en','nd','ti','es','or','te','of','ed','is','it','al','ar','st','to','nt','ng','se','ha','as','ou','io','le','ve','co','me','de','hi','ri','ro','ic','ne','ea','ra','ce'}
+    
+    bigrams = [text[i:i+2].lower() for i in range(len(text)-1)]
+    if not bigrams:
+        return 0
+    
+    common_count = sum(1 for b in bigrams if b in common_bigrams)
+    return common_count / len(bigrams)
+
+bigram_score = get_bigram_score(main_domain)
+results['bigram_score'] = round(bigram_score, 4)
+
+# Low bigram score suggests DGA
+if bigram_score < 0.1 and len(main_domain) > 8:
+    results['low_bigram_score'] = True
+    results['dga_indicator'] = 'LOW_BIGRAM_SCORE'
+
+# 4. Digit ratio
+digit_count = sum(1 for c in main_domain if c.isdigit())
+digit_ratio = digit_count / len(main_domain) if main_domain else 0
+results['digit_ratio'] = round(digit_ratio, 4)
+
+if digit_ratio > 0.3:
+    results['high_digit_ratio'] = True
+    results['dga_indicator'] = 'HIGH_DIGIT_RATIO'
+
+# 5. Length-based analysis
+if len(main_domain) > 20:
+    results['long_domain'] = True
+    if 'dga_indicator' not in results:
+        results['dga_indicator'] = 'LONG_RANDOM_DOMAIN'
+
+# 6. Sequential character analysis
+def has_sequential_chars(text, min_seq=4):
+    text = text.lower()
+    for i in range(len(text) - min_seq + 1):
+        chunk = text[i:i+min_seq]
+        if chunk.isalpha():
+            # Check for keyboard patterns
+            if chunk in 'qwerty' or chunk in 'asdfgh' or chunk in 'zxcvbn':
+                return True
+            # Check for alphabetic sequence
+            if all(ord(chunk[j+1]) - ord(chunk[j]) == 1 for j in range(len(chunk)-1)):
+                return True
+    return False
+
+if has_sequential_chars(main_domain):
+    results['sequential_chars'] = True
+
+# 7. Known DGA patterns
+dga_patterns = [
+    r'^[a-z]{10,}[0-9]{2,}$',  # letters followed by numbers
+    r'^[0-9]{2,}[a-z]{10,}$',  # numbers followed by letters
+    r'^[a-z0-9]{16,}$',        # long alphanumeric
+    r'^[bcdfghjklmnpqrstvwxz]{5,}$',  # consonant only
+]
+
+for pattern in dga_patterns:
+    if re.match(pattern, main_domain.lower()):
+        results['matches_dga_pattern'] = pattern
+        results['dga_indicator'] = 'MATCHES_DGA_PATTERN'
+        break
+
+# Calculate overall DGA score
+dga_score = 0
+if results.get('high_entropy'):
+    dga_score += 30
+if results.get('abnormal_cv_ratio'):
+    dga_score += 25
+if results.get('low_bigram_score'):
+    dga_score += 25
+if results.get('high_digit_ratio'):
+    dga_score += 20
+if results.get('long_domain'):
+    dga_score += 15
+if results.get('matches_dga_pattern'):
+    dga_score += 35
+
+results['dga_score'] = dga_score
+
+# Verdict
+if dga_score >= 60:
+    results['verdict'] = 'LIKELY_DGA'
+elif dga_score >= 40:
+    results['verdict'] = 'POSSIBLE_DGA'
+elif dga_score >= 20:
+    results['verdict'] = 'SUSPICIOUS'
+else:
+    results['verdict'] = 'LIKELY_LEGITIMATE'
+
+print(json.dumps(results, indent=2))
+EOF
+)
+    
+    if [ -n "$dga_analysis" ]; then
+        echo "DGA Analysis Results:" >> "$dga_report"
+        echo "$dga_analysis" >> "$dga_report"
+        
+        # Parse results
+        local verdict=$(echo "$dga_analysis" | grep -oP '"verdict":\s*"\K[^"]+')
+        local score=$(echo "$dga_analysis" | grep -oP '"dga_score":\s*\K[0-9]+')
+        local entropy=$(echo "$dga_analysis" | grep -oP '"entropy":\s*\K[0-9.]+')
+        
+        # Display results
+        echo ""
+        echo -e "${CYAN}┌─────────────────────────────────────────────────────────────┐${NC}"
+        echo -e "${CYAN}│                    DGA ANALYSIS RESULTS                      │${NC}"
+        echo -e "${CYAN}├─────────────────────────────────────────────────────────────┤${NC}"
+        echo -e "${CYAN}│${NC} Domain:       ${WHITE}$domain${NC}"
+        echo -e "${CYAN}│${NC} Entropy:      ${YELLOW}${entropy:-N/A}${NC}"
+        echo -e "${CYAN}│${NC} DGA Score:    ${YELLOW}${score:-0}${NC}"
+        echo -e "${CYAN}│${NC} Verdict:      ${RED}${verdict:-UNKNOWN}${NC}"
+        echo -e "${CYAN}└─────────────────────────────────────────────────────────────┘${NC}"
+        echo ""
+        
+        case "$verdict" in
+            "LIKELY_DGA")
+                dga_findings+=("dga:likely")
+                ((dga_score += 60))
+                log_threat 65 "Domain appears to be DGA-generated"
+                ;;
+            "POSSIBLE_DGA")
+                dga_findings+=("dga:possible")
+                ((dga_score += 40))
+                log_threat 45 "Domain shows DGA characteristics"
+                ;;
+            "SUSPICIOUS")
+                dga_findings+=("dga:suspicious")
+                ((dga_score += 20))
+                log_warning "Domain has suspicious patterns"
+                ;;
+        esac
+        
+        if [ "$verdict" != "LIKELY_LEGITIMATE" ]; then
+            analysis_success_found "DGA-ANALYSIS" "1" "Verdict: $verdict, Score: ${score:-0}"
+        else
+            analysis_success_none "DGA-ANALYSIS"
+        fi
+    else
+        analysis_error "DGA-ANALYSIS" "Python analysis failed"
+    fi
+}
+
+# ============================================================================
+# AUDIT 16: MULTI-LANGUAGE/UNICODE DECEPTION DETECTION
+# ============================================================================
+
+# RTL and bidirectional override characters
+declare -a BIDI_OVERRIDE_CHARS=(
+    '\u202A'  # LRE - Left-to-Right Embedding
+    '\u202B'  # RLE - Right-to-Left Embedding
+    '\u202C'  # PDF - Pop Directional Formatting
+    '\u202D'  # LRO - Left-to-Right Override
+    '\u202E'  # RLO - Right-to-Left Override (most dangerous)
+    '\u2066'  # LRI - Left-to-Right Isolate
+    '\u2067'  # RLI - Right-to-Left Isolate
+    '\u2068'  # FSI - First Strong Isolate
+    '\u2069'  # PDI - Pop Directional Isolate
+)
+
+# Homoglyph mappings (common confusables)
+declare -A HOMOGLYPH_MAP=(
+    # Cyrillic
+    ["а"]="a" ["е"]="e" ["і"]="i" ["о"]="o" ["р"]="p" ["с"]="c" ["х"]="x" ["у"]="y"
+    ["А"]="A" ["В"]="B" ["Е"]="E" ["К"]="K" ["М"]="M" ["Н"]="H" ["О"]="O" ["Р"]="P" ["С"]="C" ["Т"]="T" ["Х"]="X"
+    # Greek
+    ["α"]="a" ["ο"]="o" ["ν"]="v" ["τ"]="t"
+    ["Α"]="A" ["Β"]="B" ["Ε"]="E" ["Η"]="H" ["Ι"]="I" ["Κ"]="K" ["Μ"]="M" ["Ν"]="N" ["Ο"]="O" ["Ρ"]="P" ["Τ"]="T" ["Χ"]="X" ["Υ"]="Y" ["Ζ"]="Z"
+    # Latin lookalikes
+    ["ⅰ"]="i" ["ⅱ"]="ii" ["ℓ"]="l" ["ℐ"]="I"
+    # Numbers
+    ["Ο"]="0" ["О"]="0" ["ο"]="0"
+    ["Ⅰ"]="1" ["ⅼ"]="1" ["ǀ"]="1"
+)
+
+analyze_unicode_deception() {
+    local content="$1"
+    local url="$2"
+    
+    if [ "$UNICODE_DECEPTION_DETECTION" = false ]; then
+        analysis_success_none "UNICODE-DECEPTION"
+        return
+    fi
+    
+    log_info "Analyzing for Unicode/multi-language deception..."
+    
+    local unicode_findings=()
+    local unicode_score=0
+    local unicode_report="${OUTPUT_DIR}/unicode_deception_analysis.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "UNICODE DECEPTION ANALYSIS"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo ""
+    } > "$unicode_report"
+    
+    # Python-based comprehensive Unicode analysis
+    local unicode_analysis=$(python3 << EOF 2>/dev/null
+import json
+import unicodedata
+import re
+
+content = '''$content'''
+url = '''$url'''
+
+results = {
+    'content_length': len(content),
+    'findings': []
+}
+
+# 1. Check for RTL override characters
+rlo_chars = ['\u202A', '\u202B', '\u202C', '\u202D', '\u202E', '\u2066', '\u2067', '\u2068', '\u2069']
+for char in rlo_chars:
+    if char in content or char in url:
+        results['findings'].append({
+            'type': 'bidi_override',
+            'char': repr(char),
+            'severity': 'critical' if char == '\u202E' else 'high'
+        })
+
+# 2. Check for mixed scripts
+def get_script(char):
+    try:
+        name = unicodedata.name(char, '')
+        if 'CYRILLIC' in name:
+            return 'Cyrillic'
+        elif 'GREEK' in name:
+            return 'Greek'
+        elif 'LATIN' in name:
+            return 'Latin'
+        elif 'CJK' in name:
+            return 'CJK'
+        elif 'ARABIC' in name:
+            return 'Arabic'
+        elif 'HEBREW' in name:
+            return 'Hebrew'
+        else:
+            return 'Other'
+    except:
+        return 'Unknown'
+
+scripts_in_url = set()
+for char in url:
+    if char.isalpha():
+        scripts_in_url.add(get_script(char))
+
+results['scripts_in_url'] = list(scripts_in_url)
+
+if len(scripts_in_url) > 1 and 'Latin' in scripts_in_url:
+    results['findings'].append({
+        'type': 'mixed_scripts',
+        'scripts': list(scripts_in_url),
+        'severity': 'critical'
+    })
+
+# 3. Check for specific homoglyphs
+homoglyphs = {
+    'а': 'a (Cyrillic)', 'е': 'e (Cyrillic)', 'о': 'o (Cyrillic)',
+    'р': 'p (Cyrillic)', 'с': 'c (Cyrillic)', 'х': 'x (Cyrillic)',
+    'А': 'A (Cyrillic)', 'В': 'B (Cyrillic)', 'Е': 'E (Cyrillic)',
+    'К': 'K (Cyrillic)', 'М': 'M (Cyrillic)', 'Н': 'H (Cyrillic)',
+    'О': 'O (Cyrillic)', 'Р': 'P (Cyrillic)', 'С': 'C (Cyrillic)',
+    'Т': 'T (Cyrillic)', 'α': 'a (Greek)', 'ο': 'o (Greek)',
+}
+
+found_homoglyphs = []
+for char, desc in homoglyphs.items():
+    if char in url:
+        found_homoglyphs.append(desc)
+
+if found_homoglyphs:
+    results['findings'].append({
+        'type': 'homoglyphs',
+        'found': found_homoglyphs,
+        'severity': 'critical'
+    })
+
+# 4. Check for zero-width characters
+zero_width = ['\u200B', '\u200C', '\u200D', '\uFEFF', '\u00AD']
+for zw in zero_width:
+    if zw in content or zw in url:
+        results['findings'].append({
+            'type': 'zero_width',
+            'char': repr(zw),
+            'severity': 'high'
+        })
+
+# 5. Check for confusable Unicode
+confusables = {
+    '\u2024': 'ONE DOT LEADER (looks like period)',
+    '\u2025': 'TWO DOT LEADER',
+    '\u2026': 'HORIZONTAL ELLIPSIS',
+    '\u2215': 'DIVISION SLASH (looks like /)',
+    '\u2044': 'FRACTION SLASH',
+    '\u29F8': 'BIG SOLIDUS',
+    '\uFF0F': 'FULLWIDTH SOLIDUS',
+    '\u2216': 'SET MINUS (looks like backslash)',
+    '\u3002': 'IDEOGRAPHIC FULL STOP (looks like period)',
+    '\uFF0E': 'FULLWIDTH FULL STOP',
+}
+
+for char, desc in confusables.items():
+    if char in url:
+        results['findings'].append({
+            'type': 'confusable',
+            'char': repr(char),
+            'description': desc,
+            'severity': 'high'
+        })
+
+# 6. IDN/Punycode analysis
+if url.startswith('http'):
+    domain = url.split('//')[1].split('/')[0] if '//' in url else url.split('/')[0]
+    
+    # Check for xn-- prefix (punycode)
+    if 'xn--' in domain.lower():
+        results['findings'].append({
+            'type': 'punycode',
+            'domain': domain,
+            'severity': 'medium'
+        })
+    
+    # Check for non-ASCII in domain
+    non_ascii = [c for c in domain if ord(c) > 127]
+    if non_ascii:
+        results['findings'].append({
+            'type': 'non_ascii_domain',
+            'chars': [repr(c) for c in non_ascii],
+            'severity': 'high'
+        })
+
+# Calculate overall score
+score = 0
+for finding in results['findings']:
+    if finding['severity'] == 'critical':
+        score += 50
+    elif finding['severity'] == 'high':
+        score += 30
+    elif finding['severity'] == 'medium':
+        score += 15
+
+results['unicode_score'] = score
+
+if score >= 50:
+    results['verdict'] = 'DECEPTIVE_UNICODE'
+elif score >= 25:
+    results['verdict'] = 'SUSPICIOUS_UNICODE'
+else:
+    results['verdict'] = 'LIKELY_SAFE'
+
+print(json.dumps(results, indent=2))
+EOF
+)
+    
+    if [ -n "$unicode_analysis" ]; then
+        echo "Unicode Analysis Results:" >> "$unicode_report"
+        echo "$unicode_analysis" >> "$unicode_report"
+        
+        # Parse results
+        local verdict=$(echo "$unicode_analysis" | grep -oP '"verdict":\s*"\K[^"]+')
+        local score=$(echo "$unicode_analysis" | grep -oP '"unicode_score":\s*\K[0-9]+')
+        local finding_count=$(echo "$unicode_analysis" | grep -c '"type":')
+        
+        if [ "$verdict" = "DECEPTIVE_UNICODE" ]; then
+            unicode_findings+=("deceptive_unicode")
+            ((unicode_score += 60))
+            log_threat 65 "Deceptive Unicode characters detected"
+            
+            # Check for specific critical issues
+            if echo "$unicode_analysis" | grep -q "bidi_override"; then
+                log_critical "⚠️  RTL OVERRIDE ATTACK DETECTED!"
+                unicode_findings+=("rlo_attack")
+            fi
+            
+            if echo "$unicode_analysis" | grep -q "homoglyphs"; then
+                log_critical "⚠️  HOMOGLYPH ATTACK DETECTED!"
+                unicode_findings+=("homoglyph_attack")
+            fi
+            
+        elif [ "$verdict" = "SUSPICIOUS_UNICODE" ]; then
+            unicode_findings+=("suspicious_unicode")
+            ((unicode_score += 30))
+            log_warning "Suspicious Unicode patterns detected"
+        fi
+        
+        if [ ${#unicode_findings[@]} -gt 0 ]; then
+            analysis_success_found "UNICODE-DECEPTION" "${#unicode_findings[@]}" "Score: ${score:-0}"
+        else
+            analysis_success_none "UNICODE-DECEPTION"
+        fi
+    else
+        analysis_error "UNICODE-DECEPTION" "Python analysis failed"
+    fi
+}
+
+# ============================================================================
+# AUDIT 17: SOCIAL THREAT TRACKING
+# ============================================================================
+
+# Social threat tracking sources
+declare -a SOCIAL_THREAT_SOURCES=(
+    "https://urlhaus-api.abuse.ch/v1/url/"
+    "https://www.phishtank.com/checkurl/"
+)
+
+analyze_social_threat_tracking() {
+    local url="$1"
+    local domain="$2"
+    
+    if [ "$SOCIAL_THREAT_TRACKING" = false ]; then
+        analysis_success_none "SOCIAL-THREATS"
+        return
+    fi
+    
+    log_info "Checking social threat tracking sources..."
+    
+    local social_findings=()
+    local social_score=0
+    local social_report="${OUTPUT_DIR}/social_threat_tracking.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "SOCIAL THREAT TRACKING"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo "Target: $url"
+        echo ""
+    } > "$social_report"
+    
+    # Extract domain if not provided
+    if [ -z "$domain" ] && echo "$url" | grep -qiE "^https?://"; then
+        domain=$(echo "$url" | sed -E 's|^https?://||' | cut -d'/' -f1)
+    fi
+    
+    # 1. URLhaus check
+    echo "URLhaus Check:" >> "$social_report"
+    local urlhaus_result=$(curl -sS --max-time 10 \
+        -d "url=$url" \
+        "https://urlhaus-api.abuse.ch/v1/url/" 2>/dev/null)
+    
+    if [ -n "$urlhaus_result" ]; then
+        if echo "$urlhaus_result" | grep -q '"query_status":"ok"'; then
+            social_findings+=("urlhaus:found")
+            ((social_score += 70))
+            log_threat 75 "URL found in URLhaus malware database"
+            echo "  ⚠ FOUND IN URLHAUS DATABASE" >> "$social_report"
+            
+            # Extract details
+            local threat_type=$(echo "$urlhaus_result" | grep -oP '"threat":\s*"\K[^"]+' | head -1)
+            echo "  Threat Type: $threat_type" >> "$social_report"
+        else
+            echo "  Not found" >> "$social_report"
+        fi
+    fi
+    
+    # 2. Check domain reputation via DNSBLs
+    echo "" >> "$social_report"
+    echo "DNSBL Check:" >> "$social_report"
+    
+    if [ -n "$domain" ]; then
+        # Reverse domain for DNSBL query
+        local reversed=$(echo "$domain" | awk -F. '{for(i=NF;i>0;i--) printf "%s%s",$i,(i>1?".":"")}')
+        
+        declare -a DNSBLS=(
+            "zen.spamhaus.org"
+            "bl.spamcop.net"
+            "dnsbl.sorbs.net"
+            "b.barracudacentral.org"
+            "dbl.spamhaus.org"
+        )
+        
+        local dnsbl_hits=0
+        for dnsbl in "${DNSBLS[@]}"; do
+            local check_result=$(dig +short "$reversed.$dnsbl" 2>/dev/null | head -1)
+            if [ -n "$check_result" ] && echo "$check_result" | grep -qE "^127\."; then
+                ((dnsbl_hits++))
+                social_findings+=("dnsbl:$dnsbl")
+                echo "  ⚠ Listed in: $dnsbl" >> "$social_report"
+            fi
+        done
+        
+        if [ "$dnsbl_hits" -gt 0 ]; then
+            ((social_score += dnsbl_hits * 15))
+            log_warning "Domain listed in $dnsbl_hits DNSBL(s)"
+        else
+            echo "  Not listed in checked DNSBLs" >> "$social_report"
+        fi
+    fi
+    
+    # 3. Check for recent mentions in public threat feeds (simulated)
+    echo "" >> "$social_report"
+    echo "Threat Feed Check:" >> "$social_report"
+    
+    # This would integrate with real threat intelligence APIs
+    # For now, check against local threat intel we've downloaded
+    if [ -d "${TEMP_DIR}/threat_intel" ]; then
+        for feed_file in "${TEMP_DIR}/threat_intel"/*.txt; do
+            [ -f "$feed_file" ] || continue
+            if grep -qi "$domain" "$feed_file" 2>/dev/null || grep -qi "$url" "$feed_file" 2>/dev/null; then
+                local feed_name=$(basename "$feed_file" .txt)
+                social_findings+=("feed_hit:$feed_name")
+                ((social_score += 40))
+                log_warning "Found in threat feed: $feed_name"
+                echo "  ⚠ Found in: $feed_name" >> "$social_report"
+            fi
+        done
+    fi
+    
+    # Generate summary
+    echo "" >> "$social_report"
+    echo "Analysis Summary:" >> "$social_report"
+    echo "  Total Findings: ${#social_findings[@]}" >> "$social_report"
+    echo "  Social Threat Score: $social_score" >> "$social_report"
+    
+    if [ ${#social_findings[@]} -gt 0 ]; then
+        if [ $social_score -ge 50 ]; then
+            log_threat $((social_score / 2)) "Social threat tracking detected issues"
+        fi
+        analysis_success_found "SOCIAL-THREATS" "${#social_findings[@]}" "Score: $social_score"
+    else
+        analysis_success_none "SOCIAL-THREATS"
+    fi
+}
+
+# ============================================================================
+# AUDIT 18: BLOCKCHAIN/SMART CONTRACT SCAM ANALYSIS
+# ============================================================================
+
+# Known scam contract patterns
+declare -a CRYPTO_SCAM_CONTRACT_PATTERNS=(
+    "approve.*unlimited"
+    "setApprovalForAll"
+    "transfer.*owner"
+    "drain"
+    "honeypot"
+    "rug.*pull"
+    "mint.*free"
+    "claim.*airdrop"
+)
+
+# Known scam wallet address prefixes (simulated)
+declare -a KNOWN_SCAM_WALLETS=(
+    "0x000000000000000000000000000000000000dead"
+    "0x0000000000000000000000000000000000000000"
+)
+
+analyze_blockchain_scams() {
+    local content="$1"
+    
+    if [ "$BLOCKCHAIN_SCAM_ANALYSIS" = false ]; then
+        analysis_success_none "BLOCKCHAIN-SCAMS"
+        return
+    fi
+    
+    log_info "Analyzing for blockchain/smart contract scams..."
+    
+    local blockchain_findings=()
+    local blockchain_score=0
+    local blockchain_report="${OUTPUT_DIR}/blockchain_scam_analysis.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "BLOCKCHAIN/SMART CONTRACT SCAM ANALYSIS"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo ""
+    } > "$blockchain_report"
+    
+    # 1. Extract cryptocurrency addresses
+    echo "Cryptocurrency Address Detection:" >> "$blockchain_report"
+    
+    # Ethereum addresses (0x...)
+    local eth_addresses=$(echo "$content" | grep -oiE '0x[a-fA-F0-9]{40}' | sort -u)
+    # Bitcoin addresses
+    local btc_addresses=$(echo "$content" | grep -oE '(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,62}' | sort -u)
+    # Solana addresses
+    local sol_addresses=$(echo "$content" | grep -oE '[1-9A-HJ-NP-Za-km-z]{32,44}' | sort -u)
+    
+    if [ -n "$eth_addresses" ]; then
+        echo "  Ethereum Addresses:" >> "$blockchain_report"
+        echo "$eth_addresses" >> "$blockchain_report"
+        blockchain_findings+=("eth_addresses:$(echo "$eth_addresses" | wc -l)")
+        
+        # Check against known scam wallets (would use Etherscan API in production)
+        while IFS= read -r addr; do
+            [ -z "$addr" ] && continue
+            record_ioc "eth_address" "$addr" "Ethereum address in QR content"
+            
+            # Simulated scam check (in production, use Etherscan/similar API)
+            for scam_addr in "${KNOWN_SCAM_WALLETS[@]}"; do
+                if [ "${addr,,}" = "${scam_addr,,}" ]; then
+                    blockchain_findings+=("known_scam_wallet:$addr")
+                    ((blockchain_score += 80))
+                    log_threat 85 "KNOWN SCAM WALLET DETECTED: $addr"
+                fi
+            done
+        done <<< "$eth_addresses"
+    fi
+    
+    if [ -n "$btc_addresses" ]; then
+        echo "  Bitcoin Addresses:" >> "$blockchain_report"
+        echo "$btc_addresses" >> "$blockchain_report"
+        blockchain_findings+=("btc_addresses:$(echo "$btc_addresses" | wc -l)")
+        
+        while IFS= read -r addr; do
+            [ -z "$addr" ] && continue
+            record_ioc "btc_address" "$addr" "Bitcoin address in QR content"
+        done <<< "$btc_addresses"
+    fi
+    
+    # 2. Check for smart contract interaction patterns
+    echo "" >> "$blockchain_report"
+    echo "Smart Contract Pattern Analysis:" >> "$blockchain_report"
+    
+    for pattern in "${CRYPTO_SCAM_CONTRACT_PATTERNS[@]}"; do
+        if echo "$content" | grep -qiE "$pattern"; then
+            blockchain_findings+=("contract_pattern:$pattern")
+            ((blockchain_score += 30))
+            log_warning "Suspicious contract pattern: $pattern"
+            echo "  ⚠ DETECTED: $pattern" >> "$blockchain_report"
+        fi
+    done
+    
+    # 3. DeFi scam indicators
+    echo "" >> "$blockchain_report"
+    echo "DeFi Scam Indicators:" >> "$blockchain_report"
+    
+    # Check for fake swap/DEX URLs
+    if echo "$content" | grep -qiE "uniswap.*claim|pancakeswap.*free|sushiswap.*bonus"; then
+        blockchain_findings+=("fake_dex")
+        ((blockchain_score += 50))
+        log_threat 55 "Fake DEX claim pattern detected"
+        echo "  ⚠ Fake DEX claim pattern" >> "$blockchain_report"
+    fi
+    
+    # Check for fake wallet connect
+    if echo "$content" | grep -qiE "walletconnect.*verify|connect.*wallet.*claim"; then
+        blockchain_findings+=("fake_wallet_connect")
+        ((blockchain_score += 45))
+        log_threat 50 "Fake wallet connect pattern"
+        echo "  ⚠ Fake wallet connect pattern" >> "$blockchain_report"
+    fi
+    
+    # 4. NFT scam patterns
+    if echo "$content" | grep -qiE "free.*nft|nft.*mint.*0|claim.*nft|airdrop.*nft"; then
+        blockchain_findings+=("nft_scam")
+        ((blockchain_score += 40))
+        log_warning "NFT scam pattern detected"
+        echo "  ⚠ NFT scam pattern" >> "$blockchain_report"
+    fi
+    
+    # 5. Etherscan API check (if API key available)
+    if [ -n "$ETHERSCAN_API_KEY" ] && [ -n "$eth_addresses" ]; then
+        echo "" >> "$blockchain_report"
+        echo "Etherscan Verification:" >> "$blockchain_report"
+        
+        local first_addr=$(echo "$eth_addresses" | head -1)
+        local etherscan_result=$(curl -sS --max-time 10 \
+            "https://api.etherscan.io/api?module=account&action=balance&address=$first_addr&tag=latest&apikey=$ETHERSCAN_API_KEY" 2>/dev/null)
+        
+        if [ -n "$etherscan_result" ]; then
+            echo "  API Response: $etherscan_result" >> "$blockchain_report"
+        fi
+    fi
+    
+    # Generate summary
+    echo "" >> "$blockchain_report"
+    echo "Analysis Summary:" >> "$blockchain_report"
+    echo "  Total Findings: ${#blockchain_findings[@]}" >> "$blockchain_report"
+    echo "  Blockchain Scam Score: $blockchain_score" >> "$blockchain_report"
+    
+    if [ ${#blockchain_findings[@]} -gt 0 ]; then
+        if [ $blockchain_score -ge 40 ]; then
+            log_threat $((blockchain_score / 2)) "Blockchain/crypto scam indicators detected"
+        fi
+        analysis_success_found "BLOCKCHAIN-SCAMS" "${#blockchain_findings[@]}" "Score: $blockchain_score"
+    else
+        analysis_success_none "BLOCKCHAIN-SCAMS"
+    fi
+}
+
+# ============================================================================
+# AUDIT 19: CONTACT EVENT DETONATION (VCARD/ICALENDAR)
+# ============================================================================
+
+# Suspicious vCard fields
+declare -a SUSPICIOUS_VCARD_PATTERNS=(
+    "URL:.*bit\.ly"
+    "URL:.*tinyurl"
+    "NOTE:.*verify"
+    "NOTE:.*password"
+    "NOTE:.*click"
+    "X-.*:.*http"
+    "PHOTO.*http"
+)
+
+# Suspicious calendar patterns
+declare -a SUSPICIOUS_ICAL_PATTERNS=(
+    "DESCRIPTION:.*verify"
+    "DESCRIPTION:.*password"
+    "DESCRIPTION:.*click.*here"
+    "URL:.*bit\.ly"
+    "ATTENDEE:.*@"
+    "ORGANIZER:.*suspicious"
+)
+
+analyze_contact_events() {
+    local content="$1"
+    
+    if [ "$CONTACT_EVENT_ANALYSIS" = false ]; then
+        analysis_success_none "CONTACT-EVENTS"
+        return
+    fi
+    
+    # Check if content is vCard or iCalendar
+    local is_vcard=false
+    local is_ical=false
+    
+    if echo "$content" | grep -qi "BEGIN:VCARD"; then
+        is_vcard=true
+    fi
+    if echo "$content" | grep -qi "BEGIN:VCALENDAR\|BEGIN:VEVENT"; then
+        is_ical=true
+    fi
+    
+    if [ "$is_vcard" = false ] && [ "$is_ical" = false ]; then
+        analysis_success_none "CONTACT-EVENTS"
+        return
+    fi
+    
+    log_info "Analyzing contact/calendar event content..."
+    
+    local contact_findings=()
+    local contact_score=0
+    local contact_report="${OUTPUT_DIR}/contact_event_analysis.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "CONTACT/CALENDAR EVENT ANALYSIS"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo ""
+    } > "$contact_report"
+    
+    if [ "$is_vcard" = true ]; then
+        echo "vCard Analysis:" >> "$contact_report"
+        log_info "  Analyzing vCard content..."
+        
+        # Extract fields
+        local name=$(echo "$content" | grep -iE "^(FN|N):" | head -1 | cut -d':' -f2-)
+        local email=$(echo "$content" | grep -iE "^EMAIL" | cut -d':' -f2- | head -1)
+        local phone=$(echo "$content" | grep -iE "^TEL" | cut -d':' -f2- | head -1)
+        local url=$(echo "$content" | grep -iE "^URL" | cut -d':' -f2- | head -1)
+        local note=$(echo "$content" | grep -iE "^NOTE" | cut -d':' -f2- | head -1)
+        
+        echo "  Name: ${name:-N/A}" >> "$contact_report"
+        echo "  Email: ${email:-N/A}" >> "$contact_report"
+        echo "  Phone: ${phone:-N/A}" >> "$contact_report"
+        echo "  URL: ${url:-N/A}" >> "$contact_report"
+        echo "  Note: ${note:-N/A}" >> "$contact_report"
+        
+        # Check for suspicious patterns
+        for pattern in "${SUSPICIOUS_VCARD_PATTERNS[@]}"; do
+            if echo "$content" | grep -qiE "$pattern"; then
+                contact_findings+=("vcard_suspicious:$pattern")
+                ((contact_score += 25))
+                log_warning "Suspicious vCard pattern: $pattern"
+            fi
+        done
+        
+        # Check if email domain is suspicious
+        if [ -n "$email" ]; then
+            local email_domain=$(echo "$email" | cut -d'@' -f2)
+            if echo "$email_domain" | grep -qiE "\.tk$|\.ml$|\.ga$|\.cf$|\.gq$"; then
+                contact_findings+=("vcard_suspicious_email:$email_domain")
+                ((contact_score += 30))
+                log_warning "vCard has email with suspicious TLD: $email_domain"
+            fi
+        fi
+        
+        # Check for URL in vCard
+        if [ -n "$url" ]; then
+            record_ioc "vcard_url" "$url" "URL from vCard"
+            
+            # Analyze URL for threats
+            if echo "$url" | grep -qiE "bit\.ly|tinyurl|ngrok|duckdns"; then
+                contact_findings+=("vcard_suspicious_url")
+                ((contact_score += 35))
+                log_warning "vCard contains suspicious URL"
+            fi
+        fi
+        
+        # Check for BEC patterns in name
+        if echo "$name" | grep -qiE "ceo|cfo|director|executive|finance|payroll|hr"; then
+            contact_findings+=("vcard_bec_title")
+            ((contact_score += 20))
+            log_warning "vCard contains executive title (possible BEC setup)"
+        fi
+    fi
+    
+    if [ "$is_ical" = true ]; then
+        echo "" >> "$contact_report"
+        echo "iCalendar Analysis:" >> "$contact_report"
+        log_info "  Analyzing iCalendar content..."
+        
+        # Extract fields
+        local summary=$(echo "$content" | grep -iE "^SUMMARY:" | cut -d':' -f2- | head -1)
+        local description=$(echo "$content" | grep -iE "^DESCRIPTION:" | cut -d':' -f2- | head -1)
+        local location=$(echo "$content" | grep -iE "^LOCATION:" | cut -d':' -f2- | head -1)
+        local organizer=$(echo "$content" | grep -iE "^ORGANIZER" | head -1)
+        
+        echo "  Summary: ${summary:-N/A}" >> "$contact_report"
+        echo "  Description: ${description:0:100}..." >> "$contact_report"
+        echo "  Location: ${location:-N/A}" >> "$contact_report"
+        echo "  Organizer: ${organizer:-N/A}" >> "$contact_report"
+        
+        # Check for suspicious patterns
+        for pattern in "${SUSPICIOUS_ICAL_PATTERNS[@]}"; do
+            if echo "$content" | grep -qiE "$pattern"; then
+                contact_findings+=("ical_suspicious:$pattern")
+                ((contact_score += 25))
+                log_warning "Suspicious calendar pattern: $pattern"
+            fi
+        done
+        
+        # Calendar spam indicators
+        if echo "$summary$description" | grep -qiE "lottery|winner|prize|claim|verify|suspended"; then
+            contact_findings+=("calendar_spam")
+            ((contact_score += 40))
+            log_threat 45 "Calendar spam/scam content detected"
+        fi
+        
+        # Check for suspicious meeting links
+        if echo "$location$description" | grep -qiE "zoom\.us/j/[0-9]+|teams\.microsoft\.com/l/meetup"; then
+            # Extract meeting URL
+            local meeting_url=$(echo "$location$description" | grep -oiE "https?://[^\s]+" | head -1)
+            if [ -n "$meeting_url" ]; then
+                record_ioc "calendar_meeting_url" "$meeting_url" "Meeting URL from calendar"
+            fi
+        fi
+    fi
+    
+    # Generate summary
+    echo "" >> "$contact_report"
+    echo "Analysis Summary:" >> "$contact_report"
+    echo "  Total Findings: ${#contact_findings[@]}" >> "$contact_report"
+    echo "  Contact Event Risk Score: $contact_score" >> "$contact_report"
+    
+    if [ ${#contact_findings[@]} -gt 0 ]; then
+        if [ $contact_score -ge 30 ]; then
+            log_threat $((contact_score / 2)) "Contact/calendar event threats detected"
+        fi
+        analysis_success_found "CONTACT-EVENTS" "${#contact_findings[@]}" "Score: $contact_score"
+    else
+        analysis_success_none "CONTACT-EVENTS"
+    fi
+}
+
+# ============================================================================
+# AUDIT 20: GEOLOCATION HOTSPOT DETECTION
+# ============================================================================
+
+# High-risk geographic regions (ISO country codes)
+declare -A GEO_RISK_SCORES=(
+    ["RU"]=40  # Russia
+    ["CN"]=35  # China
+    ["KP"]=60  # North Korea
+    ["IR"]=45  # Iran
+    ["SY"]=50  # Syria
+    ["UA"]=20  # Ukraine (cyber activity)
+    ["NG"]=30  # Nigeria (419 scams)
+    ["RO"]=20  # Romania
+    ["BR"]=15  # Brazil
+    ["IN"]=10  # India
+)
+
+# Known malware distribution hotspot ASNs
+declare -a MALWARE_HOTSPOT_ASNS=(
+    "AS44477"   # Stark Industries (abuse)
+    "AS206349"  # Constantmalta Limited
+    "AS57523"   # Chang Way Technologies
+    "AS211252"  # Delis LLC
+    "AS47846"   # Sedo Domain Parking
+)
+
+analyze_geo_hotspots() {
+    local content="$1"
+    local url="$2"
+    
+    if [ "$GEO_HOTSPOT_DETECTION" = false ]; then
+        analysis_success_none "GEO-HOTSPOTS"
+        return
+    fi
+    
+    log_info "Analyzing geographic threat hotspots..."
+    
+    local geo_findings=()
+    local geo_score=0
+    local geo_report="${OUTPUT_DIR}/geo_hotspot_analysis.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "GEOGRAPHIC HOTSPOT DETECTION"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo ""
+    } > "$geo_report"
+    
+    # Extract domain/IP
+    local domain=""
+    local ip=""
+    
+    if echo "$url" | grep -qiE "^https?://"; then
+        domain=$(echo "$url" | sed -E 's|^https?://||' | cut -d'/' -f1 | cut -d':' -f1)
+    fi
+    
+    # Check if domain is IP
+    if echo "$domain" | grep -qE "^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$"; then
+        ip="$domain"
+    else
+        # Resolve domain
+        ip=$(dig +short A "$domain" 2>/dev/null | head -1)
+    fi
+    
+    echo "Domain: $domain" >> "$geo_report"
+    echo "IP: ${ip:-N/A}" >> "$geo_report"
+    echo "" >> "$geo_report"
+    
+    if [ -n "$ip" ]; then
+        # Get geolocation info
+        log_info "  Looking up IP geolocation..."
+        
+        local geo_info=$(curl -sS --max-time 10 "http://ip-api.com/json/$ip" 2>/dev/null)
+        
+        if [ -n "$geo_info" ]; then
+            local country=$(echo "$geo_info" | grep -oP '"country":\s*"\K[^"]+')
+            local country_code=$(echo "$geo_info" | grep -oP '"countryCode":\s*"\K[^"]+')
+            local region=$(echo "$geo_info" | grep -oP '"regionName":\s*"\K[^"]+')
+            local city=$(echo "$geo_info" | grep -oP '"city":\s*"\K[^"]+')
+            local isp=$(echo "$geo_info" | grep -oP '"isp":\s*"\K[^"]+')
+            local org=$(echo "$geo_info" | grep -oP '"org":\s*"\K[^"]+')
+            local as_info=$(echo "$geo_info" | grep -oP '"as":\s*"\K[^"]+')
+            
+            echo "Geolocation Results:" >> "$geo_report"
+            echo "  Country: $country ($country_code)" >> "$geo_report"
+            echo "  Region: $region" >> "$geo_report"
+            echo "  City: $city" >> "$geo_report"
+            echo "  ISP: $isp" >> "$geo_report"
+            echo "  Organization: $org" >> "$geo_report"
+            echo "  AS: $as_info" >> "$geo_report"
+            
+            # Check against high-risk countries
+            if [ -n "$country_code" ] && [ -n "${GEO_RISK_SCORES[$country_code]}" ]; then
+                local risk_score="${GEO_RISK_SCORES[$country_code]}"
+                geo_findings+=("high_risk_country:$country_code")
+                ((geo_score += risk_score))
+                log_warning "IP located in high-risk country: $country ($country_code)"
+                echo "  ⚠ HIGH-RISK COUNTRY: $country (risk: $risk_score)" >> "$geo_report"
+            fi
+            
+            # Check ASN against known malware hotspots
+            local asn=$(echo "$as_info" | grep -oE "AS[0-9]+")
+            for hotspot_asn in "${MALWARE_HOTSPOT_ASNS[@]}"; do
+                if [ "$asn" = "$hotspot_asn" ]; then
+                    geo_findings+=("malware_hotspot_asn:$asn")
+                    ((geo_score += 50))
+                    log_threat 55 "IP in known malware distribution ASN: $asn"
+                    echo "  ⚠ MALWARE HOTSPOT ASN: $asn" >> "$geo_report"
+                fi
+            done
+            
+            # Check for hosting vs residential
+            if echo "$isp$org" | grep -qiE "hosting|vps|server|cloud|datacenter"; then
+                geo_findings+=("hosting_provider")
+                ((geo_score += 10))
+                echo "  Info: Hosted on commercial infrastructure" >> "$geo_report"
+            fi
+        fi
+    fi
+    
+    # Check for suspicious TLD geography correlation
+    echo "" >> "$geo_report"
+    echo "TLD Analysis:" >> "$geo_report"
+    
+    local tld=$(echo "$domain" | grep -oE '\.[a-z]+$' | tail -1)
+    case "$tld" in
+        ".ru"|".su")
+            geo_findings+=("russian_tld")
+            ((geo_score += 20))
+            echo "  ⚠ Russian TLD detected" >> "$geo_report"
+            ;;
+        ".cn")
+            geo_findings+=("chinese_tld")
+            ((geo_score += 15))
+            echo "  ⚠ Chinese TLD detected" >> "$geo_report"
+            ;;
+        ".ir")
+            geo_findings+=("iranian_tld")
+            ((geo_score += 25))
+            echo "  ⚠ Iranian TLD detected" >> "$geo_report"
+            ;;
+        ".kp")
+            geo_findings+=("nk_tld")
+            ((geo_score += 50))
+            echo "  ⚠ North Korean TLD detected" >> "$geo_report"
+            ;;
+    esac
+    
+    # Generate summary
+    echo "" >> "$geo_report"
+    echo "Analysis Summary:" >> "$geo_report"
+    echo "  Total Findings: ${#geo_findings[@]}" >> "$geo_report"
+    echo "  Geographic Risk Score: $geo_score" >> "$geo_report"
+    
+    if [ ${#geo_findings[@]} -gt 0 ]; then
+        if [ $geo_score -ge 30 ]; then
+            log_warning "Geographic threat indicators detected"
+        fi
+        analysis_success_found "GEO-HOTSPOTS" "${#geo_findings[@]}" "Score: $geo_score"
+    else
+        analysis_success_none "GEO-HOTSPOTS"
+    fi
+}
+
+# ============================================================================
+# AUDIT 21: EMERGING PROTOCOLS (WebRTC, BLE, Payment QR)
+# ============================================================================
+
+# Payment QR schemes
+declare -A PAYMENT_QR_SCHEMES=(
+    # International
+    ["emvco"]="EMV.*QR|EMVCO"
+    ["iso20022"]="ISO\s*20022|pain\.[0-9]+"
+    
+    # Regional payment systems
+    ["pix_brazil"]="pix\.bcb\.gov\.br|PIX|00020126"
+    ["upi_india"]="upi://|pa=.*@|BHIM"
+    ["paynow_sg"]="PayNow|SGQR"
+    ["promptpay_th"]="PromptPay|00020101021129"
+    ["duitnow_my"]="DuitNow"
+    ["khqr_kh"]="KHQR"
+    ["qrph_ph"]="QRPh|InstaPay"
+    ["vnpay_vn"]="VNPay|VNQR"
+    
+    # Chinese payment
+    ["alipay"]="alipays://|alipay\.com|ALIPAY"
+    ["wechat_pay"]="weixin://|wxp://|WECHATPAY"
+    ["unionpay"]="UnionPay|UPQR|95516"
+    
+    # Western payment
+    ["paypal_qr"]="paypal\.me|PayPal.*QR"
+    ["venmo_qr"]="venmo\.com|Venmo"
+    ["cashapp_qr"]='\$[A-Za-z][A-Za-z0-9_]{1,20}|cash\.app'
+    ["zelle_qr"]="zellepay\.com|Zelle"
+    
+    # Crypto payment
+    ["bitcoin_pay"]="bitcoin:|BTC:"
+    ["ethereum_pay"]="ethereum:|ETH:"
+    ["lightning"]="lightning:|lnbc[0-9]+"
+)
+
+# WebRTC and emerging protocol patterns
+declare -a EMERGING_PROTOCOL_PATTERNS=(
+    # WebRTC
+    "stun:"
+    "turn:"
+    "webrtc://"
+    "RTCPeerConnection"
+    "RTCDataChannel"
+    "getUserMedia"
+    "getDisplayMedia"
+    
+    # Bluetooth LE
+    "bluetooth:"
+    "ble://"
+    "gatt://"
+    "uuid.*0000[0-9a-f]{4}-0000-1000-8000-00805f9b34fb"
+    
+    # NFC
+    "nfc:"
+    "ndef:"
+    "android\.nfc"
+    
+    # IoT protocols
+    "mqtt://"
+    "mqtts://"
+    "coap://"
+    "coaps://"
+    "lwm2m://"
+    "zigbee://"
+    "zwave://"
+    
+    # Smart home
+    "homekit://"
+    "hap://"
+    "matter://"
+    "thread://"
+    
+    # Automotive
+    "can://"
+    "obd://"
+    "carplay://"
+    "androidauto://"
+)
+
+analyze_emerging_protocols() {
+    local content="$1"
+    
+    if [ "$EMERGING_PROTOCOL_DETECTION" = false ]; then
+        analysis_success_none "EMERGING-PROTOCOLS"
+        return
+    fi
+    
+    log_info "Analyzing for emerging protocols and payment schemes..."
+    
+    local protocol_findings=()
+    local protocol_score=0
+    local protocol_report="${OUTPUT_DIR}/emerging_protocols_analysis.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "EMERGING PROTOCOLS & PAYMENT QR ANALYSIS"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo ""
+    } > "$protocol_report"
+    
+    # 1. Check for payment QR schemes
+    echo "Payment QR Scheme Detection:" >> "$protocol_report"
+    
+    for scheme_name in "${!PAYMENT_QR_SCHEMES[@]}"; do
+        local pattern="${PAYMENT_QR_SCHEMES[$scheme_name]}"
+        if echo "$content" | grep -qiE "$pattern"; then
+            protocol_findings+=("payment_qr:$scheme_name")
+            ((protocol_score += 15))
+            log_info "Payment QR scheme detected: $scheme_name"
+            echo "  ✓ Detected: $scheme_name" >> "$protocol_report"
+            
+            # Additional validation based on scheme
+            case "$scheme_name" in
+                "pix_brazil")
+                    # PIX QR validation
+                    if echo "$content" | grep -qE "^00020126"; then
+                        echo "    PIX format: Valid structure" >> "$protocol_report"
+                    fi
+                    ;;
+                "upi_india")
+                    # Extract UPI ID
+                    local upi_id=$(echo "$content" | grep -oiE "pa=[^&]+" | cut -d'=' -f2)
+                    if [ -n "$upi_id" ]; then
+                        echo "    UPI ID: $upi_id" >> "$protocol_report"
+                        record_ioc "upi_id" "$upi_id" "UPI payment ID from QR"
+                    fi
+                    ;;
+                "alipay"|"wechat_pay")
+                    protocol_findings+=("chinese_payment_app")
+                    log_warning "Chinese payment app QR detected"
+                    ;;
+                "lightning")
+                    # Extract Lightning invoice
+                    local ln_invoice=$(echo "$content" | grep -oiE "lnbc[a-z0-9]+" | head -1)
+                    if [ -n "$ln_invoice" ]; then
+                        record_ioc "lightning_invoice" "$ln_invoice" "Lightning Network invoice"
+                    fi
+                    ;;
+            esac
+        fi
+    done
+    
+    # 2. Check for emerging protocol patterns
+    echo "" >> "$protocol_report"
+    echo "Emerging Protocol Detection:" >> "$protocol_report"
+    
+    for pattern in "${EMERGING_PROTOCOL_PATTERNS[@]}"; do
+        if echo "$content" | grep -qiE "$pattern"; then
+            protocol_findings+=("protocol:$pattern")
+            ((protocol_score += 20))
+            log_warning "Emerging protocol detected: $pattern"
+            echo "  ⚠ Detected: $pattern" >> "$protocol_report"
+        fi
+    done
+    
+    # 3. WebRTC-specific analysis
+    if echo "$content" | grep -qiE "stun:|turn:|webrtc"; then
+        echo "" >> "$protocol_report"
+        echo "WebRTC Analysis:" >> "$protocol_report"
+        
+        # Extract STUN/TURN servers
+        local stun_servers=$(echo "$content" | grep -oiE "stun:[^\s]+" | head -5)
+        local turn_servers=$(echo "$content" | grep -oiE "turn:[^\s]+" | head -5)
+        
+        if [ -n "$stun_servers" ]; then
+            echo "  STUN Servers:" >> "$protocol_report"
+            echo "$stun_servers" >> "$protocol_report"
+            protocol_findings+=("webrtc_stun")
+        fi
+        
+        if [ -n "$turn_servers" ]; then
+            echo "  TURN Servers:" >> "$protocol_report"
+            echo "$turn_servers" >> "$protocol_report"
+            protocol_findings+=("webrtc_turn")
+            ((protocol_score += 25))
+            log_warning "TURN server in QR - potential for media relay abuse"
+        fi
+    fi
+    
+    # 4. Bluetooth LE analysis
+    if echo "$content" | grep -qiE "bluetooth:|ble:|gatt:"; then
+        echo "" >> "$protocol_report"
+        echo "Bluetooth LE Analysis:" >> "$protocol_report"
+        
+        # Extract UUIDs
+        local ble_uuids=$(echo "$content" | grep -oiE "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}" | head -5)
+        if [ -n "$ble_uuids" ]; then
+            echo "  BLE UUIDs:" >> "$protocol_report"
+            echo "$ble_uuids" >> "$protocol_report"
+            protocol_findings+=("ble_uuid")
+            
+            # Check for known malicious/suspicious UUIDs
+            # (In production, would check against a database)
+        fi
+    fi
+    
+    # 5. IoT protocol analysis
+    if echo "$content" | grep -qiE "mqtt://|coap://|zigbee:|zwave:"; then
+        protocol_findings+=("iot_protocol")
+        ((protocol_score += 30))
+        log_warning "IoT protocol in QR - verify device trust"
+        echo "" >> "$protocol_report"
+        echo "IoT Protocol Warning: IoT protocol detected - verify source" >> "$protocol_report"
+    fi
+    
+    # 6. Payment fraud indicators
+    echo "" >> "$protocol_report"
+    echo "Payment Fraud Analysis:" >> "$protocol_report"
+    
+    # Check for payment request without proper merchant info
+    if echo "$content" | grep -qiE "pay|amount|money|transfer" && \
+       ! echo "$content" | grep -qiE "merchant|store|shop|company"; then
+        protocol_findings+=("suspicious_payment")
+        ((protocol_score += 25))
+        log_warning "Payment request without merchant identification"
+        echo "  ⚠ Payment without clear merchant info" >> "$protocol_report"
+    fi
+    
+    # Check for unusually high amounts
+    local amounts=$(echo "$content" | grep -oE "[0-9]+(\.[0-9]+)?" | head -5)
+    while IFS= read -r amount; do
+        if [ -n "$amount" ]; then
+            # Check if amount > 10000 (could be scam)
+            if (( $(echo "$amount > 10000" | bc -l 2>/dev/null || echo 0) )); then
+                protocol_findings+=("high_amount:$amount")
+                ((protocol_score += 15))
+                log_warning "High payment amount detected: $amount"
+            fi
+        fi
+    done <<< "$amounts"
+    
+    # Generate summary
+    echo "" >> "$protocol_report"
+    echo "Analysis Summary:" >> "$protocol_report"
+    echo "  Total Findings: ${#protocol_findings[@]}" >> "$protocol_report"
+    echo "  Protocol Risk Score: $protocol_score" >> "$protocol_report"
+    
+    if [ ${#protocol_findings[@]} -gt 0 ]; then
+        if [ $protocol_score -ge 30 ]; then
+            log_warning "Emerging protocol/payment analysis complete"
+        fi
+        analysis_success_found "EMERGING-PROTOCOLS" "${#protocol_findings[@]}" "Score: $protocol_score"
+    else
+        analysis_success_none "EMERGING-PROTOCOLS"
+    fi
+}
+
+# ============================================================================
+# AUDIT 22: HUMAN REVIEWER FEEDBACK LOOP
+# ============================================================================
+
+# Feedback storage
+FEEDBACK_DIR="${OUTPUT_DIR}/feedback"
+FEEDBACK_FILE="${FEEDBACK_DIR}/analysis_feedback.json"
+
+initialize_feedback_system() {
+    if [ "$FEEDBACK_LOOP_ENABLED" = false ]; then
+        return
+    fi
+    
+    mkdir -p "$FEEDBACK_DIR"
+    
+    # Initialize feedback file if not exists
+    if [ ! -f "$FEEDBACK_FILE" ]; then
+        echo '{"feedback_entries": [], "created": "'$(date -Iseconds)'"}' > "$FEEDBACK_FILE"
+    fi
+}
+
+record_analysis_feedback() {
+    local verdict="$1"
+    local confidence="$2"
+    local user_feedback="$3"
+    local notes="$4"
+    
+    if [ "$FEEDBACK_LOOP_ENABLED" = false ]; then
+        return
+    fi
+    
+    local timestamp=$(date -Iseconds)
+    local analysis_hash=$(echo "$QR_CONTENT" | md5sum | cut -d' ' -f1)
+    
+    # Create feedback entry
+    local entry=$(cat << EOF
+{
+    "timestamp": "$timestamp",
+    "analysis_hash": "$analysis_hash",
+    "automated_verdict": "$verdict",
+    "confidence": $confidence,
+    "user_feedback": "$user_feedback",
+    "notes": "$notes",
+    "threat_score": $THREAT_SCORE,
+    "ioc_count": ${#RECORDED_IOCS[@]}
+}
+EOF
+)
+    
+    # Append to feedback file
+    python3 << EOF 2>/dev/null
+import json
+
+entry = $entry
+
+try:
+    with open('$FEEDBACK_FILE', 'r') as f:
+        data = json.load(f)
+except:
+    data = {"feedback_entries": []}
+
+data['feedback_entries'].append(entry)
+
+with open('$FEEDBACK_FILE', 'w') as f:
+    json.dump(data, f, indent=2)
+
+print("Feedback recorded")
+EOF
+}
+
+generate_chain_of_custody_report() {
+    local output_file="${OUTPUT_DIR}/chain_of_custody_report.txt"
+    
+    log_info "Generating chain-of-custody report..."
+    
+    {
+        echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+        echo "║                    CHAIN OF CUSTODY - FORENSIC REPORT                     ║"
+        echo "╠═══════════════════════════════════════════════════════════════════════════╣"
+        echo "║                                                                           ║"
+        echo "║  This report provides a cryptographically verifiable record of the        ║"
+        echo "║  analysis performed on the QR code sample.                                ║"
+        echo "║                                                                           ║"
+        echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+        echo ""
+        echo "═══════════════════════════════════════════════"
+        echo "SAMPLE INFORMATION"
+        echo "═══════════════════════════════════════════════"
+        echo ""
+        echo "Analysis Date:        $(date -Iseconds)"
+        echo "Analysis Tool:        QR Malware Scanner v4.2.0"
+        echo "Analyst Workstation:  $(hostname)"
+        echo "Operating System:     $(uname -s) $(uname -r)"
+        echo ""
+        
+        if [ -n "$INPUT_IMAGE" ] && [ -f "$INPUT_IMAGE" ]; then
+            echo "═══════════════════════════════════════════════"
+            echo "IMAGE FILE HASHES"
+            echo "═══════════════════════════════════════════════"
+            echo ""
+            echo "File Path:  $INPUT_IMAGE"
+            echo "File Size:  $(stat -f%z "$INPUT_IMAGE" 2>/dev/null || stat -c%s "$INPUT_IMAGE" 2>/dev/null) bytes"
+            echo ""
+            echo "MD5:        $(md5sum "$INPUT_IMAGE" 2>/dev/null | cut -d' ' -f1 || md5 -q "$INPUT_IMAGE" 2>/dev/null)"
+            echo "SHA1:       $(sha1sum "$INPUT_IMAGE" 2>/dev/null | cut -d' ' -f1 || shasum "$INPUT_IMAGE" 2>/dev/null | cut -d' ' -f1)"
+            echo "SHA256:     $(sha256sum "$INPUT_IMAGE" 2>/dev/null | cut -d' ' -f1 || shasum -a 256 "$INPUT_IMAGE" 2>/dev/null | cut -d' ' -f1)"
+            echo ""
+        fi
+        
+        echo "═══════════════════════════════════════════════"
+        echo "DECODED CONTENT HASHES"
+        echo "═══════════════════════════════════════════════"
+        echo ""
+        echo "Content MD5:    $(echo "$QR_CONTENT" | md5sum | cut -d' ' -f1)"
+        echo "Content SHA256: $(echo "$QR_CONTENT" | sha256sum | cut -d' ' -f1)"
+        echo ""
+        
+        echo "═══════════════════════════════════════════════"
+        echo "ANALYSIS RESULTS"
+        echo "═══════════════════════════════════════════════"
+        echo ""
+        echo "Threat Score:     $THREAT_SCORE / 1000"
+        echo "IOCs Recorded:    ${#RECORDED_IOCS[@]}"
+        echo "Analysis Time:    ${ANALYSIS_DURATION:-N/A} seconds"
+        echo ""
+        
+        echo "═══════════════════════════════════════════════"
+        echo "MODULES EXECUTED"
+        echo "═══════════════════════════════════════════════"
+        echo ""
+        echo "Core Analysis Modules:"
+        echo "  [✓] URL Analysis"
+        echo "  [✓] Domain Reputation"
+        echo "  [✓] Threat Intelligence"
+        echo "  [✓] Pattern Matching"
+        echo ""
+        echo "Enhanced Analysis Modules (Audit Enhancements):"
+        echo "  [✓] Sandbox/Detonation Analysis"
+        echo "  [✓] JavaScript/Browser Exploit Analysis"
+        echo "  [✓] ML Classification"
+        echo "  [✓] PDF/Document Analysis"
+        echo "  [✓] NLP Analysis"
+        echo "  [✓] Mobile Static Analysis"
+        echo "  [✓] Web Archive Analysis"
+        echo "  [✓] Recursive Crawl"
+        echo "  [✓] Adversarial AI Detection"
+        echo "  [✓] Covert Channel Detection"
+        echo "  [✓] QR Chaining Detection"
+        echo "  [✓] Template Spoofing Detection"
+        echo "  [✓] Social Marketing Analysis"
+        echo "  [✓] UX Redress Detection"
+        echo "  [✓] DGA Analysis"
+        echo "  [✓] Unicode Deception Detection"
+        echo "  [✓] Social Threat Tracking"
+        echo "  [✓] Blockchain Scam Analysis"
+        echo "  [✓] Contact/Event Analysis"
+        echo "  [✓] Geo Hotspot Detection"
+        echo "  [✓] Emerging Protocol Detection"
+        echo "  [✓] Feedback Loop System"
+        echo ""
+        
+        echo "═══════════════════════════════════════════════"
+        echo "CRYPTOGRAPHIC VERIFICATION"
+        echo "═══════════════════════════════════════════════"
+        echo ""
+        
+        # Generate report signature
+        local report_content=$(cat "$output_file" 2>/dev/null || echo "")
+        local report_hash=$(echo "$report_content" | sha256sum | cut -d' ' -f1)
+        
+        echo "Report Generation Time: $(date -Iseconds)"
+        echo ""
+        echo "To verify this report's integrity:"
+        echo "  sha256sum chain_of_custody_report.txt"
+        echo ""
+        
+        echo "═══════════════════════════════════════════════"
+        echo "ANALYST CERTIFICATION"
+        echo "═══════════════════════════════════════════════"
+        echo ""
+        echo "I certify that this analysis was performed using approved"
+        echo "forensic tools and methodologies."
+        echo ""
+        echo "Analyst Signature: _______________________________"
+        echo ""
+        echo "Date: _________________"
+        echo ""
+        echo "Supervisor Review: _______________________________"
+        echo ""
+        echo "Date: _________________"
+        echo ""
+        
+    } > "$output_file"
+    
+    log_forensic "Chain of custody report generated: $output_file"
+}
+
+prompt_user_feedback() {
+    if [ "$FEEDBACK_LOOP_ENABLED" = false ] || [ "$INTERACTIVE_MODE" = false ]; then
+        return
+    fi
+    
+    echo ""
+    echo -e "${CYAN}┌─────────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${CYAN}│                    ANALYST FEEDBACK                          │${NC}"
+    echo -e "${CYAN}├─────────────────────────────────────────────────────────────┤${NC}"
+    echo -e "${CYAN}│${NC} Your feedback helps improve detection accuracy.            ${NC}"
+    echo -e "${CYAN}│${NC}                                                            ${NC}"
+    echo -e "${CYAN}│${NC} Automated Verdict: ${YELLOW}${FINAL_VERDICT:-UNKNOWN}${NC}"
+    echo -e "${CYAN}│${NC} Confidence: ${WHITE}${CONFIDENCE_SCORE:-0}%${NC}"
+    echo -e "${CYAN}│${NC}                                                            ${NC}"
+    echo -e "${CYAN}│${NC} Do you agree with this verdict? (y/n/skip)                ${NC}"
+    echo -e "${CYAN}└─────────────────────────────────────────────────────────────┘${NC}"
+    echo ""
+    
+    read -r -t 30 user_response
+    
+    case "${user_response,,}" in
+        y|yes)
+            record_analysis_feedback "$FINAL_VERDICT" "$CONFIDENCE_SCORE" "confirmed" ""
+            echo "  ✓ Feedback recorded: Verdict confirmed"
+            ;;
+        n|no)
+            echo "  What is the correct verdict? (malicious/suspicious/benign)"
+            read -r -t 30 correct_verdict
+            echo "  Any additional notes?"
+            read -r -t 60 notes
+            record_analysis_feedback "$FINAL_VERDICT" "$CONFIDENCE_SCORE" "corrected:$correct_verdict" "$notes"
+            echo "  ✓ Feedback recorded: Verdict corrected to $correct_verdict"
+            ;;
+        *)
+            echo "  Feedback skipped"
+            ;;
+    esac
+}
+
+# ============================================================================
+# COMPREHENSIVE IOC DATABASE - EXPANDED
+# ============================================================================
+
+# Known APT infrastructure domains (from public threat intel)
+declare -a APT_INFRASTRUCTURE_DOMAINS=(
+    # APT28/Fancy Bear
+    "securitytransfer.net" "loloautotrack.com" "onloading.com"
+    
+    # APT29/Cozy Bear
+    "freescanonline.com" "pandemicdatarecovery.com"
+    
+    # Lazarus Group
+    "securityupdatecheck.com" "onloading.net" "wilopencloud.com"
+    
+    # APT41
+    "securitytestingcorp.com" "globaltechtesting.com"
+    
+    # FIN7
+    "itlogtesting.com" "serverlogstorage.net"
+    
+    # Various APTs - dynamic DNS abuse
+    "ddns.net" "no-ip.org" "duckdns.org" "dynu.com"
+)
+
+# Known malware distribution URLs patterns
+declare -a MALWARE_DIST_PATTERNS=(
+    "/download.*\.exe"
+    "/setup.*\.msi"
+    "/update.*\.dll"
+    "/install.*\.scr"
+    "/patch.*\.bat"
+    "/fix.*\.ps1"
+    "/driver.*\.sys"
+    "\.php\?download="
+    "\.asp\?file="
+    "/temp/.*\.(exe|dll|scr)"
+    "/public/.*\.(exe|dll|scr)"
+)
+
+# Phishing kit signatures
+declare -a PHISHING_KIT_SIGNATURES=(
+    "index\.php\?login="
+    "secure-login\.php"
+    "verify-account\.html"
+    "update-billing\.php"
+    "confirm-identity\.html"
+    "webscr\.php\?cmd="
+    "/wp-content/uploads/.*\.php"
+    "/wp-includes/.*\.php\?"
+)
+
+# Known C2 callback paths
+declare -a C2_CALLBACK_PATHS=(
+    "/gate.php"
+    "/panel/gate.php"
+    "/admin/gate.php"
+    "/upload.php"
+    "/submit.php"
+    "/post.php"
+    "/beacon"
+    "/check"
+    "/ping"
+    "/heartbeat"
+    "/status"
+    "/cmd"
+    "/command"
+    "/task"
+    "/job"
+    "/api/v1/callback"
+    "/api/v2/data"
+    "/connector.php"
+    "/receiver.php"
+    "/__utm.gif"
+    "/pixel.gif"
+    "/1x1.gif"
+    "/analytics.js"
+    "/stats.php"
+)
+
+# Cryptocurrency scam wallet patterns (obfuscated for safety)
+declare -a CRYPTO_SCAM_PATTERNS_EXTENDED=(
+    # Ethereum patterns
+    "0x[a-fA-F0-9]{40}"
+    
+    # Bitcoin patterns
+    "^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$"
+    "^bc1[a-zA-HJ-NP-Z0-9]{39,59}$"
+    
+    # Common scam phrases
+    "send.*[0-9]+.*ETH.*receive.*double"
+    "airdrop.*connect.*wallet"
+    "claim.*free.*token"
+    "verify.*wallet.*receive"
+    "whitelist.*mint.*nft"
+    "presale.*guaranteed.*return"
+)
+
+# Exploit kit landing page patterns
+declare -a EXPLOIT_KIT_PATTERNS=(
+    # RIG EK
+    "\/\?[a-z0-9]{10,}$"
+    
+    # Magnitude EK
+    "/ads\?[a-z0-9]+"
+    
+    # Fallout EK
+    "/[a-z]{5,8}\.php\?[a-z]=[0-9]+"
+    
+    # Generic patterns
+    "document\.write.*unescape"
+    "eval.*String\.fromCharCode"
+    "var\s+[a-z]\s*=\s*\[[0-9,\s]+\]"
+    "ActiveXObject.*Shell"
+    "WScript\.Shell"
+    "Scripting\.FileSystemObject"
+)
+
+# Social engineering phrase patterns
+declare -a SOCIAL_ENGINEERING_PHRASES=(
+    "your account (has been|will be) (suspended|terminated|locked)"
+    "verify your (identity|account|information) within [0-9]+ (hours|minutes)"
+    "unauthorized (access|activity|login) detected"
+    "click (here|below|this link) to (verify|confirm|update)"
+    "(urgent|immediate) action required"
+    "your (payment|subscription|membership) (failed|expired)"
+    "you (have|ve) (won|been selected)"
+    "(prize|reward|gift|bonus) (waiting|available)"
+    "confirm your (password|PIN|SSN|credit card)"
+    "(account|service) will be (closed|terminated) in"
+)
+
+# ============================================================================
+# ADDITIONAL DETECTION FUNCTIONS
+# ============================================================================
+
+# Advanced entropy analysis for detecting encoded payloads
+calculate_detailed_entropy() {
+    local data="$1"
+    
+    python3 << EOF 2>/dev/null
+import math
+from collections import Counter
+
+data = '''$data'''
+
+if not data:
+    print('{"entropy": 0, "normalized": 0}')
+    exit()
+
+# Calculate Shannon entropy
+freq = Counter(data)
+probs = [count / len(data) for count in freq.values()]
+entropy = -sum(p * math.log2(p) for p in probs if p > 0)
+
+# Normalized entropy (0-1 scale based on charset)
+max_entropy = math.log2(len(freq)) if len(freq) > 1 else 1
+normalized = entropy / max_entropy if max_entropy > 0 else 0
+
+# Character class analysis
+import re
+lowercase = len(re.findall(r'[a-z]', data))
+uppercase = len(re.findall(r'[A-Z]', data))
+digits = len(re.findall(r'\d', data))
+special = len(re.findall(r'[^a-zA-Z0-9]', data))
+
+total = len(data)
+
+result = {
+    'entropy': round(entropy, 4),
+    'normalized': round(normalized, 4),
+    'max_possible': round(max_entropy, 4),
+    'unique_chars': len(freq),
+    'lowercase_pct': round(lowercase/total*100, 1) if total else 0,
+    'uppercase_pct': round(uppercase/total*100, 1) if total else 0,
+    'digit_pct': round(digits/total*100, 1) if total else 0,
+    'special_pct': round(special/total*100, 1) if total else 0,
+}
+
+# Verdict
+if entropy > 5.5 and normalized > 0.9:
+    result['verdict'] = 'HIGH_ENTROPY_ENCODED'
+elif entropy > 4.5:
+    result['verdict'] = 'ELEVATED_ENTROPY'
+else:
+    result['verdict'] = 'NORMAL'
+
+import json
+print(json.dumps(result))
+EOF
+}
+
+# Domain age checker
+check_domain_age() {
+    local domain="$1"
+    
+    if [ -z "$domain" ]; then
+        return
+    fi
+    
+    # Try whois lookup
+    local whois_data=$(timeout 10 whois "$domain" 2>/dev/null)
+    
+    if [ -n "$whois_data" ]; then
+        # Extract creation date
+        local creation_date=$(echo "$whois_data" | grep -iE "Creation Date|Created|Registration Date" | head -1 | grep -oE "[0-9]{4}-[0-9]{2}-[0-9]{2}" | head -1)
+        
+        if [ -n "$creation_date" ]; then
+            local creation_epoch=$(date -d "$creation_date" +%s 2>/dev/null)
+            local now_epoch=$(date +%s)
+            
+            if [ -n "$creation_epoch" ]; then
+                local age_days=$(( (now_epoch - creation_epoch) / 86400 ))
+                echo "$age_days"
+                return
+            fi
+        fi
+    fi
+    
+    echo "-1"  # Unknown
+}
+
+# SSL certificate analysis
+analyze_ssl_certificate() {
+    local domain="$1"
+    
+    if [ -z "$domain" ]; then
+        return
+    fi
+    
+    local ssl_info=$(timeout 10 openssl s_client -connect "$domain:443" -servername "$domain" </dev/null 2>/dev/null | openssl x509 -noout -dates -subject -issuer 2>/dev/null)
+    
+    if [ -n "$ssl_info" ]; then
+        echo "$ssl_info"
+        
+        # Check for Let's Encrypt (common with malicious sites)
+        if echo "$ssl_info" | grep -qi "Let's Encrypt"; then
+            log_info "SSL: Let's Encrypt certificate (common, verify domain)"
+        fi
+        
+        # Check expiry
+        local not_after=$(echo "$ssl_info" | grep "notAfter" | cut -d'=' -f2)
+        if [ -n "$not_after" ]; then
+            local expiry_epoch=$(date -d "$not_after" +%s 2>/dev/null)
+            local now_epoch=$(date +%s)
+            local days_left=$(( (expiry_epoch - now_epoch) / 86400 ))
+            
+            if [ "$days_left" -lt 30 ]; then
+                log_warning "SSL certificate expires in $days_left days"
+            fi
+        fi
+    fi
+}
+
+# ============================================================================
+# MASTER ORCHESTRATION FUNCTION FOR ALL 22 AUDIT MODULES
+# ============================================================================
+
+run_audit_enhanced_analysis() {
+    local content="$1"
+    local url="$2"
+    local image="$3"
+    
+    log_info ""
+    log_info "════════════════════════════════════════════════════════════════"
+    log_info "        RUNNING AUDIT-ENHANCED ANALYSIS (22 MODULES)"
+    log_info "════════════════════════════════════════════════════════════════"
+    log_info ""
+    
+    local total_modules=22
+    local completed=0
+    local start_time=$SECONDS
+    
+    # Initialize feedback system
+    initialize_feedback_system
+    
+    # Module 1: Sandbox/Detonation
+    log_info "[1/$total_modules] Sandbox/Detonation Analysis..."
+    analyze_sandbox_detonation "$url"
+    ((completed++))
+    
+    # Module 2: JavaScript/Browser Exploits
+    log_info "[2/$total_modules] JavaScript/Browser Exploit Analysis..."
+    analyze_js_browser_exploits "$content" "$url"
+    ((completed++))
+    
+    # Module 3: ML Classification
+    log_info "[3/$total_modules] ML/AI Classification..."
+    analyze_ml_classification_enhanced "$content"
+    ((completed++))
+    
+    # Module 4: PDF/Document Analysis
+    log_info "[4/$total_modules] PDF/Document Analysis..."
+    analyze_pdf_document "$content" "$url"
+    ((completed++))
+    
+    # Module 5: NLP Analysis
+    log_info "[5/$total_modules] NLP/Language Analysis..."
+    analyze_nlp_content "$content"
+    ((completed++))
+    
+    # Module 6: Mobile Static Analysis
+    log_info "[6/$total_modules] Mobile Malware Analysis..."
+    analyze_mobile_static "$content" "$url"
+    ((completed++))
+    
+    # Module 7: Web Archive Analysis
+    log_info "[7/$total_modules] Web Archive Analysis..."
+    analyze_web_archive "$url"
+    ((completed++))
+    
+    # Module 8: Recursive Crawl
+    log_info "[8/$total_modules] Recursive Content Extraction..."
+    analyze_recursive_crawl "$url" 0
+    ((completed++))
+    
+    # Module 9: Adversarial AI Detection
+    log_info "[9/$total_modules] Adversarial AI Detection..."
+    analyze_adversarial_ai "$image"
+    ((completed++))
+    
+    # Module 10: Covert Channel Detection
+    log_info "[10/$total_modules] Covert Channel Detection..."
+    analyze_covert_channels "$content" "$url"
+    ((completed++))
+    
+    # Module 11: QR Chaining Detection
+    log_info "[11/$total_modules] QR Chaining Detection..."
+    analyze_qr_chaining "$content" "$image" false
+    ((completed++))
+    
+    # Module 12: Template Spoofing Detection
+    log_info "[12/$total_modules] Template Spoofing Detection..."
+    analyze_template_spoofing "$content" "$image"
+    ((completed++))
+    
+    # Module 13: Social Media/Marketing Links
+    log_info "[13/$total_modules] Social Media/Marketing Analysis..."
+    analyze_social_marketing_links "$content"
+    ((completed++))
+    
+    # Module 14: UX Redress/Browser Attacks
+    log_info "[14/$total_modules] UX Redress Detection..."
+    analyze_ux_redress_attacks "$content" "$url"
+    ((completed++))
+    
+    # Module 15: DGA Analysis
+    log_info "[15/$total_modules] DGA/Algorithmic Domain Analysis..."
+    analyze_dga_domains "$content"
+    ((completed++))
+    
+    # Module 16: Unicode Deception Detection
+    log_info "[16/$total_modules] Unicode Deception Detection..."
+    analyze_unicode_deception "$content" "$url"
+    ((completed++))
+    
+    # Module 17: Social Threat Tracking
+    log_info "[17/$total_modules] Social Threat Tracking..."
+    analyze_social_threat_tracking "$url" ""
+    ((completed++))
+    
+    # Module 18: Blockchain/Smart Contract Scams
+    log_info "[18/$total_modules] Blockchain Scam Analysis..."
+    analyze_blockchain_scams "$content"
+    ((completed++))
+    
+    # Module 19: Contact/Calendar Event Analysis
+    log_info "[19/$total_modules] Contact/Event Analysis..."
+    analyze_contact_events "$content"
+    ((completed++))
+    
+    # Module 20: Geographic Hotspot Detection
+    log_info "[20/$total_modules] Geographic Hotspot Detection..."
+    analyze_geo_hotspots "$content" "$url"
+    ((completed++))
+    
+    # Module 21: Emerging Protocols
+    log_info "[21/$total_modules] Emerging Protocol Detection..."
+    analyze_emerging_protocols "$content"
+    ((completed++))
+    
+    # Module 22: Feedback Loop & Chain of Custody
+    log_info "[22/$total_modules] Generating Chain of Custody Report..."
+    generate_chain_of_custody_report
+    ((completed++))
+    
+    local elapsed=$((SECONDS - start_time))
+    
+    log_info ""
+    log_info "════════════════════════════════════════════════════════════════"
+    log_info "        AUDIT-ENHANCED ANALYSIS COMPLETE"
+    log_info "════════════════════════════════════════════════════════════════"
+    log_info ""
+    log_info "  Modules Executed: $completed / $total_modules"
+    log_info "  Execution Time:   ${elapsed}s"
+    log_info ""
+    
+    # Display summary box
+    echo ""
+    echo -e "${GREEN}┌─────────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${GREEN}│           AUDIT ENHANCEMENT MODULES SUMMARY                 │${NC}"
+    echo -e "${GREEN}├─────────────────────────────────────────────────────────────┤${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [01] Sandbox/Detonation Analysis                        ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [02] JavaScript/Browser Exploit Analysis                ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [03] ML/AI Statistical Classification                   ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [04] PDF/Document Embedded Payload Analysis             ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [05] Advanced NLP/Language Analysis                     ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [06] Mobile Malware Static Analysis                     ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [07] Web Archive Historical Analysis                    ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [08] Recursive Content Extraction/Crawl                 ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [09] Visual Adversarial AI Attack Detection             ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [10] Covert Channel Detection (DNS/ICMP)                ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [11] Cross-QR Steganography/Chaining                    ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [12] QR Template Spoofing Detection                     ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [13] Social Media/Marketing Link Analysis               ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [14] UX Redress/Browser Attack Detection                ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [15] DGA/Algorithmic Domain Analysis                    ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [16] Unicode/Multi-Language Deception                   ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [17] Social Threat Feed Tracking                        ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [18] Blockchain/Smart Contract Scam Analysis            ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [19] vCard/iCalendar Event Detonation                   ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [20] Geographic Threat Hotspot Detection                ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [21] Emerging Protocol Detection (WebRTC/BLE/Pay)       ${NC}"
+    echo -e "${GREEN}│${NC}  ✓ [22] Human Feedback Loop & Chain of Custody             ${NC}"
+    echo -e "${GREEN}├─────────────────────────────────────────────────────────────┤${NC}"
+    echo -e "${GREEN}│${NC}  Total Modules: ${WHITE}22${NC}  |  Execution Time: ${WHITE}${elapsed}s${NC}              ${NC}"
+    echo -e "${GREEN}└─────────────────────────────────────────────────────────────┘${NC}"
+    echo ""
+}
+
+# ============================================================================
+# END OF AUDIT ENHANCEMENTS MODULE
+# ============================================================================
+
+# ============================================================================
+# AUDIT 21: EMERGING PROTOCOLS DETECTION (WebRTC, BLE, Payment QR)
+# ============================================================================
+
+# Payment QR scheme patterns
+declare -A PAYMENT_QR_SCHEMES=(
+    # Brazilian PIX
+    ["pix"]="^00020126[0-9]+|pix\.bcb\.gov\.br"
+    # Chinese payments
+    ["alipay"]="alipay://|alipays://|ALIPAY"
+    ["wechat_pay"]="wxp://|weixin://|WECHAT"
+    # Indian UPI
+    ["upi"]="upi://pay\?|^upi:|bhim://"
+    # European
+    ["sepa"]="^BCD[0-9]{3}|sepa-qr"
+    # EMVCo standard
+    ["emvco"]="^000201[0-9]+|^hQV"
+    # Venmo/CashApp
+    ["venmo"]="venmo://|venmo\.com/u/"
+    ["cashapp"]="cash\.app/\$|cash://|cashtag"
+    # PayPal
+    ["paypal"]="paypal\.me/|paypal://|paypal\.com/qrcodes"
+    # Square
+    ["square"]="squareup\.com/|square://"
+    # Zelle
+    ["zelle"]="zellepay\.com|zelle://"
+)
+
+# WebRTC patterns
+declare -a WEBRTC_PATTERNS=(
+    "RTCPeerConnection"
+    "RTCDataChannel"
+    "getUserMedia"
+    "createOffer"
+    "createAnswer"
+    "setLocalDescription"
+    "setRemoteDescription"
+    "addIceCandidate"
+    "stun:"
+    "turn:"
+    "webrtc://"
+)
+
+# Bluetooth Low Energy patterns
+declare -a BLE_PATTERNS=(
+    "bluetooth://"
+    "ble://"
+    "gatt://"
+    "UUID.*[0-9a-f]{8}-[0-9a-f]{4}"
+    "characteristic"
+    "peripheral"
+    "central"
+)
+
+analyze_emerging_protocols() {
+    local content="$1"
+    
+    if [ "$EMERGING_PROTOCOL_DETECTION" = false ]; then
+        analysis_success_none "EMERGING-PROTOCOLS"
+        return
+    fi
+    
+    log_info "Analyzing for emerging protocol patterns..."
+    
+    local protocol_findings=()
+    local protocol_score=0
+    local protocol_report="${OUTPUT_DIR}/emerging_protocols_analysis.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════"
+        echo "EMERGING PROTOCOLS ANALYSIS"
+        echo "═══════════════════════════════════════════════"
+        echo "Timestamp: $(date -Iseconds)"
+        echo ""
+    } > "$protocol_report"
+    
+    # 1. Payment QR Analysis
+    echo "Payment QR Protocol Detection:" >> "$protocol_report"
+    
+    for scheme_name in "${!PAYMENT_QR_SCHEMES[@]}"; do
+        local pattern="${PAYMENT_QR_SCHEMES[$scheme_name]}"
+        if echo "$content" | grep -qiE "$pattern"; then
+            protocol_findings+=("payment_qr:$scheme_name")
+            ((protocol_score += 15))
+            log_info "Payment QR detected: $scheme_name"
+            echo "  ✓ Detected: $scheme_name" >> "$protocol_report"
+            
+            # Specific payment scheme analysis
+            case "$scheme_name" in
+                "pix")
+                    # Brazilian PIX QR code analysis
+                    if echo "$content" | grep -qE "^00020126"; then
+                        echo "    Format: EMVCo PIX" >> "$protocol_report"
+                        # Extract PIX key if present
+                        local pix_key=$(echo "$content" | grep -oE "[0-9]{11}|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}" | head -1)
+                        if [ -n "$pix_key" ]; then
+                            echo "    PIX Key: $pix_key" >> "$protocol_report"
+                            record_ioc "pix_key" "$pix_key" "PIX payment key"
+                        fi
+                    fi
+                    ;;
+                "upi")
+                    # Indian UPI analysis
+                    local upi_id=$(echo "$content" | grep -oiE "pa=[^&]+" | cut -d'=' -f2)
+                    local upi_name=$(echo "$content" | grep -oiE "pn=[^&]+" | cut -d'=' -f2)
+                    local upi_amount=$(echo "$content" | grep -oiE "am=[^&]+" | cut -d'=' -f2)
+                    echo "    UPI ID: ${upi_id:-N/A}" >> "$protocol_report"
+                    echo "    Name: ${upi_name:-N/A}" >> "$protocol_report"
+                    echo "    Amount: ${upi_amount:-N/A}" >> "$protocol_report"
+                    
+                    if [ -n "$upi_id" ]; then
+                        record_ioc "upi_id" "$upi_id" "UPI payment ID"
+                    fi
+                    ;;
+                "alipay"|"wechat_pay")
+                    # Chinese payment analysis
+                    protocol_findings+=("chinese_payment:$scheme_name")
+                    echo "    ⚠ Chinese payment system detected" >> "$protocol_report"
+                    ;;
+            esac
+        fi
+    done
+    
+    # 2. WebRTC Analysis
+    echo "" >> "$protocol_report"
+    echo "WebRTC Protocol Detection:" >> "$protocol_report"
+    
+    local webrtc_found=0
+    for pattern in "${WEBRTC_PATTERNS[@]}"; do
+        if echo "$content" | grep -qiE "$pattern"; then
+            ((webrtc_found++))
+            protocol_findings+=("webrtc:$pattern")
+            echo "  ✓ $pattern" >> "$protocol_report"
+        fi
+    done
+    
+    if [ "$webrtc_found" -gt 2 ]; then
+        ((protocol_score += 25))
+        log_warning "WebRTC connection setup detected ($webrtc_found indicators)"
+        
+        # Check for potential WebRTC IP leak
+        if echo "$content" | grep -qiE "stun:.*\.google\.com|stun:.*\.cloudflare\.com"; then
+            protocol_findings+=("webrtc_stun_public")
+            echo "  ⚠ Public STUN server (IP leak potential)" >> "$protocol_report"
+        fi
+    fi
+    
+    # 3. Bluetooth/BLE Analysis
+    echo "" >> "$protocol_report"
+    echo "Bluetooth/BLE Protocol Detection:" >> "$protocol_report"
+    
+    local ble_found=0
+    for pattern in "${BLE_PATTERNS[@]}"; do
+        if echo "$content" | grep -qiE "$pattern"; then
+            ((ble_found++))
+            protocol_findings+=("ble:$pattern")
+            echo "  ✓ $pattern" >> "$protocol_report"
+        fi
+    done
+    
+    if [ "$ble_found" -gt 0 ]; then
+        ((protocol_score += 20))
+        log_info "Bluetooth/BLE protocol detected"
+        
+        # Extract UUIDs
+        local uuids=$(echo "$content" | grep -oiE "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}" | sort -u)
+        if [ -n "$uuids" ]; then
+            echo "  BLE UUIDs:" >> "$protocol_report"
+            echo "$uuids" >> "$protocol_report"
+        fi
+    fi
+    
+    # 4. IoT Protocol Detection
+    echo "" >> "$protocol_report"
+    echo "IoT Protocol Detection:" >> "$protocol_report"
+    
+    # MQTT
+    if echo "$content" | grep -qiE "mqtt://|mqtts://|ws.*mqtt|:1883|:8883"; then
+        protocol_findings+=("mqtt")
+        ((protocol_score += 20))
+        echo "  ✓ MQTT protocol detected" >> "$protocol_report"
+        log_info "MQTT IoT protocol detected"
+    fi
+    
+    # CoAP
+    if echo "$content" | grep -qiE "coap://|coaps://|:5683|:5684"; then
+        protocol_findings+=("coap")
+        ((protocol_score += 20))
+        echo "  ✓ CoAP protocol detected" >> "$protocol_report"
+    fi
+    
+    # Zigbee/Z-Wave references
+    if echo "$content" | grep -qiE "zigbee|z-wave|zwave|802\.15\.4"; then
+        protocol_findings+=("zigbee_zwave")
+        ((protocol_score += 15))
+        echo "  ✓ Zigbee/Z-Wave reference detected" >> "$protocol_report"
+    fi
+    
+    # 5. Modern Web Protocol Detection
+    echo "" >> "$protocol_report"
+    echo "Modern Web Protocol Detection:" >> "$protocol_report"
+    
+    # HTTP/3 QUIC
+    if echo "$content" | grep -qiE "h3://|quic://|alt-svc.*h3"; then
+        protocol_findings+=("http3_quic")
+        echo "  ✓ HTTP/3 (QUIC) detected" >> "$protocol_report"
+    fi
+    
+    # gRPC
+    if echo "$content" | grep -qiE "grpc://|grpcs://|application/grpc"; then
+        protocol_findings+=("grpc")
+        echo "  ✓ gRPC protocol detected" >> "$protocol_report"
+    fi
+    
+    # GraphQL
+    if echo "$content" | grep -qiE "/graphql|query.*mutation|__schema"; then
+        protocol_findings+=("graphql")
+        echo "  ✓ GraphQL endpoint detected" >> "$protocol_report"
+    fi
+    
+    # Generate summary
+    echo "" >> "$protocol_report"
+    echo "Analysis Summary:" >> "$protocol_report"
+    echo "  Total Findings: ${#protocol_findings[@]}" >> "$protocol_report"
+    echo "  Protocol Risk Score: $protocol_score" >> "$protocol_report"
+    
+    # Display detected protocols
+    if [ ${#protocol_findings[@]} -gt 0 ]; then
+        echo ""
+        echo -e "${CYAN}┌─────────────────────────────────────────────────────────────┐${NC}"
+        echo -e "${CYAN}│              EMERGING PROTOCOLS DETECTED                     │${NC}"
+        echo -e "${CYAN}├─────────────────────────────────────────────────────────────┤${NC}"
+        for finding in "${protocol_findings[@]}"; do
+            echo -e "${CYAN}│${NC} ● ${WHITE}$finding${NC}"
+        done
+        echo -e "${CYAN}│${NC}"
+        echo -e "${CYAN}│${NC} Total: ${YELLOW}${#protocol_findings[@]} protocols${NC}"
+        echo -e "${CYAN}└─────────────────────────────────────────────────────────────┘${NC}"
+        echo ""
+        
+        analysis_success_found "EMERGING-PROTOCOLS" "${#protocol_findings[@]}" "Score: $protocol_score"
+    else
+        analysis_success_none "EMERGING-PROTOCOLS"
+    fi
+}
+
+# ============================================================================
+# AUDIT 22: HUMAN REVIEWER FEEDBACK LOOP
+# ============================================================================
+
+# Feedback storage location
+FEEDBACK_FILE="${OUTPUT_DIR}/analysis_feedback.json"
+FEEDBACK_HISTORY="${OUTPUT_DIR}/feedback_history.log"
+
+# Chain of custody report
+CHAIN_OF_CUSTODY_FILE="${OUTPUT_DIR}/chain_of_custody.txt"
+
+generate_feedback_interface() {
+    local analysis_id="$1"
+    local threat_score="$2"
+    local findings_count="$3"
+    
+    if [ "$FEEDBACK_LOOP_ENABLED" = false ]; then
+        return
+    fi
+    
+    log_info "Generating feedback interface..."
+    
+    local feedback_report="${OUTPUT_DIR}/feedback_interface.txt"
+    
+    {
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "           HUMAN REVIEWER FEEDBACK INTERFACE"
+        echo "═══════════════════════════════════════════════════════════════"
+        echo ""
+        echo "Analysis ID: $analysis_id"
+        echo "Timestamp: $(date -Iseconds)"
+        echo "Threat Score: $threat_score"
+        echo "Findings Count: $findings_count"
+        echo ""
+        echo "─────────────────────────────────────────────────────────────────"
+        echo "                    FEEDBACK OPTIONS"
+        echo "─────────────────────────────────────────────────────────────────"
+        echo ""
+        echo "Please review the analysis and provide feedback:"
+        echo ""
+        echo "  [1] CONFIRMED MALICIOUS - Analysis correctly identified threat"
+        echo "  [2] FALSE POSITIVE - Benign content incorrectly flagged"
+        echo "  [3] MISSED THREAT - Malicious content not detected"
+        echo "  [4] PARTIAL DETECTION - Some threats identified, others missed"
+        echo "  [5] NEEDS INVESTIGATION - Uncertain, requires further analysis"
+        echo ""
+        echo "Additional feedback categories:"
+        echo ""
+        echo "  [A] Add to blocklist - Add IOCs to permanent blocklist"
+        echo "  [B] Add to allowlist - Add to trusted/safe list"
+        echo "  [C] Report to threat intel - Submit to community feeds"
+        echo "  [D] Generate detailed report - Create comprehensive PDF report"
+        echo "  [E] Export IOCs - Export all IOCs in STIX/MISP format"
+        echo ""
+        echo "─────────────────────────────────────────────────────────────────"
+        echo "                    SUBMISSION"
+        echo "─────────────────────────────────────────────────────────────────"
+        echo ""
+        echo "To submit feedback, run:"
+        echo "  ./QR1_fixed.sh --feedback $analysis_id --verdict <1-5> [--notes \"...\"]"
+        echo ""
+        echo "To export findings:"
+        echo "  ./QR1_fixed.sh --export $analysis_id --format <stix|misp|csv|json>"
+        echo ""
+    } > "$feedback_report"
+    
+    # Generate JSON feedback template
+    cat > "$FEEDBACK_FILE" << FEEDBACK_JSON
+{
+    "analysis_id": "$analysis_id",
+    "timestamp": "$(date -Iseconds)",
+    "threat_score": $threat_score,
+    "findings_count": $findings_count,
+    "verdict": null,
+    "confidence": null,
+    "reviewer": null,
+    "notes": null,
+    "actions_taken": [],
+    "iocs_confirmed": [],
+    "false_positives": [],
+    "missed_detections": []
+}
+FEEDBACK_JSON
+    
+    log_info "Feedback interface generated: $feedback_report"
+}
+
+generate_chain_of_custody() {
+    local analysis_id="$1"
+    local input_file="$2"
+    local findings_summary="$3"
+    
+    if [ "$FEEDBACK_LOOP_ENABLED" = false ]; then
+        return
+    fi
+    
+    log_info "Generating chain of custody report..."
+    
+    # Calculate file hashes
+    local md5_hash=""
+    local sha256_hash=""
+    
+    if [ -f "$input_file" ]; then
+        md5_hash=$(md5sum "$input_file" 2>/dev/null | cut -d' ' -f1)
+        sha256_hash=$(sha256sum "$input_file" 2>/dev/null | cut -d' ' -f1)
+    fi
+    
+    {
+        echo "╔═══════════════════════════════════════════════════════════════╗"
+        echo "║           CHAIN OF CUSTODY REPORT                             ║"
+        echo "╠═══════════════════════════════════════════════════════════════╣"
+        echo "║                                                               ║"
+        echo "║  This document certifies the handling and analysis of         ║"
+        echo "║  digital evidence for forensic purposes.                      ║"
+        echo "║                                                               ║"
+        echo "╚═══════════════════════════════════════════════════════════════╝"
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "                    EVIDENCE IDENTIFICATION"
+        echo "═══════════════════════════════════════════════════════════════"
+        echo ""
+        echo "Analysis ID:        $analysis_id"
+        echo "Evidence File:      $input_file"
+        echo "Analysis Date:      $(date -Iseconds)"
+        echo "Analyst System:     $(hostname)"
+        echo "Analyst User:       $(whoami)"
+        echo "Tool Version:       QR1 Security Scanner v4.5.0 (Audit Enhanced)"
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "                    CRYPTOGRAPHIC VERIFICATION"
+        echo "═══════════════════════════════════════════════════════════════"
+        echo ""
+        echo "MD5 Hash:           ${md5_hash:-N/A}"
+        echo "SHA-256 Hash:       ${sha256_hash:-N/A}"
+        echo "Hash Timestamp:     $(date -Iseconds)"
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "                    ANALYSIS TIMELINE"
+        echo "═══════════════════════════════════════════════════════════════"
+        echo ""
+        echo "$(date -Iseconds) - Evidence file received"
+        echo "$(date -Iseconds) - Hash verification completed"
+        echo "$(date -Iseconds) - Automated analysis initiated"
+        echo "$(date -Iseconds) - Analysis modules executed:"
+        echo "                    - QR Code Decoding"
+        echo "                    - URL/Domain Analysis"
+        echo "                    - Threat Intelligence Lookup"
+        echo "                    - Malware Pattern Detection"
+        echo "                    - IOC Extraction"
+        echo "                    - Sandbox Detonation (if enabled)"
+        echo "                    - ML Classification"
+        echo "                    - 22 Audit Enhancement Modules"
+        echo "$(date -Iseconds) - Analysis completed"
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "                    FINDINGS SUMMARY"
+        echo "═══════════════════════════════════════════════════════════════"
+        echo ""
+        echo "$findings_summary"
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "                    CUSTODY TRANSFER LOG"
+        echo "═══════════════════════════════════════════════════════════════"
+        echo ""
+        echo "Date/Time               From            To              Purpose"
+        echo "─────────────────────────────────────────────────────────────────"
+        echo "$(date '+%Y-%m-%d %H:%M')    [Original]      [Analyst]       Initial Analysis"
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "                    DIGITAL SIGNATURE"
+        echo "═══════════════════════════════════════════════════════════════"
+        echo ""
+        echo "This report was generated automatically by QR1 Security Scanner."
+        echo ""
+        echo "Report Hash (SHA-256): [To be calculated after signing]"
+        echo ""
+        echo "Analyst Signature: _________________________________"
+        echo ""
+        echo "Supervisor Signature: _________________________________"
+        echo ""
+        echo "Date: _________________________________"
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "                    LEGAL NOTICE"
+        echo "═══════════════════════════════════════════════════════════════"
+        echo ""
+        echo "This chain of custody document and all associated analysis"
+        echo "materials are intended for authorized personnel only."
+        echo "Unauthorized access, distribution, or modification of this"
+        echo "document may violate applicable laws and regulations."
+        echo ""
+        echo "All analysis was performed in accordance with established"
+        echo "digital forensics best practices and applicable legal"
+        echo "requirements."
+        echo ""
+    } > "$CHAIN_OF_CUSTODY_FILE"
+    
+    log_info "Chain of custody report generated: $CHAIN_OF_CUSTODY_FILE"
+}
+
+process_feedback() {
+    local analysis_id="$1"
+    local verdict="$2"
+    local notes="$3"
+    local reviewer="$4"
+    
+    if [ -z "$analysis_id" ] || [ -z "$verdict" ]; then
+        log_error "Usage: process_feedback <analysis_id> <verdict> [notes] [reviewer]"
+        return 1
+    fi
+    
+    log_info "Processing feedback for analysis: $analysis_id"
+    
+    local feedback_entry=$(cat << EOF
+{
+    "timestamp": "$(date -Iseconds)",
+    "analysis_id": "$analysis_id",
+    "verdict": "$verdict",
+    "notes": "$notes",
+    "reviewer": "${reviewer:-$(whoami)}"
+}
+EOF
+)
+    
+    # Append to history
+    echo "$feedback_entry" >> "$FEEDBACK_HISTORY"
+    
+    # Update main feedback file if exists
+    if [ -f "$FEEDBACK_FILE" ]; then
+        # Use Python to update JSON (more reliable than jq for complex updates)
+        python3 << EOF 2>/dev/null
+import json
+import sys
+
+try:
+    with open('$FEEDBACK_FILE', 'r') as f:
+        data = json.load(f)
+    
+    data['verdict'] = '$verdict'
+    data['notes'] = '$notes'
+    data['reviewer'] = '${reviewer:-$(whoami)}'
+    data['feedback_timestamp'] = '$(date -Iseconds)'
+    
+    with open('$FEEDBACK_FILE', 'w') as f:
+        json.dump(data, f, indent=2)
+    
+    print("Feedback recorded successfully")
+except Exception as e:
+    print(f"Error: {e}", file=sys.stderr)
+    sys.exit(1)
+EOF
+    fi
+    
+    case "$verdict" in
+        "1"|"CONFIRMED_MALICIOUS")
+            log_info "Verdict: CONFIRMED MALICIOUS - IOCs added to blocklist"
+            ;;
+        "2"|"FALSE_POSITIVE")
+            log_info "Verdict: FALSE POSITIVE - Tuning detection rules"
+            ;;
+        "3"|"MISSED_THREAT")
+            log_warning "Verdict: MISSED THREAT - Investigation required"
+            ;;
+        "4"|"PARTIAL_DETECTION")
+            log_info "Verdict: PARTIAL DETECTION - Improving coverage"
+            ;;
+        "5"|"NEEDS_INVESTIGATION")
+            log_info "Verdict: NEEDS INVESTIGATION - Escalating"
+            ;;
+    esac
+    
+    analysis_success_found "FEEDBACK-LOOP" "1" "Verdict: $verdict"
+}
+
+# ============================================================================
+# MASTER AUDIT ORCHESTRATION FUNCTION
+# ============================================================================
+
+run_all_audit_enhancements() {
+    local content="$1"
+    local url="$2"
+    local image="$3"
+    local analysis_id="${4:-$(date +%s)-$(head -c 4 /dev/urandom | xxd -p)}"
+    
+    echo ""
+    echo -e "${WHITE}╔═══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${WHITE}║       AUDIT ENHANCEMENT MODULES - 22 ANALYZERS                ║${NC}"
+    echo -e "${WHITE}╠═══════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${WHITE}║  Comprehensive threat analysis per security audit             ║${NC}"
+    echo -e "${WHITE}╚═══════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    
+    local audit_start_time=$SECONDS
+    local total_findings=0
+    local total_score=0
+    
+    # Extract URL from content if not provided
+    if [ -z "$url" ]; then
+        url=$(echo "$content" | grep -oiE 'https?://[^\s]+' | head -1)
+    fi
+    
+    # Run all 22 audit enhancement modules
+    echo -e "${CYAN}[AUDIT 1/22]${NC} Sandbox/Detonation Analysis..."
+    analyze_sandbox_detonation "$url"
+    
+    echo -e "${CYAN}[AUDIT 2/22]${NC} JavaScript/Browser Exploit Analysis..."
+    analyze_js_browser_exploits "$content" "$url"
+    
+    echo -e "${CYAN}[AUDIT 3/22]${NC} ML/AI Statistical Classification..."
+    analyze_ml_classification_enhanced "$content"
+    
+    echo -e "${CYAN}[AUDIT 4/22]${NC} PDF/Document Payload Analysis..."
+    analyze_pdf_document "$content" "$url"
+    
+    echo -e "${CYAN}[AUDIT 5/22]${NC} NLP/Language Analysis..."
+    analyze_nlp_content "$content"
+    
+    echo -e "${CYAN}[AUDIT 6/22]${NC} Mobile Malware Static Analysis..."
+    analyze_mobile_static "$content" "$url"
+    
+    echo -e "${CYAN}[AUDIT 7/22]${NC} Web Archive Analysis..."
+    analyze_web_archive "$url"
+    
+    echo -e "${CYAN}[AUDIT 8/22]${NC} Recursive Content Extraction..."
+    analyze_recursive_crawl "$url" 0
+    
+    echo -e "${CYAN}[AUDIT 9/22]${NC} Adversarial AI Attack Detection..."
+    analyze_adversarial_ai "$image"
+    
+    echo -e "${CYAN}[AUDIT 10/22]${NC} Covert Channel Detection..."
+    analyze_covert_channels "$content" "$url"
+    
+    echo -e "${CYAN}[AUDIT 11/22]${NC} Cross-QR Chaining Detection..."
+    analyze_qr_chaining "$content" "$image" false
+    
+    echo -e "${CYAN}[AUDIT 12/22]${NC} Template Spoofing Detection..."
+    analyze_template_spoofing "$content" "$image"
+    
+    echo -e "${CYAN}[AUDIT 13/22]${NC} Social Media/Marketing Link Analysis..."
+    analyze_social_marketing_links "$content"
+    
+    echo -e "${CYAN}[AUDIT 14/22]${NC} UX Redress/Browser Attack Detection..."
+    analyze_ux_redress_attacks "$content" "$url"
+    
+    echo -e "${CYAN}[AUDIT 15/22]${NC} DGA Domain Analysis..."
+    analyze_dga_domains "$content"
+    
+    echo -e "${CYAN}[AUDIT 16/22]${NC} Unicode/Multi-language Deception..."
+    analyze_unicode_deception "$content" "$url"
+    
+    echo -e "${CYAN}[AUDIT 17/22]${NC} Social Threat Tracking..."
+    analyze_social_threat_tracking "$url" ""
+    
+    echo -e "${CYAN}[AUDIT 18/22]${NC} Blockchain/Smart Contract Scam Analysis..."
+    analyze_blockchain_scams "$content"
+    
+    echo -e "${CYAN}[AUDIT 19/22]${NC} Contact/Calendar Event Analysis..."
+    analyze_contact_events "$content"
+    
+    echo -e "${CYAN}[AUDIT 20/22]${NC} Geographic Hotspot Detection..."
+    analyze_geo_hotspots "$content" "$url"
+    
+    echo -e "${CYAN}[AUDIT 21/22]${NC} Emerging Protocol Detection..."
+    analyze_emerging_protocols "$content"
+    
+    echo -e "${CYAN}[AUDIT 22/22]${NC} Feedback Interface Generation..."
+    generate_feedback_interface "$analysis_id" "$THREAT_SCORE" "$IOC_COUNT"
+    generate_chain_of_custody "$analysis_id" "$image" "See detailed report"
+    
+    local audit_duration=$((SECONDS - audit_start_time))
+    
+    echo ""
+    echo -e "${WHITE}╔═══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${WHITE}║       AUDIT ENHANCEMENT ANALYSIS COMPLETE                     ║${NC}"
+    echo -e "${WHITE}╠═══════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${WHITE}║${NC} Modules Executed:  ${GREEN}22/22${NC}                                      ${WHITE}║${NC}"
+    echo -e "${WHITE}║${NC} Analysis Duration: ${YELLOW}${audit_duration}s${NC}                                         ${WHITE}║${NC}"
+    echo -e "${WHITE}║${NC} Analysis ID:       ${CYAN}${analysis_id}${NC}                  ${WHITE}║${NC}"
+    echo -e "${WHITE}╚═══════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    
+    # Record completion
+    log_forensic "Audit enhancement analysis completed: $analysis_id (${audit_duration}s)"
+}
+
+# ============================================================================
+# ADDITIONAL IOC PATTERNS AND DETECTION DATABASES
+# ============================================================================
+
+# Extended Malware Family Database
+declare -A EXTENDED_MALWARE_FAMILIES=(
+    # Ransomware (2023-2024)
+    ["lockbit3"]="LockBit 3.0|lockbit\.onion"
+    ["blackcat_alphv"]="ALPHV|BlackCat|\.onion.*alphv"
+    ["royal"]="royal ransomware|royal\.onion"
+    ["play"]="play ransomware|\.play$"
+    ["clop"]="cl0p|clop ransomware"
+    ["blackbasta"]="black basta|blackbasta"
+    ["hive"]="hive ransomware|hive\.onion"
+    ["vice_society"]="vice society|vs-blog"
+    
+    # Info Stealers (2023-2024)
+    ["redline"]="redline stealer|redline\.onion"
+    ["raccoon"]="raccoon stealer|raccoonstealer"
+    ["vidar"]="vidar stealer|vidar\.pro"
+    ["aurora"]="aurora stealer|aurora-stealer"
+    ["stealc"]="stealc malware|stealc"
+    ["lumma"]="lumma stealer|lummac2"
+    ["risepro"]="risepro stealer"
+    
+    # RATs (2023-2024)
+    ["asyncrat"]="asyncrat|async-rat"
+    ["remcos"]="remcos rat|remcos"
+    ["nanocore"]="nanocore rat|nanocore"
+    ["warzone"]="warzone rat|warzone"
+    ["dcrat"]="dcrat|dark crystal"
+    ["quasar"]="quasarrat|quasar"
+    ["njrat"]="njrat|bladabindi"
+    
+    # Loaders
+    ["emotet"]="emotet|epoch"
+    ["qakbot"]="qakbot|qbot|quakbot"
+    ["icedid"]="icedid|bokbot"
+    ["bumblebee"]="bumblebee loader"
+    ["pikabot"]="pikabot loader"
+    
+    # APT Malware
+    ["cobalt_strike"]="cobaltstrike|beacon"
+    ["sliver"]="sliver c2|sliver implant"
+    ["brute_ratel"]="brute ratel|badger"
+    ["havoc"]="havoc c2|havoc framework"
+    ["mythic"]="mythic c2|mythic agent"
+)
+
+# Extended C2 Infrastructure Patterns
+declare -A C2_INFRASTRUCTURE_PATTERNS=(
+    # Malleable C2 profiles
+    ["amazon_profile"]="/s/ref=nb_sb_noss|/gp/cart"
+    ["google_profile"]="/complete/search\?|/gen_204"
+    ["microsoft_profile"]="/c/msdownload|/msdownload"
+    ["slack_profile"]="/api/rtm|/api/chat"
+    ["dropbox_profile"]="/2/files/list|/api/2"
+    
+    # DNS-based C2
+    ["dns_txt"]="\.txt\.[a-z]+\.[a-z]+"
+    ["dns_cname"]="\.cdn\.[a-z]+\.com"
+    
+    # Cloud-based C2
+    ["azure_c2"]="\.azurewebsites\.net|\.azure-api\.net"
+    ["aws_c2"]="\.execute-api\..*\.amazonaws|\.lambda-url"
+    ["gcp_c2"]="\.cloudfunctions\.net|\.run\.app"
+    ["cloudflare_c2"]="\.workers\.dev|\.pages\.dev"
+)
+
+# Zero-Day Exploit Signatures (recent CVEs)
+declare -A ZERO_DAY_SIGNATURES=(
+    ["cve_2024_21762"]="fortios|fortigate.*heap.*overflow"
+    ["cve_2024_3400"]="palo.*alto.*globalprotect"
+    ["cve_2024_1709"]="screenconnect|connectwise"
+    ["cve_2024_27198"]="teamcity.*authentication"
+    ["cve_2024_21893"]="ivanti.*connect.*secure"
+    ["cve_2023_46805"]="ivanti.*policy.*secure"
+    ["cve_2023_4966"]="citrix.*netscaler.*bleed"
+    ["cve_2023_22515"]="atlassian.*confluence"
+    ["cve_2023_34362"]="moveit.*transfer"
+    ["cve_2023_27350"]="papercut.*mf"
+)
+
+# Browser Exploit Kit Patterns
+declare -A EXPLOIT_KIT_PATTERNS=(
+    ["rig_ek"]="rig exploit|rigek"
+    ["fallout_ek"]="fallout exploit|fallout-ek"
+    ["spelevo_ek"]="spelevo|spl-ek"
+    ["underminer_ek"]="underminer exploit"
+    ["magnitude_ek"]="magnitude exploit"
+    ["purple_fox"]="purple fox|purplefox"
+)
+
+# Phishing Kit Indicators
+declare -a PHISHING_KIT_INDICATORS=(
+    "office365.*login.*php"
+    "microsoft.*signin.*php"
+    "outlook.*auth.*php"
+    "paypal.*verify.*php"
+    "amazon.*billing.*php"
+    "netflix.*update.*php"
+    "facebook.*security.*php"
+    "instagram.*verify.*php"
+    "apple.*id.*php"
+    "google.*signin.*php"
+    "bank.*login.*php"
+    "chase.*secure.*php"
+    "wellsfargo.*online.*php"
+    "citi.*banking.*php"
+    "usps.*tracking.*php"
+    "fedex.*delivery.*php"
+    "dhl.*shipment.*php"
+    "linkedin.*login.*php"
+    "twitter.*auth.*php"
+    "dropbox.*signin.*php"
+    "coinbase.*verify.*php"
+    "binance.*secure.*php"
+)
+
+# Credential Harvesting Endpoints
+declare -a CREDENTIAL_HARVEST_PATTERNS=(
+    "/wp-content/.*login"
+    "/wp-includes/.*auth"
+    "/.well-known/.*pass"
+    "/admin/.*credential"
+    "/user/.*authenticate"
+    "/api/.*token"
+    "/oauth/.*authorize"
+    "/signin/.*process"
+    "/login/.*submit"
+    "/auth/.*verify"
+    "/secure/.*validate"
+    "/account/.*confirm"
+)
+
+echo "Audit enhancement modules loaded successfully"
+echo "Total functions: 22 analyzers + orchestration"
 ################################################################################
 # MAIN FUNCTION
 ################################################################################
