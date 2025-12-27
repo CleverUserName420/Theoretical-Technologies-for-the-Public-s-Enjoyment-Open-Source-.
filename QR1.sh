@@ -2,7 +2,18 @@
 
 ################################################################################
 # QR CODE MALWARE SCANNER - ULTIMATE FORENSIC EDITION
-# Version: 4.1.0-ENHANCED
+# Version: 4.1.1-GRANULAR-RESTORED
+#
+# CHANGELOG v4.1.1:
+#   - Restored granular threat outputs for forensic/blue-team visibility
+#   - [THREAT +40] Homograph character detected: <char> per character
+#   - [THREAT +100] URL found in OpenPhish feed!
+#   - [THREAT +100] URL found in URLhaus feed!
+#   - [CRITICAL] ⚠️  CRITICAL THREAT LEVEL - Immediate action required!
+#   - [WARNING] Domain registered with high-abuse registrar: <registrar>
+#   - [THREAT +N] Suspicious network infrastructure detected
+#   - All error messages preserved, no suppression
+#   - Classic Paste A format coexists with enhanced audit modules
 #
 # Automatically uses Homebrew bash on macOS if available
 ################################################################################
@@ -46,7 +57,7 @@ fi
 # GLOBAL CONFIGURATION
 ################################################################################
 
-VERSION="4.1.0-ENHANCED"
+VERSION="4.1.1-GRANULAR-RESTORED"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 OUTPUT_DIR="${SCRIPT_DIR}/qr_analysis_${TIMESTAMP}"
@@ -5360,12 +5371,18 @@ check_homograph_attack() {
     fi
     
     # Check for lookalike characters (non-ASCII only)
+    # GRANULAR OUTPUT RESTORED: Output per-character threat as required for forensic visibility
     local homograph_found=false
+    local homograph_count=0
     for char in "${HOMOGRAPH_CHARS[@]}"; do
         [ -z "$char" ] && continue
         if echo "$domain" | grep -qF "$char"; then
+            # GRANULAR: Output individual threat per homograph character (Paste A format)
+            log_threat 40 "Homograph character detected: $char"
+            ((homograph_count++))
+            
             if [ "$homograph_found" = false ]; then
-                log_threat 50 "⚠️  HOMOGRAPH ATTACK DETECTED in domain!"
+                log_warning "⚠️  HOMOGRAPH ATTACK DETECTED in domain!"
                 log_warning "    ├─ Domain: $domain"
                 homograph_found=true
             fi
@@ -5376,6 +5393,7 @@ check_homograph_attack() {
     done
     if [ "$homograph_found" = true ]; then
         log_warning "    └─ Recommendation: Verify domain authenticity - may be spoofing a legitimate site"
+        log_warning "    └─ Total homograph characters found: $homograph_count"
     fi
     
     # Punycode detection
@@ -5761,7 +5779,9 @@ check_against_threat_intel() {
             # OpenPhish
             if [ -f "${TEMP_DIR}/threat_intel/openphish.txt" ]; then
                 if grep -qF "$ioc" "${TEMP_DIR}/threat_intel/openphish.txt" 2>/dev/null; then
-                    log_threat 100 "⚠️  PHISHING URL DETECTED!"
+                    # GRANULAR OUTPUT RESTORED: Classic Paste A format threat feed match
+                    log_threat 100 "URL found in OpenPhish feed!"
+                    log_threat 0 "⚠️  PHISHING URL DETECTED!"
                     log_error "    ├─ Source: OpenPhish Feed"
                     log_error "    ├─ URL: $ioc"
                     log_error "    └─ Recommendation: DO NOT VISIT - Known phishing site"
@@ -5773,7 +5793,9 @@ check_against_threat_intel() {
             # URLhaus
             if [ -f "${TEMP_DIR}/threat_intel/urlhaus.txt" ]; then
                 if grep -qF "$ioc" "${TEMP_DIR}/threat_intel/urlhaus.txt" 2>/dev/null; then
-                    log_threat 100 "⚠️  MALWARE URL DETECTED!"
+                    # GRANULAR OUTPUT RESTORED: Classic Paste A format threat feed match
+                    log_threat 100 "URL found in URLhaus feed!"
+                    log_threat 0 "⚠️  MALWARE URL DETECTED!"
                     log_error "    ├─ Source: URLhaus (Abuse.ch)"
                     log_error "    ├─ URL: $ioc"
                     log_error "    └─ Recommendation: DO NOT VISIT - Known malware distribution"
@@ -9267,7 +9289,22 @@ analyze_asn_infrastructure() {
         } >> "$ASN_REPORT"
         
         if [ $asn_score -ge 30 ]; then
+            # GRANULAR OUTPUT RESTORED: Classic Paste A format for suspicious network infrastructure
             log_threat $((asn_score / 2)) "Suspicious network infrastructure detected"
+            # Additional granular output per finding type for forensic visibility
+            for finding in "${asn_findings[@]}"; do
+                case "$finding" in
+                    bulletproof_asn:*)
+                        log_warning "    └─ Bulletproof/high-abuse ASN: ${finding#bulletproof_asn:}"
+                        ;;
+                    high_risk_country:*)
+                        log_warning "    └─ High-risk country infrastructure: ${finding#high_risk_country:}"
+                        ;;
+                    suspicious_registrar:*)
+                        log_warning "    └─ Suspicious registrar: ${finding#suspicious_registrar:}"
+                        ;;
+                esac
+            done
         fi
         
         analysis_success_found "ASN-ANALYSIS" "${#asn_findings[@]}" "Score: $asn_score"
@@ -14234,7 +14271,9 @@ analyze_social_threat_tracking() {
         if echo "$urlhaus_result" | grep -q '"query_status":"ok"'; then
             social_findings+=("urlhaus:found")
             ((social_score += 70))
-            log_threat 75 "URL found in URLhaus malware database"
+            # GRANULAR OUTPUT RESTORED: Classic Paste A format for threat feed match
+            log_threat 100 "URL found in URLhaus feed!"
+            log_threat 0 "URL found in URLhaus malware database"
             echo "  ⚠ FOUND IN URLHAUS DATABASE" >> "$social_report"
             
             # Extract details
@@ -16616,6 +16655,8 @@ main() {
     # Threat Level Indicator
     echo -e "${WHITE}THREAT ASSESSMENT:${NC}"
     if [ $THREAT_SCORE -ge $CRITICAL_THRESHOLD ]; then
+        # GRANULAR OUTPUT RESTORED: Classic Paste A critical threat format
+        log_critical "⚠️  CRITICAL THREAT LEVEL - Immediate action required!"
         echo -e "${RED}╔═════════════════════════════════════════════════════════════╗${NC}"
         echo -e "${RED}║  ████  CRITICAL THREAT LEVEL  ████                          ║${NC}"
         echo -e "${RED}║  Score: $THREAT_SCORE - IMMEDIATE ACTION REQUIRED             ${NC}"
@@ -16628,6 +16669,8 @@ main() {
         echo "  4. Check IOC report for indicators to block"
         echo "  5. Consider forensic investigation of the QR source"
     elif [ $THREAT_SCORE -ge $HIGH_THRESHOLD ]; then
+        # GRANULAR OUTPUT RESTORED: Classic Paste A format for high threat level
+        log_warning "▲▲▲  HIGH THREAT LEVEL - Exercise extreme caution!"
         echo -e "${RED}╔═════════════════════════════════════════════════════════════╗${NC}"
         echo -e "${RED}║  ▲▲▲  HIGH THREAT LEVEL  ▲▲▲                                ║${NC}"
         echo -e "${RED}║  Score: $THREAT_SCORE - EXERCISE EXTREME CAUTION               ${NC}"
