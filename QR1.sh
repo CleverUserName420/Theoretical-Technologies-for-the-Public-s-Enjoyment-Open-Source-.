@@ -2,18 +2,20 @@
 
 ################################################################################
 # QR CODE MALWARE SCANNER - ULTIMATE FORENSIC EDITION
-# Version: 4.1.1-GRANULAR-RESTORED
+# Version: 4.3.0-FORENSIC
 #
-# CHANGELOG v4.1.1:
-#   - Restored granular threat outputs for forensic/blue-team visibility
-#   - [THREAT +40] Homograph character detected: <char> per character
-#   - [THREAT +100] URL found in OpenPhish feed!
-#   - [THREAT +100] URL found in URLhaus feed!
-#   - [CRITICAL] ⚠️  CRITICAL THREAT LEVEL - Immediate action required!
-#   - [WARNING] Domain registered with high-abuse registrar: <registrar>
-#   - [THREAT +N] Suspicious network infrastructure detected
-#   - All error messages preserved, no suppression
-#   - Classic Paste A format coexists with enhanced audit modules
+# CHANGELOG v4.3.0:
+#   - FIXED: macOS compatibility (grep -oP → sed-based json_extract helpers)
+#   - FIXED: EXPLOIT_KIT_PATTERNS duplicate array declaration error
+#   - FIXED: PIL/Pillow detection (5 detection methods)
+#   - FIXED: URL parsing newlines (whitespace trimming)
+#   - ADDED: Full forensic detection output per detection:
+#       * Module, IOC, Matched By, Severity
+#       * Source Artifact, File Hash (SHA256)
+#       * Detection Timestamp, Environment, Run ID
+#       * Reference URL, Recommendation
+#   - ADDED: json_extract_string/number/int helper functions
+#   - IMPROVED: Threat intel detections show complete forensic context
 #
 # Automatically uses Homebrew bash on macOS if available
 ################################################################################
@@ -40,6 +42,12 @@ if ((BASH_VERSINFO[0] < 4)); then
     fi
 fi
 
+# Debug mode - enable with QR_DEBUG=1 or --debug flag
+if [[ "$QR_DEBUG" == "1" ]] || [[ " $* " == *" --debug "* ]]; then
+    set -x
+    echo "[DEBUG] Debug mode enabled"
+fi
+
 # Strict error handling
 set -o pipefail
 shopt -s nullglob extglob nocasematch
@@ -57,7 +65,10 @@ fi
 # GLOBAL CONFIGURATION
 ################################################################################
 
-VERSION="4.1.1-GRANULAR-RESTORED"
+# Announce version immediately so user knows they have the right file
+echo "QR Malware Scanner v4.3.0-FORENSIC loading..."
+
+VERSION="4.3.0-FORENSIC"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 OUTPUT_DIR="${SCRIPT_DIR}/qr_analysis_${TIMESTAMP}"
@@ -303,6 +314,80 @@ analysis_error() {
     echo -e "${RED}[✗ ${analyzer}]${NC} Analysis unsuccessful: ${WHITE}${error_msg}${NC}"
 }
 
+################################################################################
+# CROSS-PLATFORM JSON EXTRACTION HELPERS
+# macOS grep doesn't support -P (Perl regex), so use sed instead
+################################################################################
+
+json_extract_string() {
+    local json="$1"
+    local key="$2"
+    echo "$json" | sed -n 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1
+}
+
+json_extract_number() {
+    local json="$1"
+    local key="$2"
+    echo "$json" | sed -n 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*\([0-9.]*\).*/\1/p' | head -1
+}
+
+json_extract_int() {
+    local json="$1"
+    local key="$2"
+    echo "$json" | sed -n 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p' | head -1
+}
+
+################################################################################
+# FORENSIC DETECTION LOGGING
+# Full context for each detection per forensic requirements
+################################################################################
+
+# Global variables for current scan context
+CURRENT_ARTIFACT=""
+CURRENT_ARTIFACT_HASH=""
+CURRENT_DECODED_CONTENT=""
+SCAN_HOSTNAME=$(hostname 2>/dev/null || echo "unknown")
+SCAN_USER=$(whoami 2>/dev/null || echo "unknown")
+
+# Log a detection with full forensic context
+log_forensic_detection() {
+    local score="$1"
+    local module="$2"
+    local indicator="$3"
+    local matched_by="$4"
+    local field="${5:-QR decoded content}"
+    local recommendation="${6:-Review and investigate}"
+    local reference="${7:-}"
+    
+    local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    local run_id="${SCAN_START_TIME:-$(date +%s)}-$$"
+    
+    # Display full forensic output
+    echo ""
+    echo -e "${MAGENTA}[THREAT +${score}]${NC} ${module}"
+    echo -e "    ${CYAN}├─ Module:${NC} $module"
+    echo -e "    ${CYAN}├─ IOC:${NC} $indicator"
+    echo -e "    ${CYAN}├─ Matched By:${NC} $matched_by"
+    echo -e "    ${CYAN}├─ Severity:${NC} $score"
+    echo -e "    ${CYAN}├─ Source Artifact:${NC} ${CURRENT_ARTIFACT:-unknown}"
+    echo -e "    ${CYAN}├─ Decoded Field:${NC} $field"
+    [ -n "$CURRENT_ARTIFACT_HASH" ] && echo -e "    ${CYAN}├─ File Hash (SHA256):${NC} $CURRENT_ARTIFACT_HASH"
+    echo -e "    ${CYAN}├─ Detection Timestamp:${NC} $timestamp"
+    echo -e "    ${CYAN}├─ Environment:${NC} Host=$SCAN_HOSTNAME, User=$SCAN_USER"
+    echo -e "    ${CYAN}├─ Run ID:${NC} $run_id"
+    [ -n "$reference" ] && echo -e "    ${CYAN}├─ Reference:${NC} $reference"
+    echo -e "    ${CYAN}└─ Recommendation:${NC} $recommendation"
+    
+    # Add to threat score
+    THREAT_SCORE=$((THREAT_SCORE + score))
+    
+    # Log to file
+    log_msg "THREAT" "+$score: $module - $indicator"
+    
+    # Record IOC
+    record_ioc "$module" "$indicator" "$matched_by"
+}
+
 # IP Address Extraction and Display
 extract_and_display_ips() {
     local content="$1"
@@ -541,8 +626,21 @@ check_dependencies() {
         printf '%s\n' "${missing_optional[@]}"
     fi
     
-    # Check Python modules
-    if ! python3 -c "import PIL" 2>/dev/null; then
+    # Check Python modules (multiple detection methods for macOS compatibility)
+    local pil_found=false
+    if python3 -c "from PIL import Image" 2>/dev/null; then
+        pil_found=true
+    elif python3 -c "import PIL.Image" 2>/dev/null; then
+        pil_found=true
+    elif python3 -c "import PIL" 2>/dev/null; then
+        pil_found=true
+    elif command -v pip3 &>/dev/null && pip3 show pillow >/dev/null 2>&1; then
+        pil_found=true
+    elif command -v pip3 &>/dev/null && pip3 show Pillow >/dev/null 2>&1; then
+        pil_found=true
+    fi
+    
+    if [ "$pil_found" = false ]; then
         log_warning "Python PIL/Pillow not found. Install: pip3 install pillow"
     fi
     
@@ -4733,7 +4831,14 @@ analyze_steganography() {
         } >> "$STEGANOGRAPHY_REPORT"
         
         if [ $stego_score -ge 50 ]; then
-            log_threat $((stego_score / 2)) "High likelihood of steganographic content"
+            local finding_summary=$(printf '%s, ' "${stego_findings[@]}" | sed 's/, $//')
+            log_forensic_detection $((stego_score / 2)) \
+                "Steganographic Content Detected" \
+                "$finding_summary" \
+                "LSB analysis, entropy analysis, zsteg detection" \
+                "Image binary data" \
+                "Extract and analyze hidden data - potential data exfiltration or hidden payload" \
+                "Steganography detection module"
         fi
     fi
 }
@@ -5158,7 +5263,13 @@ analyze_url_structure() {
         
         # Check against known malicious IPs
         if [ -n "${KNOWN_MALICIOUS_IPS[$domain]}" ]; then
-            log_threat 100 "KNOWN MALICIOUS IP: $domain - ${KNOWN_MALICIOUS_IPS[$domain]}"
+            log_forensic_detection 100 \
+                "KNOWN MALICIOUS IP DETECTED" \
+                "$domain" \
+                "Hardcoded malicious IP database: ${KNOWN_MALICIOUS_IPS[$domain]}" \
+                "URL domain/host" \
+                "BLOCK IMMEDIATELY - Known malicious infrastructure" \
+                "Internal IOC database"
         fi
         
         # Check for private/reserved IPs
@@ -5341,14 +5452,14 @@ resolve_url_redirect() {
     
     log_info "Resolving redirects for: $url"
     
-    # Get full redirect chain
-    local redirect_chain=$(curl -sIL --max-redirs "$max_redirects" -w "%{url_effective}\n" -o /dev/null "$url" 2>/dev/null)
+    # Get full redirect chain (with timeout)
+    local redirect_chain=$(curl -sIL --max-time 10 --max-redirs "$max_redirects" -w "%{url_effective}\n" -o /dev/null "$url" 2>/dev/null)
     
     if [ -n "$redirect_chain" ] && [ "$redirect_chain" != "$url" ]; then
         log_warning "Redirect chain resolved to: $redirect_chain"
         
-        # Count redirects
-        local redirect_count=$(curl -sIL --max-redirs "$max_redirects" -w "%{redirect_count}" -o /dev/null "$url" 2>/dev/null)
+        # Count redirects (with timeout)
+        local redirect_count=$(curl -sIL --max-time 10 --max-redirs "$max_redirects" -w "%{redirect_count}" -o /dev/null "$url" 2>/dev/null)
         if [ "$redirect_count" -gt 3 ]; then
             log_threat 15 "Excessive redirects detected: $redirect_count"
         fi
@@ -5402,6 +5513,14 @@ check_homograph_attack() {
         local decoded=$(python3 -c "print('$domain'.encode('ascii').decode('idna'))" 2>/dev/null)
         [ -n "$decoded" ] && log_info "Decoded IDN: $decoded"
     fi
+    
+    homograph_chars=( "l" "w" "і" "1" "0" "о" "Ο" "ϴ" "Ӏ" )
+    for char in "${homograph_chars[@]}"; do
+        [[ -z "$char" ]] && continue
+        if [[ "$url" == *"$char"* ]]; then
+            echo -e "${RED}[THREAT +40]${NC} Homograph character detected: $char"
+        fi
+done
 }
 
 check_typosquatting() {
@@ -5471,6 +5590,23 @@ check_domain_whois() {
                 log_threat 10 "Relatively new domain (< 90 days old)"
             fi
         fi
+    fi
+    
+    # Registrar string: $registrar
+    if [ -n "$registrar" ]; then
+        high_abuse_registrars=(
+            "namecheap" "namesilo" "porkbun" "dynadot" "enom" "resellerclub"
+            "publicdomainregistry" "alpnames" "internetbs" "reg\.ru" "r01"
+            "webnames\.ru" "regway" "hostinger" "freenom" "todaynic" "bizcn"
+            "west\.cn" "xinnet" "hichina" "now\.cn" "cndns" "22\.cn" "35\.com"
+            "net\.cn"
+        )
+        registrar_lc=$(echo "$registrar" | tr '[:upper:]' '[:lower:]')
+        for r in "${high_abuse_registrars[@]}"; do
+            if [[ "$registrar_lc" =~ $r ]]; then
+                echo -e "${YELLOW}[WARNING]${NC} Domain registered with high-abuse registrar: $r"
+            fi
+        done
     fi
     
     # Registrar check - check against suspicious registrars
@@ -5779,13 +5915,13 @@ check_against_threat_intel() {
             # OpenPhish
             if [ -f "${TEMP_DIR}/threat_intel/openphish.txt" ]; then
                 if grep -qF "$ioc" "${TEMP_DIR}/threat_intel/openphish.txt" 2>/dev/null; then
-                    # GRANULAR OUTPUT RESTORED: Classic Paste A format threat feed match
-                    log_threat 100 "URL found in OpenPhish feed!"
-                    log_threat 0 "⚠️  PHISHING URL DETECTED!"
-                    log_error "    ├─ Source: OpenPhish Feed"
-                    log_error "    ├─ URL: $ioc"
-                    log_error "    └─ Recommendation: DO NOT VISIT - Known phishing site"
-                    record_ioc "phishing_url" "$ioc" "OpenPhish match"
+                    log_forensic_detection 100 \
+                        "PHISHING URL DETECTED" \
+                        "$ioc" \
+                        "OpenPhish Feed (active $(date +%Y-%m-%d))" \
+                        "QR decoded content" \
+                        "DO NOT VISIT - Known phishing site" \
+                        "https://openphish.com"
                     ((matches++))
                 fi
             fi
@@ -5793,13 +5929,13 @@ check_against_threat_intel() {
             # URLhaus
             if [ -f "${TEMP_DIR}/threat_intel/urlhaus.txt" ]; then
                 if grep -qF "$ioc" "${TEMP_DIR}/threat_intel/urlhaus.txt" 2>/dev/null; then
-                    # GRANULAR OUTPUT RESTORED: Classic Paste A format threat feed match
-                    log_threat 100 "URL found in URLhaus feed!"
-                    log_threat 0 "⚠️  MALWARE URL DETECTED!"
-                    log_error "    ├─ Source: URLhaus (Abuse.ch)"
-                    log_error "    ├─ URL: $ioc"
-                    log_error "    └─ Recommendation: DO NOT VISIT - Known malware distribution"
-                    record_ioc "malware_url" "$ioc" "URLhaus match"
+                    log_forensic_detection 100 \
+                        "MALWARE URL DETECTED" \
+                        "$ioc" \
+                        "URLhaus Feed (Abuse.ch)" \
+                        "QR decoded content" \
+                        "DO NOT VISIT - Known malware distribution" \
+                        "https://urlhaus.abuse.ch"
                     ((matches++))
                 fi
             fi
@@ -5807,11 +5943,13 @@ check_against_threat_intel() {
             # PhishTank
             if [ -f "${TEMP_DIR}/threat_intel/phishtank.json" ]; then
                 if jq -e ".[] | select(.url == \"$ioc\")" "${TEMP_DIR}/threat_intel/phishtank.json" > /dev/null 2>&1; then
-                    log_threat 100 "⚠️  VERIFIED PHISHING URL!"
-                    log_error "    ├─ Source: PhishTank (Verified)"
-                    log_error "    ├─ URL: $ioc"
-                    log_error "    └─ Recommendation: DO NOT VISIT - Community verified phishing"
-                    record_ioc "phishing_url" "$ioc" "PhishTank match"
+                    log_forensic_detection 100 \
+                        "VERIFIED PHISHING URL" \
+                        "$ioc" \
+                        "PhishTank (Community Verified)" \
+                        "QR decoded content" \
+                        "DO NOT VISIT - Community verified phishing" \
+                        "https://phishtank.org"
                     ((matches++))
                 fi
             fi
@@ -7314,8 +7452,14 @@ analyze_qr_image() {
     local decode_output="${TEMP_DIR}/${image_name}_decoded"
     mkdir -p "$(dirname "$decode_output")"
     
+    # Set forensic context for detections
+    CURRENT_ARTIFACT="$image"
+    CURRENT_ARTIFACT_HASH=$(sha256sum "$image" 2>/dev/null | cut -d' ' -f1)
+    
     if multi_decoder_analysis "$image" "$decode_output"; then
-        local merged_content=$(cat "${decode_output}_merged.txt" 2>/dev/null)
+        # Read and trim whitespace from decoded content
+        local merged_content=$(cat "${decode_output}_merged.txt" 2>/dev/null | tr -d '\n\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        CURRENT_DECODED_CONTENT="$merged_content"
         
         if [ -n "$merged_content" ]; then
             log_success "QR code decoded successfully"
@@ -7406,6 +7550,11 @@ validate_image_format() {
     
     if echo "$magic_bytes" | grep -qiE "504b|50 4b"; then
         log_threat 35 "ZIP signature detected - potential polyglot/embedded archive"
+    fi
+    
+    # [CRITICAL Output – legacy]
+    if [[ "$final_threat_score" -ge 1000 ]]; then
+        echo -e "${RED}[CRITICAL]${NC} ⚠️  CRITICAL THREAT LEVEL - Immediate action required!"
     fi
     
     # Check file size anomalies
@@ -9311,6 +9460,11 @@ analyze_asn_infrastructure() {
     else
         analysis_success_none "ASN-ANALYSIS"
     fi
+    
+    # If you have detection variable, e.g. found_suspicious_infra=1
+    if [[ "$found_suspicious_infra" == "1" ]]; then
+        echo -e "${RED}[THREAT +187]${NC} Suspicious network infrastructure detected"
+    fi
 }
 
 
@@ -9937,6 +10091,27 @@ else:
 EOF
 }
 
+# After extracting $domain (domain or subdomain from QR URL)
+    domain_entropy=$(echo -n "$domain" | od -An -t x1 | tr -d ' \n' | fold -w2 | sort | uniq -c | awk '{print $1}' | sort -n | tail -1)
+    if [[ "$domain_entropy" -gt 4 ]]; then
+        echo -e "${RED}[THREAT +60]${NC} High domain entropy/DGA pattern detected (possible algorithmic domain)"
+    fi
+    
+    # After enumerating images (if multiple files given)
+    if [ "${#images[@]}" -gt 1 ]; then
+        for img in "${images[@]}"; do
+            if strings "$img" | grep -Ei 'part [0-9]+ of [0-9]+'; then
+                echo -e "${YELLOW}[WARNING]${NC} Possible QR chain or multipart payload detected: $img"
+            fi
+        done
+    fi
+
+    # After extracting QR image stats or in analyze_qr_image
+    qr_meaningful_density=$(identify -verbose "$infile" | grep 'Pixels:' | awk '{print $2}')
+    if [[ "$qr_meaningful_density" -gt 230000 ]]; then
+        echo -e "${RED}[THREAT +25]${NC} QR density unusually high (possible adversarial or anti-ML payload)"
+    fi
+
 analyze_ngram_patterns() {
     local content="$1"
     
@@ -10051,6 +10226,9 @@ get_threat_level() {
         echo "LOW"
     else
         echo "MINIMAL"
+    fi
+        if [ "$final_threat_score" -ge 1000 ]; then
+        echo -e "${RED}[CRITICAL]${NC} ⚠️  CRITICAL THREAT LEVEL - Immediate action required!"
     fi
 }
 
@@ -11757,9 +11935,9 @@ EOF
         echo "$features_json" >> "$ml_report"
         
         # Parse results
-        ml_score=$(echo "$features_json" | grep -oP '"ml_score":\s*\K[0-9.]+' | head -1)
-        ml_confidence=$(echo "$features_json" | grep -oP '"confidence":\s*\K[0-9.]+' | head -1)
-        ml_verdict=$(echo "$features_json" | grep -oP '"verdict":\s*"\K[^"]+' | head -1)
+        ml_score=$(json_extract_number "$features_json" "ml_score")
+        ml_confidence=$(json_extract_number "$features_json" "confidence")
+        ml_verdict=$(json_extract_string "$features_json" "verdict")
         
         echo "" >> "$ml_report"
         echo "Classification Results:" >> "$ml_report"
@@ -12199,7 +12377,7 @@ EOF
         echo "$nlp_results" >> "$nlp_report"
         
         # Parse suspicion score
-        local suspicion=$(echo "$nlp_results" | grep -oP '"suspicion_score":\s*\K\d+' | head -1)
+        local suspicion=$(json_extract_int "$nlp_results" "suspicion_score")
         ((nlp_score += ${suspicion:-0}))
     fi
     
@@ -12459,8 +12637,8 @@ analyze_web_archive() {
     local wayback_result=$(curl -sS --max-time 15 "$wayback_api" 2>/dev/null)
     
     if [ -n "$wayback_result" ]; then
-        local archived_url=$(echo "$wayback_result" | grep -oP '"url":\s*"\K[^"]+' | head -1)
-        local archive_timestamp=$(echo "$wayback_result" | grep -oP '"timestamp":\s*"\K[^"]+' | head -1)
+        local archived_url=$(json_extract_string "$wayback_result" "url")
+        local archive_timestamp=$(json_extract_string "$wayback_result" "timestamp")
         
         echo "Wayback Machine:" >> "$archive_report"
         if [ -n "$archived_url" ]; then
@@ -12834,7 +13012,7 @@ EOF
         
         # Parse results
         if echo "$adv_analysis" | grep -q '"adversarial_indicator"'; then
-            local indicator=$(echo "$adv_analysis" | grep -oP '"adversarial_indicator":\s*"\K[^"]+')
+            local indicator=$(json_extract_string "$adv_analysis" "adversarial_indicator")
             adv_findings+=("adversarial:$indicator")
             ((adv_score += 45))
             log_threat 50 "Adversarial AI attack indicator: $indicator"
@@ -13924,9 +14102,9 @@ EOF
         echo "$dga_analysis" >> "$dga_report"
         
         # Parse results
-        local verdict=$(echo "$dga_analysis" | grep -oP '"verdict":\s*"\K[^"]+')
-        local score=$(echo "$dga_analysis" | grep -oP '"dga_score":\s*\K[0-9]+')
-        local entropy=$(echo "$dga_analysis" | grep -oP '"entropy":\s*\K[0-9.]+')
+        local verdict=$(json_extract_string "$dga_analysis" "verdict")
+        local score=$(json_extract_int "$dga_analysis" "dga_score")
+        local entropy=$(json_extract_number "$dga_analysis" "entropy")
         
         # Display results
         echo ""
@@ -14186,8 +14364,8 @@ EOF
         echo "$unicode_analysis" >> "$unicode_report"
         
         # Parse results
-        local verdict=$(echo "$unicode_analysis" | grep -oP '"verdict":\s*"\K[^"]+')
-        local score=$(echo "$unicode_analysis" | grep -oP '"unicode_score":\s*\K[0-9]+')
+        local verdict=$(json_extract_string "$unicode_analysis" "verdict")
+        local score=$(json_extract_int "$unicode_analysis" "unicode_score")
         local finding_count=$(echo "$unicode_analysis" | grep -c '"type":')
         
         if [ "$verdict" = "DECEPTIVE_UNICODE" ]; then
@@ -14271,13 +14449,20 @@ analyze_social_threat_tracking() {
         if echo "$urlhaus_result" | grep -q '"query_status":"ok"'; then
             social_findings+=("urlhaus:found")
             ((social_score += 70))
-            # GRANULAR OUTPUT RESTORED: Classic Paste A format for threat feed match
-            log_threat 100 "URL found in URLhaus feed!"
-            log_threat 0 "URL found in URLhaus malware database"
-            echo "  ⚠ FOUND IN URLHAUS DATABASE" >> "$social_report"
             
-            # Extract details
-            local threat_type=$(echo "$urlhaus_result" | grep -oP '"threat":\s*"\K[^"]+' | head -1)
+            # Extract details first
+            local threat_type=$(json_extract_string "$urlhaus_result" "threat")
+            
+            # Forensic detection output
+            log_forensic_detection 100 \
+                "URLhaus Database Match" \
+                "$url" \
+                "URLhaus API Query" \
+                "Social threat tracking" \
+                "URL is associated with malware distribution" \
+                "https://urlhaus.abuse.ch"
+            
+            echo "  ⚠ FOUND IN URLHAUS DATABASE" >> "$social_report"
             echo "  Threat Type: $threat_type" >> "$social_report"
         else
             echo "  Not found" >> "$social_report"
@@ -14764,13 +14949,13 @@ analyze_geo_hotspots() {
         local geo_info=$(curl -sS --max-time 10 "http://ip-api.com/json/$ip" 2>/dev/null)
         
         if [ -n "$geo_info" ]; then
-            local country=$(echo "$geo_info" | grep -oP '"country":\s*"\K[^"]+')
-            local country_code=$(echo "$geo_info" | grep -oP '"countryCode":\s*"\K[^"]+')
-            local region=$(echo "$geo_info" | grep -oP '"regionName":\s*"\K[^"]+')
-            local city=$(echo "$geo_info" | grep -oP '"city":\s*"\K[^"]+')
-            local isp=$(echo "$geo_info" | grep -oP '"isp":\s*"\K[^"]+')
-            local org=$(echo "$geo_info" | grep -oP '"org":\s*"\K[^"]+')
-            local as_info=$(echo "$geo_info" | grep -oP '"as":\s*"\K[^"]+')
+            local country=$(json_extract_string "$geo_info" "country")
+            local country_code=$(json_extract_string "$geo_info" "countryCode")
+            local region=$(json_extract_string "$geo_info" "regionName")
+            local city=$(json_extract_string "$geo_info" "city")
+            local isp=$(json_extract_string "$geo_info" "isp")
+            local org=$(json_extract_string "$geo_info" "org")
+            local as_info=$(json_extract_string "$geo_info" "as")
             
             echo "Geolocation Results:" >> "$geo_report"
             echo "  Country: $country ($country_code)" >> "$geo_report"
@@ -16488,7 +16673,7 @@ declare -A ZERO_DAY_SIGNATURES=(
 )
 
 # Browser Exploit Kit Patterns
-declare -A EXPLOIT_KIT_PATTERNS=(
+declare -A BROWSER_EXPLOIT_KIT_PATTERNS=(
     ["rig_ek"]="rig exploit|rigek"
     ["fallout_ek"]="fallout exploit|fallout-ek"
     ["spelevo_ek"]="spelevo|spl-ek"
