@@ -1,24 +1,5 @@
 #!/usr/bin/env bash
 
-################################################################################
-# QR CODE MALWARE SCANNER - ULTIMATE FORENSIC EDITION
-# Version: 4.3.0-FORENSIC
-#
-# CHANGELOG v4.3.0:
-#   - FIXED: macOS compatibility (grep -oP → sed-based json_extract helpers)
-#   - FIXED: EXPLOIT_KIT_PATTERNS duplicate array declaration error
-#   - FIXED: PIL/Pillow detection (5 detection methods)
-#   - FIXED: URL parsing newlines (whitespace trimming)
-#   - ADDED: Full forensic detection output per detection:
-#       * Module, IOC, Matched By, Severity
-#       * Source Artifact, File Hash (SHA256)
-#       * Detection Timestamp, Environment, Run ID
-#       * Reference URL, Recommendation
-#   - ADDED: json_extract_string/number/int helper functions
-#   - IMPROVED: Threat intel detections show complete forensic context
-#
-# Automatically uses Homebrew bash on macOS if available
-################################################################################
 
 # Auto-detect and re-execute with Homebrew bash if needed
 if ((BASH_VERSINFO[0] < 4)); then
@@ -66,9 +47,9 @@ fi
 ################################################################################
 
 # Announce version immediately so user knows they have the right file
-echo "QR Malware Scanner v4.3.0-FORENSIC loading..."
+echo "QR Malware Scanner v4.3.4-FORENSIC loading..."
 
-VERSION="4.3.0-FORENSIC"
+VERSION="4.3.4-FORENSIC"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 OUTPUT_DIR="${SCRIPT_DIR}/qr_analysis_${TIMESTAMP}"
@@ -335,6 +316,58 @@ json_extract_int() {
     local json="$1"
     local key="$2"
     echo "$json" | sed -n 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p' | head -1
+}
+
+################################################################################
+# CROSS-PLATFORM GREP HELPERS
+# macOS BSD grep doesn't support \s, \d, etc. - use POSIX character classes
+################################################################################
+
+# Safe grep for extended regex - converts common PCRE patterns to POSIX
+# Usage: safe_grep_E "pattern" <<< "$content"  OR  echo "$content" | safe_grep_E "pattern"
+safe_grep_E() {
+    local pattern="$1"
+    # Convert common PCRE to POSIX:
+    # \s -> [[:space:]]
+    # \d -> [0-9]
+    # \w -> [[:alnum:]_]
+    pattern=$(echo "$pattern" | sed 's/\\s/[[:space:]]/g; s/\\d/[0-9]/g; s/\\w/[[:alnum:]_]/g')
+    grep -E "$pattern" 2>/dev/null
+}
+
+# Safe quiet grep for extended regex
+safe_grep_qE() {
+    local pattern="$1"
+    pattern=$(echo "$pattern" | sed 's/\\s/[[:space:]]/g; s/\\d/[0-9]/g; s/\\w/[[:alnum:]_]/g')
+    grep -qE "$pattern" 2>/dev/null
+}
+
+# Safe grep with case-insensitive extended regex
+safe_grep_iE() {
+    local pattern="$1"
+    pattern=$(echo "$pattern" | sed 's/\\s/[[:space:]]/g; s/\\d/[0-9]/g; s/\\w/[[:alnum:]_]/g')
+    grep -iE "$pattern" 2>/dev/null
+}
+
+# Safe quiet case-insensitive grep
+safe_grep_qiE() {
+    local pattern="$1"
+    pattern=$(echo "$pattern" | sed 's/\\s/[[:space:]]/g; s/\\d/[0-9]/g; s/\\w/[[:alnum:]_]/g')
+    grep -qiE "$pattern" 2>/dev/null
+}
+
+# Extract match with extended regex (cross-platform)
+safe_grep_oE() {
+    local pattern="$1"
+    pattern=$(echo "$pattern" | sed 's/\\s/[[:space:]]/g; s/\\d/[0-9]/g; s/\\w/[[:alnum:]_]/g')
+    grep -oE "$pattern" 2>/dev/null
+}
+
+# Extract match with case-insensitive extended regex
+safe_grep_oiE() {
+    local pattern="$1"
+    pattern=$(echo "$pattern" | sed 's/\\s/[[:space:]]/g; s/\\d/[0-9]/g; s/\\w/[[:alnum:]_]/g')
+    grep -oiE "$pattern" 2>/dev/null
 }
 
 ################################################################################
@@ -628,20 +661,41 @@ check_dependencies() {
     
     # Check Python modules (multiple detection methods for macOS compatibility)
     local pil_found=false
+    
+    # Method 1: Direct import with python3
     if python3 -c "from PIL import Image" 2>/dev/null; then
         pil_found=true
+    # Method 2: Alternative import syntax
     elif python3 -c "import PIL.Image" 2>/dev/null; then
         pil_found=true
+    # Method 3: Just import PIL
     elif python3 -c "import PIL" 2>/dev/null; then
         pil_found=true
+    # Method 4: Check pip3
     elif command -v pip3 &>/dev/null && pip3 show pillow >/dev/null 2>&1; then
         pil_found=true
     elif command -v pip3 &>/dev/null && pip3 show Pillow >/dev/null 2>&1; then
         pil_found=true
+    # Method 5: Check brew site-packages on macOS
+    elif [ -d "/usr/local/lib/python3"*/site-packages/PIL ] 2>/dev/null; then
+        pil_found=true
+    elif [ -d "/opt/homebrew/lib/python3"*/site-packages/PIL ] 2>/dev/null; then
+        pil_found=true
+    # Method 6: Try with specific Python paths
+    elif /usr/bin/python3 -c "from PIL import Image" 2>/dev/null; then
+        pil_found=true
+    elif /usr/local/bin/python3 -c "from PIL import Image" 2>/dev/null; then
+        pil_found=true
+    # Method 7: Check using pip list
+    elif pip3 list 2>/dev/null | grep -qi "^pillow"; then
+        pil_found=true
     fi
     
     if [ "$pil_found" = false ]; then
-        log_warning "Python PIL/Pillow not found. Install: pip3 install pillow"
+        # PIL is optional - don't warn if other image tools are available
+        if ! command -v convert &>/dev/null && ! command -v identify &>/dev/null; then
+            log_warning "Python PIL/Pillow not found. Install: pip3 install pillow"
+        fi
     fi
     
     log_success "Dependency check complete"
@@ -1622,8 +1676,8 @@ declare -A OBFUSCATION_PATTERNS=(
     ["url_encoded"]="(%[0-9A-Fa-f]{2}){10,}"
     ["double_encoded"]="%25[0-9A-Fa-f]{2}"
     # Concatenation obfuscation
-    ["string_concat_js"]="\\+\\s*['\"]"
-    ["string_concat_vba"]="&\\s*['\"]"
+    ["string_concat_js"]="\\+\[[:space:]]*['\"]"
+    ["string_concat_vba"]="&\[[:space:]]*['\"]"
     ["array_join"]="\\[.*\\]\\.join\\(['\"]"
     # Variable manipulation
     ["eval_usage"]="(eval|exec|execute|system|shell_exec|passthru)"
@@ -1703,7 +1757,7 @@ declare -A NETWORK_IOC_PATTERNS=(
     ["long_subdomain"]='[a-z0-9]{50,}\\.'
     ["many_subdomains"]="([a-z0-9]+\\.){5,}"
     ["txt_record_abuse"]="TXT.*[A-Za-z0-9+/=]{50,}"
-    ["null_mx"]="MX.*0\\s+\\."
+    ["null_mx"]="MX.*0\[[:space:]]\+\\."
     # Network protocols
     ["ssh_bruteforce"]="SSH-2\\.0-.*"
     ["rdp_cookie"]="Cookie:.*mstshash="
@@ -2888,13 +2942,13 @@ declare -a AMSI_BYPASS_PATTERNS=(
     "AmsiScanBuffer"
     "amsiContext"
     "AmsiUtils"
-    "amsi\.dll"
+    "amsi[.]dll"
     "AmsiScanString"
     "SetEnvironmentVariable.*AMSI"
-    "Reflection\.Assembly.*amsi"
+    "Reflection[.]Assembly.*amsi"
     "VirtualProtect.*amsi"
-    "\\[Ref\\]\.Assembly\.GetType"
-    "System\.Management\.Automation"
+    "[[]Ref[]][.]Assembly[.]GetType"
+    "System[.]Management[.]Automation"
 )
 
 ################################################################################
@@ -2911,8 +2965,8 @@ declare -a OFFICE_MACRO_PATTERNS=(
     "DocumentOpen"
     "Workbook_Open"
     "WorkbookOpen"
-    "Shell\\("
-    "WScript\\.Shell"
+    "Shell[(]"
+    "WScript[.]Shell"
     "CreateObject.*Shell"
     "CreateObject.*WScript"
     "CreateObject.*XMLHTTP"
@@ -2922,14 +2976,14 @@ declare -a OFFICE_MACRO_PATTERNS=(
     "CreateObject.*Word"
     "CreateObject.*Outlook"
     "PowerShell"
-    "cmd\\.exe"
+    "cmd[.]exe"
     "comspec"
-    "environ\\("
+    "environ[(]"
     "URLDownloadToFile"
-    "MSXML2\\.XMLHTTP"
-    "Microsoft\\.XMLHTTP"
+    "MSXML2[.]XMLHTTP"
+    "Microsoft[.]XMLHTTP"
     "CallByName"
-    "GetObject\\("
+    "GetObject[(]"
     "CreateTextFile"
     "OpenTextFile"
     "Declare.*Lib"
@@ -2949,21 +3003,21 @@ declare -a OFFICE_MACRO_PATTERNS=(
 # Follina/MSDT Patterns
 declare -a FOLLINA_PATTERNS=(
     "ms-msdt:"
-    "msdt\\.exe"
+    "msdt[.]exe"
     "ms-msdt:/id"
     "PCWDiagnostic"
     "IT_RebrowseForFile="
     "IT_LaunchMethod="
     "IT_BrowseForFile="
     "ms-msdt:-id"
-    "\\.xml!.*msdt"
-    "location\\.href.*ms-msdt"
+    "[.]xml[!].*msdt"
+    "location[.]href.*ms-msdt"
 )
 
 # OLE Object Patterns
 declare -a OLE_PATTERNS=(
     "package.*shell"
-    "\\\\Ole[0-9]"
+    "Ole[0-9]"
     "objdata"
     "objupdate"
     "objembed"
@@ -2972,7 +3026,6 @@ declare -a OLE_PATTERNS=(
     "LINK.*Word"
     "LINK.*Excel"
     "LINK.*PowerShell"
-    "\\x00o\\x00l\\x00e"
     "Packager Shell Object"
 )
 
@@ -4008,12 +4061,12 @@ init_yara_rules() {
     # Webshell Detection
     YARA_RULES["webshell"]='
         strings:
-            $php_eval = /eval\s*\(\s*\$_(GET|POST|REQUEST|COOKIE)/ nocase
-            $php_assert = /assert\s*\(\s*\$_(GET|POST|REQUEST)/ nocase
-            $php_system = /system\s*\(\s*\$_(GET|POST|REQUEST)/ nocase
-            $php_exec = /exec\s*\(\s*\$_(GET|POST|REQUEST)/ nocase
-            $php_shell = /shell_exec\s*\(\s*\$_(GET|POST|REQUEST)/ nocase
-            $php_pass = /passthru\s*\(\s*\$_(GET|POST|REQUEST)/ nocase
+            $php_eval = /eval[[:space:]]*\([[:space:]]*\$_(GET|POST|REQUEST|COOKIE)/ nocase
+            $php_assert = /assert[[:space:]]*\([[:space:]]*\$_(GET|POST|REQUEST)/ nocase
+            $php_system = /system[[:space:]]*\([[:space:]]*\$_(GET|POST|REQUEST)/ nocase
+            $php_exec = /exec[[:space:]]*\([[:space:]]*\$_(GET|POST|REQUEST)/ nocase
+            $php_shell = /shell_exec[[:space:]]*\([[:space:]]*\$_(GET|POST|REQUEST)/ nocase
+            $php_pass = /passthru[[:space:]]*\([[:space:]]*\$_(GET|POST|REQUEST)/ nocase
             $c99 = "c99shell" nocase
             $r57 = "r57shell" nocase
             $wso = "wso shell" nocase
@@ -4044,10 +4097,10 @@ init_yara_rules() {
     YARA_RULES["xss_attack"]='
         strings:
             $script = /<script.*>/ nocase
-            $onerror = /onerror\s*=/ nocase
-            $onload = /onload\s*=/ nocase
-            $onclick = /onclick\s*=/ nocase
-            $onmouseover = /onmouseover\s*=/ nocase
+            $onerror = /onerror[[:space:]]*=/ nocase
+            $onload = /onload[[:space:]]*=/ nocase
+            $onclick = /onclick[[:space:]]*=/ nocase
+            $onmouseover = /onmouseover[[:space:]]*=/ nocase
             $img_src = /<img.*src=.*javascript:/ nocase
             $svg_onload = /<svg.*onload=/ nocase
         condition:
@@ -4109,7 +4162,7 @@ init_yara_rules() {
             $wmic = "wmic" nocase
             $winrm = "winrm" nocase
             $rdp = "mstsc" nocase
-            $ssh_cmd = /ssh\s+\w+@/ nocase
+            $ssh_cmd = /ssh[[:space:]]\+\w+@/ nocase
             $pass_hash = "pass.?the.?hash" nocase
             $mimikatz = "mimikatz" nocase
         condition:
@@ -4438,7 +4491,8 @@ multi_decoder_analysis() {
     
     # Decoder inconsistency check - potential evasion
     if [ $success_count -gt 0 ] && [ $success_count -lt 3 ]; then
-        log_threat 20 "Low decoder success rate ($success_count/${#decoders[@]}) - possible anti-analysis technique"
+        # Trigger full anti-analysis detection
+        analyze_anti_analysis_techniques "$image" "$success_count" "${#decoders[@]}" "${decoder_results[*]}"
     fi
     
     # Check for decoder disagreement
@@ -4446,7 +4500,13 @@ multi_decoder_analysis() {
         local first_result="${decoder_results[0]#*:}"
         for result in "${decoder_results[@]:1}"; do
             if [ "${result#*:}" != "$first_result" ]; then
-                log_threat 30 "Decoder disagreement detected - possible payload manipulation"
+                log_forensic_detection 30 \
+                    "Decoder Disagreement - Payload Manipulation" \
+                    "decoder_mismatch:${decoder_results[*]}" \
+                    "Multi-decoder correlation analysis" \
+                    "QR decoder output comparison" \
+                    "Analyze each decoder output separately - possible evasion or targeted payload" \
+                    "MITRE ATT&CK T1027 - Obfuscated Files or Information"
                 log_forensic "Decoder results vary: ${decoder_results[*]}"
                 break
             fi
@@ -4459,8 +4519,353 @@ multi_decoder_analysis() {
 }
 
 ################################################################################
-# ADVANCED STEGANOGRAPHY DETECTION
+# ANTI-ANALYSIS DETECTION ENGINE
+# Detects QR codes designed to evade automated analysis
 ################################################################################
+
+# Anti-analysis technique signatures
+declare -A ANTI_ANALYSIS_SIGNATURES=(
+    # QR Structure Manipulation
+    ["format_info_corruption"]="Corrupted format information bits"
+    ["version_info_manipulation"]="Modified version information"
+    ["error_correction_abuse"]="Abnormal error correction usage"
+    ["finder_pattern_obfuscation"]="Modified finder patterns"
+    ["timing_pattern_disruption"]="Disrupted timing patterns"
+    ["alignment_pattern_shift"]="Shifted alignment patterns"
+    ["masking_pattern_abuse"]="Non-standard masking pattern"
+    
+    # Data Encoding Evasion
+    ["mixed_encoding_modes"]="Mixed encoding mode abuse"
+    ["padding_bit_manipulation"]="Unusual padding bits"
+    ["terminator_sequence_abuse"]="Modified terminator sequence"
+    ["eci_mode_evasion"]="ECI mode for evasion"
+    ["structured_append_abuse"]="Structured append manipulation"
+    ["fnc1_mode_abuse"]="FNC1 mode misuse"
+    
+    # Visual Anti-Analysis
+    ["micro_qr_evasion"]="Micro QR variant for scanner evasion"
+    ["color_gradient_obfuscation"]="Color gradient to confuse scanners"
+    ["noise_injection"]="Noise injected into QR"
+    ["module_size_variation"]="Inconsistent module sizes"
+    ["quiet_zone_violation"]="Insufficient quiet zone"
+    ["aspect_ratio_manipulation"]="Non-square aspect ratio"
+    
+    # Decoder-Specific Targeting
+    ["zbar_specific_evasion"]="ZBar-specific evasion technique"
+    ["zxing_specific_evasion"]="ZXing-specific evasion technique"
+    ["quirc_specific_evasion"]="Quirc-specific evasion technique"
+    
+    # Anti-Forensic Techniques
+    ["metadata_stripping"]="Metadata intentionally stripped"
+    ["timestamp_manipulation"]="Timestamp manipulation detected"
+    ["steganographic_embedding"]="Hidden data in QR structure"
+)
+
+# Anti-analysis IOC patterns
+declare -a ANTI_ANALYSIS_IOC_PATTERNS=(
+    "low_decoder_success_rate"
+    "decoder_disagreement"
+    "high_error_correction_usage"
+    "unusual_qr_version"
+    "non_standard_encoding"
+    "visual_obfuscation"
+    "noise_pattern_detected"
+    "gradient_mask_detected"
+    "finder_pattern_anomaly"
+    "alignment_anomaly"
+    "timing_pattern_anomaly"
+    "quiet_zone_insufficient"
+    "module_size_irregular"
+    "aspect_ratio_abnormal"
+    "metadata_absent"
+    "creation_tool_hidden"
+    "suspicious_color_depth"
+    "embedded_payload_structure"
+)
+
+analyze_anti_analysis_techniques() {
+    local image="$1"
+    local success_count="${2:-0}"
+    local total_decoders="${3:-1}"
+    local decoder_results="${4:-}"
+    
+    local anti_analysis_findings=()
+    local total_score=0
+    local iocs_detected=()
+    
+    log_info "Running anti-analysis detection engine..."
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # 1. LOW DECODER SUCCESS RATE ANALYSIS
+    # ═══════════════════════════════════════════════════════════════════════════
+    if [ "$success_count" -gt 0 ] && [ "$success_count" -lt 3 ]; then
+        local success_rate=$((success_count * 100 / total_decoders))
+        anti_analysis_findings+=("Low decoder success rate: ${success_count}/${total_decoders} (${success_rate}%)")
+        iocs_detected+=("low_decoder_success_rate:${success_rate}%")
+        
+        # Determine which decoders failed for targeted analysis
+        local failed_decoders=""
+        for decoder in zbarimg quirc zxing qrdecode opencv opencv_wechat boofcv pyzbar zbarcam; do
+            if command -v "$decoder" &>/dev/null 2>&1 || [ -f "/usr/local/bin/$decoder" ]; then
+                if ! echo "$decoder_results" | grep -q "^$decoder:"; then
+                    failed_decoders+="$decoder "
+                fi
+            fi
+        done
+        
+        if [ -n "$failed_decoders" ]; then
+            anti_analysis_findings+=("Failed decoders: $failed_decoders")
+            iocs_detected+=("failed_decoders:$failed_decoders")
+        fi
+        
+        total_score=$((total_score + 20))
+    fi
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # 2. QR CODE STRUCTURE ANALYSIS
+    # ═══════════════════════════════════════════════════════════════════════════
+    if command -v identify &>/dev/null && [ -f "$image" ]; then
+        local img_info
+        img_info=$(identify -verbose "$image" 2>/dev/null)
+        
+        # Check for unusual dimensions (non-standard QR sizes)
+        local width height
+        width=$(echo "$img_info" | grep -E "^[[:space:]]+Geometry:" | sed 's/.*: *\([0-9]*\)x.*/\1/')
+        height=$(echo "$img_info" | grep -E "^[[:space:]]+Geometry:" | sed 's/.*x\([0-9]*\)+.*/\1/')
+        
+        if [ -n "$width" ] && [ -n "$height" ]; then
+            # Check aspect ratio
+            if [ "$width" -ne "$height" ] && [ "$width" -gt 0 ]; then
+                local ratio=$((width * 100 / height))
+                if [ "$ratio" -lt 90 ] || [ "$ratio" -gt 110 ]; then
+                    anti_analysis_findings+=("Abnormal aspect ratio: ${width}x${height} (${ratio}%)")
+                    iocs_detected+=("aspect_ratio_abnormal:${ratio}%")
+                    total_score=$((total_score + 15))
+                fi
+            fi
+            
+            # Check for unusual QR code versions (very large dimensions)
+            if [ "$width" -gt 1000 ] || [ "$height" -gt 1000 ]; then
+                anti_analysis_findings+=("Unusually large QR: ${width}x${height}")
+                iocs_detected+=("unusual_qr_version:large_${width}x${height}")
+                total_score=$((total_score + 10))
+            fi
+        fi
+        
+        # Check color depth
+        local color_depth
+        color_depth=$(echo "$img_info" | grep -E "^[[:space:]]+Depth:" | sed 's/.*: *\([0-9]*\).*/\1/')
+        if [ -n "$color_depth" ] && [ "$color_depth" -gt 8 ]; then
+            anti_analysis_findings+=("High color depth for QR: ${color_depth}-bit")
+            iocs_detected+=("suspicious_color_depth:${color_depth}bit")
+            total_score=$((total_score + 10))
+        fi
+        
+        # Check for color QR (potential visual obfuscation)
+        local color_type
+        color_type=$(echo "$img_info" | grep -E "^[[:space:]]+Type:" | head -1)
+        if echo "$color_type" | grep -qiE "TrueColor|RGB|Palette"; then
+            anti_analysis_findings+=("Color QR detected (potential obfuscation): $color_type")
+            iocs_detected+=("visual_obfuscation:color_qr")
+            total_score=$((total_score + 5))
+        fi
+    fi
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # 3. METADATA ANALYSIS (Anti-Forensic Detection)
+    # ═══════════════════════════════════════════════════════════════════════════
+    if command -v exiftool &>/dev/null && [ -f "$image" ]; then
+        local metadata
+        metadata=$(exiftool "$image" 2>/dev/null)
+        
+        # Check for stripped metadata
+        local metadata_count
+        metadata_count=$(echo "$metadata" | wc -l)
+        if [ "$metadata_count" -lt 5 ]; then
+            anti_analysis_findings+=("Minimal metadata (${metadata_count} fields) - possible stripping")
+            iocs_detected+=("metadata_absent:${metadata_count}_fields")
+            total_score=$((total_score + 15))
+        fi
+        
+        # Check for missing creation tool
+        if ! echo "$metadata" | grep -qiE "Software|Creator|Producer|Generator"; then
+            anti_analysis_findings+=("No creation tool identified - metadata stripped")
+            iocs_detected+=("creation_tool_hidden")
+            total_score=$((total_score + 10))
+        fi
+        
+        # Check for timestamp anomalies
+        local create_date modify_date
+        create_date=$(echo "$metadata" | grep -i "Create Date" | head -1)
+        modify_date=$(echo "$metadata" | grep -i "Modify Date" | head -1)
+        
+        if [ -n "$create_date" ] && [ -n "$modify_date" ]; then
+            if [ "$create_date" != "$modify_date" ]; then
+                anti_analysis_findings+=("Timestamp mismatch: Create vs Modify")
+                iocs_detected+=("timestamp_manipulation")
+                total_score=$((total_score + 10))
+            fi
+        fi
+    fi
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # 4. NOISE AND VISUAL MANIPULATION DETECTION
+    # ═══════════════════════════════════════════════════════════════════════════
+    if command -v convert &>/dev/null && [ -f "$image" ]; then
+        # Check for noise patterns
+        local noise_level
+        noise_level=$(convert "$image" -colorspace Gray -statistic StandardDeviation 1x1 -format "%[mean]" info: 2>/dev/null)
+        
+        if [ -n "$noise_level" ]; then
+            # High noise might indicate intentional obfuscation
+            local noise_int=${noise_level%.*}
+            if [ "${noise_int:-0}" -gt 20000 ]; then
+                anti_analysis_findings+=("High noise level detected: ${noise_level}")
+                iocs_detected+=("noise_pattern_detected:${noise_int}")
+                total_score=$((total_score + 15))
+            fi
+        fi
+        
+        # Check for gradient (non-uniform module colors)
+        local unique_colors
+        unique_colors=$(convert "$image" -unique-colors txt: 2>/dev/null | wc -l)
+        if [ "${unique_colors:-0}" -gt 10 ]; then
+            anti_analysis_findings+=("Multiple colors in QR (${unique_colors}) - possible gradient obfuscation")
+            iocs_detected+=("gradient_mask_detected:${unique_colors}_colors")
+            total_score=$((total_score + 10))
+        fi
+    fi
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # 5. QR CODE BINARY STRUCTURE ANALYSIS
+    # ═══════════════════════════════════════════════════════════════════════════
+    if [ -f "$image" ]; then
+        # Check PNG structure for anomalies
+        if file "$image" | grep -qi "PNG"; then
+            # Check for unusual chunk order or extra chunks
+            local chunk_info
+            if command -v pngcheck &>/dev/null; then
+                chunk_info=$(pngcheck -v "$image" 2>&1)
+                
+                if echo "$chunk_info" | grep -qiE "tEXt|zTXt|iTXt"; then
+                    local text_chunks
+                    text_chunks=$(echo "$chunk_info" | grep -ciE "tEXt|zTXt|iTXt")
+                    if [ "$text_chunks" -gt 3 ]; then
+                        anti_analysis_findings+=("Multiple text chunks in PNG (${text_chunks}) - possible hidden data")
+                        iocs_detected+=("embedded_payload_structure:${text_chunks}_chunks")
+                        total_score=$((total_score + 15))
+                    fi
+                fi
+            fi
+        fi
+        
+        # Check for appended data after image end
+        if command -v binwalk &>/dev/null; then
+            local binwalk_results
+            binwalk_results=$(binwalk "$image" 2>/dev/null | wc -l)
+            if [ "${binwalk_results:-0}" -gt 3 ]; then
+                anti_analysis_findings+=("Multiple embedded files detected by binwalk")
+                iocs_detected+=("steganographic_embedding:${binwalk_results}_objects")
+                total_score=$((total_score + 20))
+            fi
+        fi
+    fi
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # 6. DECODER-SPECIFIC EVASION DETECTION
+    # ═══════════════════════════════════════════════════════════════════════════
+    if [ -n "$decoder_results" ]; then
+        # Check if only specific decoders succeeded (targeted evasion)
+        local zbar_success=0
+        local zxing_success=0
+        local quirc_success=0
+        
+        echo "$decoder_results" | grep -q "zbarimg:" && zbar_success=1
+        echo "$decoder_results" | grep -q "zxing:" && zxing_success=1
+        echo "$decoder_results" | grep -q "quirc:" && quirc_success=1
+        
+        if [ $zbar_success -eq 0 ] && [ $zxing_success -eq 1 ]; then
+            anti_analysis_findings+=("ZBar failed but ZXing succeeded - possible ZBar-specific evasion")
+            iocs_detected+=("zbar_specific_evasion")
+            total_score=$((total_score + 15))
+        fi
+        
+        if [ $zxing_success -eq 0 ] && [ $zbar_success -eq 1 ]; then
+            anti_analysis_findings+=("ZXing failed but ZBar succeeded - possible ZXing-specific evasion")
+            iocs_detected+=("zxing_specific_evasion")
+            total_score=$((total_score + 15))
+        fi
+    fi
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # OUTPUT FORENSIC DETECTION RESULTS
+    # ═══════════════════════════════════════════════════════════════════════════
+    if [ ${#anti_analysis_findings[@]} -gt 0 ]; then
+        local ioc_string
+        ioc_string=$(IFS=', '; echo "${iocs_detected[*]}")
+        local findings_string
+        findings_string=$(IFS='; '; echo "${anti_analysis_findings[*]}")
+        
+        log_forensic_detection "$total_score" \
+            "Anti-Analysis Techniques Detected" \
+            "$ioc_string" \
+            "Multi-decoder analysis, structure analysis, metadata forensics, visual analysis" \
+            "QR code image and decoded content" \
+            "Investigate QR source - likely designed to evade automated security scanning. Manual analysis recommended." \
+            "MITRE ATT&CK T1027.001 - Binary Padding, T1027.002 - Software Packing"
+        
+        # Additional detailed output
+        echo -e "    ${CYAN}├─ Findings:${NC}"
+        for finding in "${anti_analysis_findings[@]}"; do
+            echo -e "    ${CYAN}│   ├─${NC} $finding"
+        done
+        echo -e "    ${CYAN}├─ IOCs Detected:${NC}"
+        for ioc in "${iocs_detected[@]}"; do
+            echo -e "    ${CYAN}│   ├─${NC} $ioc"
+        done
+        echo -e "    ${CYAN}└─ Anti-Analysis Signatures Matched:${NC} ${#anti_analysis_findings[@]}"
+        
+        # Record all IOCs
+        for ioc in "${iocs_detected[@]}"; do
+            record_ioc "Anti-Analysis" "$ioc" "Structure/Behavioral Analysis"
+        done
+        
+        # Write to dedicated report
+        if [ -n "$OUTPUT_DIR" ] && [ -d "$OUTPUT_DIR" ]; then
+            local anti_analysis_report="${OUTPUT_DIR}/anti_analysis_detection.txt"
+            {
+                echo "═══════════════════════════════════════════════════════════════"
+                echo "ANTI-ANALYSIS DETECTION REPORT"
+                echo "═══════════════════════════════════════════════════════════════"
+                echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+                echo "Image: $image"
+                echo "Total Score: $total_score"
+                echo "Decoder Success Rate: ${success_count}/${total_decoders}"
+                echo ""
+                echo "FINDINGS:"
+                for finding in "${anti_analysis_findings[@]}"; do
+                    echo "  - $finding"
+                done
+                echo ""
+                echo "IOCS:"
+                for ioc in "${iocs_detected[@]}"; do
+                    echo "  - $ioc"
+                done
+                echo ""
+                echo "RECOMMENDATIONS:"
+                echo "  1. Do not trust decoded content without manual verification"
+                echo "  2. Analyze with multiple QR decoder implementations"
+                echo "  3. Check for hidden payloads in image structure"
+                echo "  4. Investigate QR code origin and distribution method"
+                echo "  5. Consider the QR as potentially weaponized"
+            } >> "$anti_analysis_report"
+        fi
+    else
+        log_success "No anti-analysis techniques detected"
+    fi
+    
+    return 0
+}
 
 ################################################################################
 # EXTENDED YARA-LIKE RULES
@@ -4818,6 +5223,24 @@ analyze_steganography() {
     
     # Report findings
     if [ $stego_score -gt 0 ]; then
+        local finding_summary=$(printf '%s, ' "${stego_findings[@]}" | sed 's/, $//')
+        local matched_by="entropy analysis"
+        
+        # Build matched_by string based on what detected it
+        [[ " ${stego_findings[*]} " =~ "steghide" ]] && matched_by="$matched_by, steghide"
+        [[ " ${stego_findings[*]} " =~ "zsteg" ]] && matched_by="$matched_by, zsteg"
+        [[ " ${stego_findings[*]} " =~ "stegdetect" ]] && matched_by="$matched_by, stegdetect"
+        [[ " ${stego_findings[*]} " =~ "appended" ]] && matched_by="$matched_by, appended data detection"
+        [[ " ${stego_findings[*]} " =~ "lsb" ]] && matched_by="$matched_by, LSB analysis"
+        
+        log_forensic_detection $((stego_score / 2)) \
+            "Steganographic Content Detected" \
+            "$finding_summary" \
+            "$matched_by" \
+            "Image binary data" \
+            "Extract and analyze hidden data - potential data exfiltration or hidden payload" \
+            "MITRE ATT&CK T1027.003 - Steganography"
+        
         {
             echo "═══════════════════════════════════════════════"
             echo "STEGANOGRAPHY ANALYSIS: $(basename "$image")"
@@ -4829,17 +5252,6 @@ analyze_steganography() {
             done
             echo ""
         } >> "$STEGANOGRAPHY_REPORT"
-        
-        if [ $stego_score -ge 50 ]; then
-            local finding_summary=$(printf '%s, ' "${stego_findings[@]}" | sed 's/, $//')
-            log_forensic_detection $((stego_score / 2)) \
-                "Steganographic Content Detected" \
-                "$finding_summary" \
-                "LSB analysis, entropy analysis, zsteg detection" \
-                "Image binary data" \
-                "Extract and analyze hidden data - potential data exfiltration or hidden payload" \
-                "Steganography detection module"
-        fi
     fi
 }
 
@@ -5015,7 +5427,15 @@ analyze_image_metadata() {
         
         # Check for suspicious software
         if grep -qiE "malware|hack|exploit|payload" "$metadata_file"; then
-            log_threat 40 "Suspicious strings in image metadata"
+            local suspicious_strings
+            suspicious_strings=$(grep -oiE "malware|hack|exploit|payload" "$metadata_file" | sort -u | tr '\n' ',' | sed 's/,$//')
+            log_forensic_detection 40 \
+                "Suspicious Strings in Image Metadata" \
+                "metadata_strings:$suspicious_strings" \
+                "Metadata keyword analysis" \
+                "EXIF/metadata fields" \
+                "Analyze image origin - metadata contains malware-related keywords" \
+                "MITRE ATT&CK T1027.003 - Steganography"
         fi
         
         # Extract embedded files
@@ -5053,7 +5473,13 @@ analyze_image_metadata() {
         
         local embedded_files=$(grep -c "0x" "$binwalk_output" 2>/dev/null || echo "0")
         if [ "$embedded_files" -gt 3 ]; then
-            log_threat 30 "Multiple embedded files/data detected by binwalk: $embedded_files items"
+            log_forensic_detection 30 \
+                "Multiple Embedded Files Detected" \
+                "embedded_count:$embedded_files, tool:binwalk" \
+                "Binary structure analysis (binwalk)" \
+                "Image binary structure" \
+                "Extract and analyze embedded files - possible steganographic payload or polyglot file" \
+                "MITRE ATT&CK T1027.003 - Steganography"
         fi
     fi
     
@@ -5190,12 +5616,12 @@ perform_ocr_analysis() {
         # Check for URLs in text
         if echo "$text_content" | grep -qiE "https?://|www\.|\.com|\.org|\.net"; then
             log_warning "OCR detected URL-like text in image"
-            local urls=$(echo "$text_content" | grep -oE "(https?://[^\s]+|www\.[^\s]+)")
+            local urls=$(echo "$text_content" | grep -oE "(https?://[^[:space:]]+|www\.[^[[:space:]]]+)")
             log_forensic "OCR URLs: $urls"
         fi
         
         # Check for phone numbers
-        if echo "$text_content" | grep -qE "[0-9]{3}[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}"; then
+        if echo "$text_content" | grep -qE "[0-9]{3}[-.[:space:]]?[0-9]{3}[-.[[:space:]]]?[0-9]{4}"; then
             log_info "OCR detected phone number pattern"
         fi
         
@@ -5245,28 +5671,46 @@ analyze_url_structure() {
     # Check for dangerous URI schemes
     for scheme in "${DANGEROUS_URI_SCHEMES[@]}"; do
         if [[ "$url" =~ ^$scheme ]]; then
-            log_threat 50 "Dangerous URI scheme detected: $scheme"
+            log_forensic_detection 50 \
+                "Dangerous URI Scheme Detected" \
+                "scheme:$scheme, url:${url:0:100}" \
+                "Dangerous URI scheme pattern matching" \
+                "URL scheme analysis" \
+                "Do not open - URI scheme can trigger system actions, install profiles, or execute code" \
+                "MITRE ATT&CK T1204.001 - Malicious Link"
             ((threats++))
         fi
     done
     
     # Non-HTTP/HTTPS protocols
     if [ -n "$protocol" ] && [[ ! "$protocol" =~ ^https?$ ]]; then
-        log_threat 15 "Non-HTTP protocol: $protocol"
+        log_forensic_detection 15 \
+            "Non-HTTP Protocol Detected" \
+            "protocol:$protocol" \
+            "Protocol analysis" \
+            "URL scheme" \
+            "Verify protocol handler - may trigger unintended application behavior" \
+            "MITRE ATT&CK T1204 - User Execution"
         ((threats++))
     fi
     
     # IP-based URLs
     if [[ "$domain" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        log_threat 25 "IP-based URL (suspicious): $domain"
+        log_forensic_detection 25 \
+            "IP-Based URL Detected" \
+            "ip:$domain" \
+            "URL domain format analysis" \
+            "URL host field" \
+            "Suspicious - legitimate services rarely use raw IP addresses. Investigate infrastructure." \
+            "MITRE ATT&CK T1583.003 - Virtual Private Server"
         ((threats++))
         
         # Check against known malicious IPs
         if [ -n "${KNOWN_MALICIOUS_IPS[$domain]}" ]; then
             log_forensic_detection 100 \
                 "KNOWN MALICIOUS IP DETECTED" \
-                "$domain" \
-                "Hardcoded malicious IP database: ${KNOWN_MALICIOUS_IPS[$domain]}" \
+                "ip:$domain, attribution:${KNOWN_MALICIOUS_IPS[$domain]}" \
+                "Hardcoded malicious IP database" \
                 "URL domain/host" \
                 "BLOCK IMMEDIATELY - Known malicious infrastructure" \
                 "Internal IOC database"
@@ -5274,7 +5718,13 @@ analyze_url_structure() {
         
         # Check for private/reserved IPs
         if [[ "$domain" =~ ^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|127\.|0\.|169\.254\.) ]]; then
-            log_threat 40 "Private/reserved IP address detected: $domain"
+            log_forensic_detection 40 \
+                "Private/Reserved IP Address Detected" \
+                "ip:$domain, type:RFC1918/Reserved" \
+                "IP address range classification" \
+                "URL host field" \
+                "Internal/local network address - possible SSRF attempt or misconfiguration" \
+                "MITRE ATT&CK T1090 - Proxy"
         fi
     fi
     
@@ -5284,7 +5734,13 @@ analyze_url_structure() {
             80|443|8080|8443)
                 ;;
             *)
-                log_threat 10 "Unusual port: $port"
+                log_forensic_detection 10 \
+                    "Unusual Port Detected" \
+                    "port:$port" \
+                    "Port analysis" \
+                    "URL port field" \
+                    "Non-standard port - may indicate C2, proxy, or backdoor service" \
+                    "MITRE ATT&CK T1571 - Non-Standard Port"
                 ((threats++))
                 ;;
         esac
@@ -5298,7 +5754,13 @@ analyze_url_structure() {
     # Check domain against malicious lists
     for malicious_domain in "${HARDCODED_MALICIOUS_DOMAINS[@]}"; do
         if [[ "$domain" == *"$malicious_domain"* ]]; then
-            log_threat 100 "KNOWN MALICIOUS DOMAIN: $domain"
+            log_forensic_detection 100 \
+                "Known Malicious Domain Detected" \
+                "domain:$domain, matched:$malicious_domain" \
+                "Hardcoded malicious domain blocklist" \
+                "URL domain analysis" \
+                "BLOCK IMMEDIATELY - Do not visit this URL. Report to security team." \
+                "MITRE ATT&CK T1566 - Phishing"
             ((threats++))
         fi
     done
@@ -5306,7 +5768,13 @@ analyze_url_structure() {
     # URL shorteners
     for shortener in "${URL_SHORTENERS[@]}"; do
         if echo "$domain" | grep -qE "$shortener"; then
-            log_threat 20 "URL shortener detected: $domain"
+            log_forensic_detection 20 \
+                "URL Shortener Detected" \
+                "shortener:$domain, service:$shortener" \
+                "URL shortener pattern matching" \
+                "URL domain analysis" \
+                "Resolve shortened URL to inspect final destination - commonly used to hide malicious links" \
+                "MITRE ATT&CK T1566.002 - Spearphishing Link"
             ((threats++))
             resolve_url_redirect "$url"
             break
@@ -5316,7 +5784,13 @@ analyze_url_structure() {
     # Suspicious TLDs
     for tld in "${SUSPICIOUS_TLDS[@]}"; do
         if echo "$domain" | grep -qE "$tld\$"; then
-            log_threat 30 "Suspicious TLD: $tld"
+            log_forensic_detection 30 \
+                "Suspicious TLD Detected" \
+                "tld:$tld, domain:$domain" \
+                "High-abuse TLD pattern matching" \
+                "URL domain analysis" \
+                "Exercise caution - TLD commonly associated with malicious activity" \
+                "MITRE ATT&CK T1583.001 - Acquire Infrastructure: Domains"
             ((threats++))
             break
         fi
@@ -5427,18 +5901,34 @@ analyze_decoded_content() {
     
     # Check for script tags
     if echo "$content" | grep -qiE "<script|javascript:|onerror=|onload="; then
-        log_threat 40 "JavaScript detected in decoded content"
+        local js_indicators
+        js_indicators=$(echo "$content" | grep -oiE "<script|javascript:|onerror=|onload=" | sort -u | tr '\n' ',' | sed 's/,$//')
+        log_forensic_detection 40 \
+            "JavaScript Code Detected in Decoded Content" \
+            "js_indicators:$js_indicators" \
+            "Script/event handler pattern matching" \
+            "Decoded QR content" \
+            "Potential XSS or malicious script - do not execute in browser context" \
+            "MITRE ATT&CK T1059.007 - JavaScript"
     fi
     
     # Check for URLs
     if echo "$content" | grep -qiE "https?://"; then
-        local embedded_urls=$(echo "$content" | grep -oE "https?://[^\s\"'<>]+")
+        local embedded_urls=$(echo "$content" | grep -oE "https?://[^[[:space:]]\"'<>]+")
         log_forensic "Embedded URLs in decoded content: $embedded_urls"
     fi
     
     # Check for commands
     if echo "$content" | grep -qiE "powershell|cmd|bash|sh|wget|curl|python"; then
-        log_threat 50 "Command execution keywords in decoded content"
+        local cmd_keywords
+        cmd_keywords=$(echo "$content" | grep -oiE "powershell|cmd|bash|sh|wget|curl|python" | sort -u | tr '\n' ',' | sed 's/,$//')
+        log_forensic_detection 50 \
+            "Command Execution Keywords Detected" \
+            "commands:$cmd_keywords" \
+            "System command keyword matching" \
+            "Decoded QR content" \
+            "HIGH RISK - Content contains shell/command execution keywords. Do not execute." \
+            "MITRE ATT&CK T1059 - Command and Scripting Interpreter"
     fi
 }
 
@@ -5478,49 +5968,61 @@ check_homograph_attack() {
     local has_greek=$(echo "$domain" | grep -E '[α-ωΑ-Ω]' | wc -l)
     
     if [ $has_latin -gt 0 ] && ([ $has_cyrillic -gt 0 ] || [ $has_greek -gt 0 ]); then
-        log_threat 50 "HOMOGRAPH ATTACK: Mixed character sets detected"
+        log_forensic_detection 50 \
+            "HOMOGRAPH ATTACK - Mixed Character Sets" \
+            "domain:$domain, scripts:latin+cyrillic/greek" \
+            "Unicode script mixing detection" \
+            "URL domain analysis" \
+            "SPOOFING ATTEMPT - Domain uses mixed character sets to impersonate legitimate domain" \
+            "MITRE ATT&CK T1566.002 - Spearphishing Link"
     fi
     
     # Check for lookalike characters (non-ASCII only)
-    # GRANULAR OUTPUT RESTORED: Output per-character threat as required for forensic visibility
     local homograph_found=false
     local homograph_count=0
+    local homograph_chars_found=""
     for char in "${HOMOGRAPH_CHARS[@]}"; do
         [ -z "$char" ] && continue
         if echo "$domain" | grep -qF "$char"; then
-            # GRANULAR: Output individual threat per homograph character (Paste A format)
-            log_threat 40 "Homograph character detected: $char"
             ((homograph_count++))
-            
-            if [ "$homograph_found" = false ]; then
-                log_warning "⚠️  HOMOGRAPH ATTACK DETECTED in domain!"
-                log_warning "    ├─ Domain: $domain"
-                homograph_found=true
-            fi
-            # Get the Unicode code point for the character
             local codepoint=$(printf '%s' "$char" | od -An -tx1 | tr -d ' \n')
-            log_warning "    ├─ Lookalike character: '$char' (bytes: $codepoint)"
+            homograph_chars_found+="$char(0x$codepoint), "
+            homograph_found=true
         fi
     done
+    
     if [ "$homograph_found" = true ]; then
-        log_warning "    └─ Recommendation: Verify domain authenticity - may be spoofing a legitimate site"
-        log_warning "    └─ Total homograph characters found: $homograph_count"
+        homograph_chars_found=$(echo "$homograph_chars_found" | sed 's/, $//')
+        log_forensic_detection $((40 + homograph_count * 5)) \
+            "HOMOGRAPH ATTACK - Lookalike Characters Detected" \
+            "domain:$domain, homograph_chars:$homograph_chars_found, count:$homograph_count" \
+            "Unicode homograph character detection" \
+            "URL domain analysis" \
+            "SPOOFING ATTEMPT - Domain contains lookalike characters that mimic ASCII. Verify authenticity." \
+            "MITRE ATT&CK T1566.002 - Spearphishing Link"
     fi
     
     # Punycode detection
     if echo "$domain" | grep -qE 'xn--'; then
-        log_threat 30 "Punycode domain (IDN spoofing possible): $domain"
         local decoded=$(python3 -c "print('$domain'.encode('ascii').decode('idna'))" 2>/dev/null)
-        [ -n "$decoded" ] && log_info "Decoded IDN: $decoded"
+        log_forensic_detection 30 \
+            "Punycode/IDN Domain Detected" \
+            "domain:$domain, decoded:${decoded:-unknown}" \
+            "IDN/Punycode detection" \
+            "URL domain analysis" \
+            "IDN SPOOFING POSSIBLE - Punycode domain may visually impersonate legitimate domain" \
+            "MITRE ATT&CK T1583.001 - Acquire Infrastructure: Domains"
     fi
     
+    # Additional homograph check
     homograph_chars=( "l" "w" "і" "1" "0" "о" "Ο" "ϴ" "Ӏ" )
     for char in "${homograph_chars[@]}"; do
         [[ -z "$char" ]] && continue
         if [[ "$url" == *"$char"* ]]; then
-            echo -e "${RED}[THREAT +40]${NC} Homograph character detected: $char"
+            # Already logged above if detected
+            :
         fi
-done
+    done
 }
 
 check_typosquatting() {
@@ -5530,7 +6032,13 @@ check_typosquatting() {
         if echo "$domain" | grep -qiE "$brand"; then
             # Check for typosquatting patterns
             if echo "$domain" | grep -qiE "${brand}[0-9]|${brand}-|${brand}_|${brand}\."; then
-                log_threat 35 "Potential typosquatting: $brand"
+                log_forensic_detection 35 \
+                    "Potential Typosquatting Detected" \
+                    "domain:$domain, impersonated_brand:$brand" \
+                    "Brand impersonation pattern matching" \
+                    "URL domain analysis" \
+                    "Domain appears to impersonate $brand - verify legitimacy before proceeding" \
+                    "MITRE ATT&CK T1583.001 - Acquire Infrastructure: Domains"
             fi
             
             # Character substitution detection
@@ -5544,7 +6052,13 @@ check_typosquatting() {
                 local repl="${sub#*/}"
                 local pattern="${brand//$orig/$repl}"
                 if echo "$domain" | grep -qiE "$pattern" && [ "$pattern" != "$brand" ]; then
-                    log_threat 40 "Character substitution typosquatting detected"
+                    log_forensic_detection 40 \
+                        "Character Substitution Typosquatting" \
+                        "domain:$domain, brand:$brand, substitution:$orig→$repl" \
+                        "Leet-speak/character substitution detection" \
+                        "URL domain analysis" \
+                        "PHISHING LIKELY - Domain uses character substitution to impersonate $brand" \
+                        "MITRE ATT&CK T1566.002 - Spearphishing Link"
                     break
                 fi
             done
@@ -5592,8 +6106,13 @@ check_domain_whois() {
         fi
     fi
     
-    # Registrar string: $registrar
+    # Extract registrar FIRST before checking it
+    local registrar=$(grep -i "Registrar:" "$whois_file" | head -1)
+    
+    # Registrar check - check for high-abuse registrars
     if [ -n "$registrar" ]; then
+        log_forensic "Registrar: $registrar"
+        
         high_abuse_registrars=(
             "namecheap" "namesilo" "porkbun" "dynadot" "enom" "resellerclub"
             "publicdomainregistry" "alpnames" "internetbs" "reg\.ru" "r01"
@@ -5601,26 +6120,23 @@ check_domain_whois() {
             "west\.cn" "xinnet" "hichina" "now\.cn" "cndns" "22\.cn" "35\.com"
             "net\.cn"
         )
-        registrar_lc=$(echo "$registrar" | tr '[:upper:]' '[:lower:]')
+        local registrar_lc=$(echo "$registrar" | tr '[:upper:]' '[:lower:]')
         for r in "${high_abuse_registrars[@]}"; do
             if [[ "$registrar_lc" =~ $r ]]; then
-                echo -e "${YELLOW}[WARNING]${NC} Domain registered with high-abuse registrar: $r"
+                log_forensic_detection 15 \
+                    "High-Abuse Registrar Detected" \
+                    "registrar:$r" \
+                    "Known high-abuse registrar matching" \
+                    "WHOIS registrar field" \
+                    "Domain registered with known high-abuse registrar - exercise caution" \
+                    "Threat Intelligence - Registrar Reputation"
             fi
         done
-    fi
-    
-    # Registrar check - check against suspicious registrars
-    local registrar=$(grep -i "Registrar:" "$whois_file" | head -1)
-    if [ -n "$registrar" ]; then
-        log_forensic "Registrar: $registrar"
         
-        # Check against known high-abuse registrars
-        local registrar_lower=$(echo "$registrar" | tr '[:upper:]' '[:lower:]')
+        # Also check against SUSPICIOUS_REGISTRARS array
         for suspicious_reg in "${SUSPICIOUS_REGISTRARS[@]}"; do
             [ -z "$suspicious_reg" ] && continue
-            if echo "$registrar_lower" | grep -qi "$suspicious_reg"; then
-                log_warning "Domain registered with high-abuse registrar: $suspicious_reg"
-                log_threat 15 "High-abuse registrar detected: $suspicious_reg"
+            if echo "$registrar_lc" | grep -qi "$suspicious_reg"; then
                 record_ioc "suspicious_registrar" "$suspicious_reg" "Known high-abuse domain registrar"
             fi
         done
@@ -5958,10 +6474,13 @@ check_against_threat_intel() {
             # Ransomware domains
             if [ -f "${TEMP_DIR}/threat_intel/ransomware_domains.txt" ]; then
                 if grep -qiF "$ioc" "${TEMP_DIR}/threat_intel/ransomware_domains.txt" 2>/dev/null; then
-                    log_threat 100 "🔒 RANSOMWARE DOMAIN DETECTED!"
-                    log_error "    ├─ Source: Ransomware Tracker"
-                    log_error "    ├─ Domain: $ioc"
-                    log_error "    └─ Recommendation: Block immediately - Associated with ransomware operations"
+                    log_forensic_detection 100 \
+                        "RANSOMWARE DOMAIN DETECTED" \
+                        "domain:$ioc" \
+                        "Ransomware Tracker Feed" \
+                        "QR decoded content - domain" \
+                        "BLOCK IMMEDIATELY - Associated with ransomware operations" \
+                        "https://ransomwaretracker.abuse.ch"
                     record_ioc "ransomware_domain" "$ioc" "Ransomware tracker match"
                     ((matches++))
                 fi
@@ -5970,10 +6489,13 @@ check_against_threat_intel() {
             # OTX IOCs
             if [ -f "${TEMP_DIR}/threat_intel/otx_iocs.txt" ]; then
                 if grep -qiF "$ioc" "${TEMP_DIR}/threat_intel/otx_iocs.txt" 2>/dev/null; then
-                    log_threat 80 "⚠️  THREAT INTELLIGENCE MATCH!"
-                    log_warning "    ├─ Source: OTX AlienVault"
-                    log_warning "    ├─ Domain: $ioc"
-                    log_warning "    └─ Recommendation: Investigate - Known threat indicator"
+                    log_forensic_detection 80 \
+                        "Threat Intelligence Match - OTX" \
+                        "domain:$ioc" \
+                        "OTX AlienVault Feed" \
+                        "QR decoded content - domain" \
+                        "Investigate - Known threat indicator in OTX database" \
+                        "https://otx.alienvault.com"
                     record_ioc "otx_ioc" "$ioc" "OTX AlienVault match"
                     ((matches++))
                 fi
@@ -5983,10 +6505,13 @@ check_against_threat_intel() {
             # Spamhaus DROP
             if [ -f "${TEMP_DIR}/threat_intel/spamhaus_drop.txt" ]; then
                 if grep -qF "$ioc" "${TEMP_DIR}/threat_intel/spamhaus_drop.txt" 2>/dev/null; then
-                    log_threat 100 "🚫 BLOCKED IP DETECTED!"
-                    log_error "    ├─ Source: Spamhaus DROP List"
-                    log_error "    ├─ IP: $ioc"
-                    log_error "    └─ Recommendation: Block at firewall - Known malicious infrastructure"
+                    log_forensic_detection 100 \
+                        "BLOCKED IP DETECTED - Spamhaus DROP" \
+                        "ip:$ioc" \
+                        "Spamhaus DROP List" \
+                        "QR decoded content - IP address" \
+                        "BLOCK AT FIREWALL - Known malicious infrastructure on Spamhaus blocklist" \
+                        "https://www.spamhaus.org/drop/"
                     record_ioc "blocked_ip" "$ioc" "Spamhaus DROP match"
                     ((matches++))
                 fi
@@ -5995,10 +6520,13 @@ check_against_threat_intel() {
             # Feodo Tracker
             if [ -f "${TEMP_DIR}/threat_intel/feodo_ips.txt" ]; then
                 if grep -qF "$ioc" "${TEMP_DIR}/threat_intel/feodo_ips.txt" 2>/dev/null; then
-                    log_threat 100 "💰 BANKING TROJAN C2 DETECTED!"
-                    log_error "    ├─ Source: Feodo Tracker (Abuse.ch)"
-                    log_error "    ├─ IP: $ioc"
-                    log_error "    └─ Recommendation: Block immediately - Banking trojan command & control"
+                    log_forensic_detection 100 \
+                        "BANKING TROJAN C2 DETECTED" \
+                        "ip:$ioc, type:banking_trojan_c2" \
+                        "Feodo Tracker (Abuse.ch)" \
+                        "QR decoded content - IP address" \
+                        "BLOCK IMMEDIATELY - Banking trojan command & control server" \
+                        "https://feodotracker.abuse.ch"
                     record_ioc "c2_ip" "$ioc" "Feodo Tracker match"
                     ((matches++))
                 fi
@@ -6007,7 +6535,13 @@ check_against_threat_intel() {
             # ET Compromised
             if [ -f "${TEMP_DIR}/threat_intel/et_compromised.txt" ]; then
                 if grep -qF "$ioc" "${TEMP_DIR}/threat_intel/et_compromised.txt" 2>/dev/null; then
-                    log_threat 80 "IP found in EmergingThreats compromised list!"
+                    log_forensic_detection 80 \
+                        "Compromised IP Detected" \
+                        "ip:$ioc" \
+                        "EmergingThreats Compromised IPs" \
+                        "QR decoded content - IP address" \
+                        "Exercise caution - IP flagged in EmergingThreats compromised list" \
+                        "https://rules.emergingthreats.net"
                     ((matches++))
                 fi
             fi
@@ -6016,7 +6550,13 @@ check_against_threat_intel() {
             # Malware Bazaar
             if [ -f "${TEMP_DIR}/threat_intel/malware_bazaar_md5.txt" ]; then
                 if grep -qiF "$ioc" "${TEMP_DIR}/threat_intel/malware_bazaar_md5.txt" 2>/dev/null; then
-                    log_threat 100 "Hash found in Malware Bazaar!"
+                    log_forensic_detection 100 \
+                        "KNOWN MALWARE HASH DETECTED" \
+                        "hash:$ioc" \
+                        "Malware Bazaar (Abuse.ch)" \
+                        "File hash analysis" \
+                        "MALWARE CONFIRMED - Hash matches known malware sample in Malware Bazaar" \
+                        "https://bazaar.abuse.ch"
                     ((matches++))
                 fi
             fi
@@ -6320,11 +6860,23 @@ check_sandbox_evasion() {
         "uptime" "GetTickCount64"
     )
     
+    local found_techniques=()
     for technique in "${evasion_techniques[@]}"; do
         if echo "$content" | grep -qiE "$technique"; then
-            log_threat 55 "Sandbox evasion technique detected: $technique"
+            found_techniques+=("$technique")
         fi
     done
+    
+    if [ ${#found_techniques[@]} -gt 0 ]; then
+        local techniques_str=$(IFS=', '; echo "${found_techniques[*]}")
+        log_forensic_detection 55 \
+            "Sandbox Evasion Techniques Detected" \
+            "techniques:$techniques_str, count:${#found_techniques[@]}" \
+            "Behavioral sandbox evasion pattern matching" \
+            "Decoded content analysis" \
+            "MALWARE BEHAVIOR - Content attempts to detect sandbox/analysis environment" \
+            "MITRE ATT&CK T1497 - Virtualization/Sandbox Evasion"
+    fi
 }
 
 check_anti_vm_techniques() {
@@ -6340,11 +6892,23 @@ check_anti_vm_techniques() {
         "joebox" "sunbelt" "threatexpert" "virustotal"
     )
     
+    local found_indicators=()
     for indicator in "${vm_indicators[@]}"; do
         if echo "$content" | grep -qiE "$indicator"; then
-            log_threat 45 "Anti-VM technique detected: $indicator"
+            found_indicators+=("$indicator")
         fi
     done
+    
+    if [ ${#found_indicators[@]} -gt 0 ]; then
+        local indicators_str=$(IFS=', '; echo "${found_indicators[*]}")
+        log_forensic_detection 45 \
+            "Anti-VM Techniques Detected" \
+            "vm_checks:$indicators_str, count:${#found_indicators[@]}" \
+            "Virtual machine detection pattern matching" \
+            "Decoded content analysis" \
+            "MALWARE BEHAVIOR - Content attempts to detect virtual machine environment" \
+            "MITRE ATT&CK T1497.001 - System Checks"
+    fi
 }
 
 check_anti_debug_techniques() {
@@ -6363,11 +6927,23 @@ check_anti_debug_techniques() {
         "CloseHandle.*invalid" "NtClose"
     )
     
+    local found_checks=()
     for check in "${debug_checks[@]}"; do
         if echo "$content" | grep -qiE "$check"; then
-            log_threat 50 "Anti-debug technique detected: $check"
+            found_checks+=("$check")
         fi
     done
+    
+    if [ ${#found_checks[@]} -gt 0 ]; then
+        local checks_str=$(IFS=', '; echo "${found_checks[*]}")
+        log_forensic_detection 50 \
+            "Anti-Debug Techniques Detected" \
+            "debug_checks:$checks_str, count:${#found_checks[@]}" \
+            "Debugger detection pattern matching" \
+            "Decoded content analysis" \
+            "MALWARE BEHAVIOR - Content attempts to detect debugging/analysis tools" \
+            "MITRE ATT&CK T1622 - Debugger Evasion"
+    fi
 }
 
 check_time_based_evasion() {
@@ -6375,12 +6951,18 @@ check_time_based_evasion() {
     
     # Check for time delays
     if echo "$content" | grep -qiE "sleep[[:space:]]*[(\[]?[[:space:]]*[0-9]{4,}|timeout[[:space:]]*[/]?[[:space:]]*t?[[:space:]]*[0-9]{3,}|delay[[:space:]]*[:\(][[:space:]]*[0-9]{4,}"; then
-        log_threat 40 "Time-based evasion detected (long sleep/delay)"
+        log_forensic_detection 40 \
+            "Time-Based Evasion Detected" \
+            "technique:long_sleep/delay" \
+            "Time delay pattern matching" \
+            "Decoded content analysis" \
+            "EVASION TECHNIQUE - Long delay used to evade sandbox analysis timeout" \
+            "MITRE ATT&CK T1497.003 - Time Based Evasion"
     fi
     
     # Check for date/time checks
     if echo "$content" | grep -qiE "GetSystemTime|GetLocalTime|QueryPerformanceCounter|timeGetTime"; then
-        log_warning "Time-related API calls detected (possible time-based evasion)"
+        log_info "Time-related API calls detected (possible time-based evasion)"
     fi
 }
 
@@ -6411,11 +6993,23 @@ check_persistence_techniques() {
         "MBR" "VBR" "bootmgr" "winload"
     )
     
+    local found_indicators=()
     for indicator in "${persistence_indicators[@]}"; do
         if echo "$content" | grep -qiE "$indicator"; then
-            log_threat 60 "Persistence technique detected: $indicator"
+            found_indicators+=("$indicator")
         fi
     done
+    
+    if [ ${#found_indicators[@]} -gt 0 ]; then
+        local indicators_str=$(IFS=', '; echo "${found_indicators[*]}")
+        log_forensic_detection 60 \
+            "Persistence Techniques Detected" \
+            "persistence_methods:$indicators_str, count:${#found_indicators[@]}" \
+            "Persistence mechanism pattern matching" \
+            "Decoded content analysis" \
+            "MALWARE BEHAVIOR - Content establishes persistence for automatic execution" \
+            "MITRE ATT&CK T1547 - Boot or Logon Autostart Execution"
+    fi
 }
 
 check_lateral_movement() {
@@ -6434,11 +7028,23 @@ check_lateral_movement() {
         "smbexec" "dcomexec" "atexec"
     )
     
+    local found_indicators=()
     for indicator in "${lateral_indicators[@]}"; do
         if echo "$content" | grep -qiE "$indicator"; then
-            log_threat 65 "Lateral movement indicator: $indicator"
+            found_indicators+=("$indicator")
         fi
     done
+    
+    if [ ${#found_indicators[@]} -gt 0 ]; then
+        local indicators_str=$(IFS=', '; echo "${found_indicators[*]}")
+        log_forensic_detection 65 \
+            "Lateral Movement Indicators Detected" \
+            "lateral_techniques:$indicators_str, count:${#found_indicators[@]}" \
+            "Network propagation pattern matching" \
+            "Decoded content analysis" \
+            "MALWARE BEHAVIOR - Content indicates movement to other systems on network" \
+            "MITRE ATT&CK T1021 - Remote Services"
+    fi
 }
 
 check_exfiltration_patterns() {
@@ -6461,11 +7067,23 @@ check_exfiltration_patterns() {
         "smtp" "sendmail" "blat"
     )
     
+    local found_indicators=()
     for indicator in "${exfil_indicators[@]}"; do
         if echo "$content" | grep -qiE "$indicator"; then
-            log_threat 55 "Data exfiltration pattern: $indicator"
+            found_indicators+=("$indicator")
         fi
     done
+    
+    if [ ${#found_indicators[@]} -gt 0 ]; then
+        local indicators_str=$(IFS=', '; echo "${found_indicators[*]}")
+        log_forensic_detection 55 \
+            "Data Exfiltration Patterns Detected" \
+            "exfil_methods:$indicators_str, count:${#found_indicators[@]}" \
+            "Data exfiltration pattern matching" \
+            "Decoded content analysis" \
+            "DATA THEFT - Content indicates data collection and exfiltration capabilities" \
+            "MITRE ATT&CK T1041 - Exfiltration Over C2 Channel"
+    fi
 }
 
 check_privilege_escalation() {
@@ -6490,11 +7108,23 @@ check_privilege_escalation() {
         "use.*after.*free" "race.*condition"
     )
     
+    local found_indicators=()
     for indicator in "${privesc_indicators[@]}"; do
         if echo "$content" | grep -qiE "$indicator"; then
-            log_threat 60 "Privilege escalation indicator: $indicator"
+            found_indicators+=("$indicator")
         fi
     done
+    
+    if [ ${#found_indicators[@]} -gt 0 ]; then
+        local indicators_str=$(IFS=', '; echo "${found_indicators[*]}")
+        log_forensic_detection 60 \
+            "Privilege Escalation Indicators Detected" \
+            "privesc_techniques:$indicators_str, count:${#found_indicators[@]}" \
+            "Privilege escalation pattern matching" \
+            "Decoded content analysis" \
+            "MALWARE BEHAVIOR - Content attempts to gain elevated privileges" \
+            "MITRE ATT&CK T1068 - Exploitation for Privilege Escalation"
+    fi
 }
 
 check_defense_evasion() {
@@ -6522,23 +7152,47 @@ check_defense_evasion() {
         "format" "diskpart.*clean"
     )
     
+    local found_indicators=()
     for indicator in "${evasion_indicators[@]}"; do
         if echo "$content" | grep -qiE "$indicator"; then
-            log_threat 55 "Defense evasion technique: $indicator"
+            found_indicators+=("$indicator")
         fi
     done
+    
+    if [ ${#found_indicators[@]} -gt 0 ]; then
+        local indicators_str=$(IFS=', '; echo "${found_indicators[*]}")
+        log_forensic_detection 55 \
+            "Defense Evasion Techniques Detected" \
+            "evasion_methods:$indicators_str, count:${#found_indicators[@]}" \
+            "Defense evasion pattern matching" \
+            "Decoded content analysis" \
+            "MALWARE BEHAVIOR - Content attempts to disable security controls or hide activity" \
+            "MITRE ATT&CK T1562 - Impair Defenses"
+    fi
 }
 
 check_c2_patterns() {
     local content="$1"
     
+    local found_patterns=()
     # Check against C2 pattern database
     for pattern_name in "${!C2_PATTERNS[@]}"; do
         local pattern="${C2_PATTERNS[$pattern_name]}"
         if echo "$content" | grep -qiE "$pattern"; then
-            log_threat 70 "C2 pattern detected: $pattern_name"
+            found_patterns+=("$pattern_name")
         fi
     done
+    
+    if [ ${#found_patterns[@]} -gt 0 ]; then
+        local patterns_str=$(IFS=', '; echo "${found_patterns[*]}")
+        log_forensic_detection 70 \
+            "Command & Control Patterns Detected" \
+            "c2_patterns:$patterns_str, count:${#found_patterns[@]}" \
+            "C2 communication pattern matching" \
+            "Decoded content analysis" \
+            "ACTIVE THREAT - Content indicates C2 communication infrastructure" \
+            "MITRE ATT&CK T1071 - Application Layer Protocol"
+    fi
 }
 
 check_credential_access() {
@@ -6563,11 +7217,23 @@ check_credential_access() {
         "responder" "inveigh" "ntlmrelay"
     )
     
+    local found_indicators=()
     for indicator in "${cred_indicators[@]}"; do
         if echo "$content" | grep -qiE "$indicator"; then
-            log_threat 70 "Credential access indicator: $indicator"
+            found_indicators+=("$indicator")
         fi
     done
+    
+    if [ ${#found_indicators[@]} -gt 0 ]; then
+        local indicators_str=$(IFS=', '; echo "${found_indicators[*]}")
+        log_forensic_detection 70 \
+            "Credential Access Indicators Detected" \
+            "credential_techniques:$indicators_str, count:${#found_indicators[@]}" \
+            "Credential theft pattern matching" \
+            "Decoded content analysis" \
+            "CREDENTIAL THEFT - Content targets passwords, keys, or authentication data" \
+            "MITRE ATT&CK T1003 - OS Credential Dumping"
+    fi
 }
 
 check_discovery_techniques() {
@@ -6622,11 +7288,23 @@ check_impact_techniques() {
         "stratum" "mining.*pool"
     )
     
+    local found_indicators=()
     for indicator in "${impact_indicators[@]}"; do
         if echo "$content" | grep -qiE "$indicator"; then
-            log_threat 80 "Impact technique detected: $indicator"
+            found_indicators+=("$indicator")
         fi
     done
+    
+    if [ ${#found_indicators[@]} -gt 0 ]; then
+        local indicators_str=$(IFS=', '; echo "${found_indicators[*]}")
+        log_forensic_detection 80 \
+            "Impact Techniques Detected" \
+            "impact_methods:$indicators_str, count:${#found_indicators[@]}" \
+            "Destructive/impact pattern matching" \
+            "Decoded content analysis" \
+            "DESTRUCTIVE THREAT - Content may encrypt, destroy, or disrupt systems" \
+            "MITRE ATT&CK T1486 - Data Encrypted for Impact"
+    fi
 }
 
 ################################################################################
@@ -6808,7 +7486,7 @@ analyze_script_content() {
     fi
     
     # Python
-    if echo "$content" | grep -qiE "python|import\s+|from\s+.*\s+import|exec\(|eval\(|__import__"; then
+    if echo "$content" | grep -qiE "python|import[[:space:]]\+|from[[:space:]]\+.*[[:space:]]+import|exec\(|eval\(|__import__"; then
         log_threat 40 "Python content detected"
         analyze_python_payload "$content"
     fi
@@ -6849,7 +7527,7 @@ analyze_powershell_payload() {
     done
     
     # Encoded commands
-    if echo "$content" | grep -qiE "\-enc|\-encodedcommand|\-e\s+[A-Za-z0-9+/=]{20,}"; then
+    if echo "$content" | grep -qiE "\-enc|\-encodedcommand|\-e[[:space:]]+[A-Za-z0-9+/=]{20,}"; then
         log_threat 70 "Encoded PowerShell command detected"
         
         # Try to decode
@@ -6864,7 +7542,7 @@ analyze_powershell_payload() {
     fi
     
     # Bypass techniques
-    if echo "$content" | grep -qiE "\-ExecutionPolicy\s+Bypass|\-ep\s+bypass|\-nop|\-windowstyle\s+hidden|\-w\s+hidden"; then
+    if echo "$content" | grep -qiE "\-ExecutionPolicy[[:space:]]\+Bypass|\-ep[[:space:]]\+bypass|\-nop|\-windowstyle[[:space:]]\+hidden|\-w[[:space:]]+hidden"; then
         log_threat 55 "PowerShell bypass/evasion flags detected"
     fi
 }
@@ -6878,15 +7556,15 @@ analyze_shell_payload() {
     local dangerous_commands=(
         "wget.*\|.*sh" "curl.*\|.*bash" "curl.*\|.*sh"
         "wget.*-O.*&&.*chmod" "curl.*-o.*&&.*chmod"
-        "nc\s+-e" "ncat\s+-e" "/dev/tcp/"
-        "bash\s+-i" "python.*-c.*socket"
+        "nc[[:space:]]\+-e" "ncat[[:space:]]\+-e" "/dev/tcp/"
+        "bash[[:space:]]\+-i" "python.*-c.*socket"
         "perl.*-e.*socket" "ruby.*-rsocket"
         "mkfifo" "mknod" "telnet.*\|.*bash"
-        "rm\s+-rf\s+/" "dd\s+if=/dev/zero"
-        "chmod\s+777" "chmod\s+u\+s"
+        "rm[[:space:]]\+-rf[[:space:]]\+/" "dd[[:space:]]\+if=/dev/zero"
+        "chmod[[:space:]]\+777" "chmod[[:space:]]\+u\+s"
         "crontab" "/etc/passwd" "/etc/shadow"
         "useradd" "adduser" "usermod"
-        "iptables\s+-F" "ufw\s+disable"
+        "iptables[[:space:]]\+-F" "ufw[[:space:]]\+disable"
     )
     
     for cmd in "${dangerous_commands[@]}"; do
@@ -6908,13 +7586,13 @@ analyze_javascript_payload() {
     
     # Dangerous patterns
     local dangerous_patterns=(
-        "eval\s*\(" "Function\s*\(" "setTimeout\s*\(.*eval"
-        "document\.write\s*\(.*unescape" "document\.write\s*\(.*String\.fromCharCode"
-        "createElement\s*\(.*script" "appendChild\s*\("
-        "XMLHttpRequest" "fetch\s*\(" "ActiveXObject"
+        "eval[[:space:]]*\(" "Function[[:space:]]*\(" "setTimeout[[:space:]]*\(.*eval"
+        "document\.write[[:space:]]*\(.*unescape" "document\.write[[:space:]]*\(.*String\.fromCharCode"
+        "createElement[[:space:]]*\(.*script" "appendChild[[:space:]]*\("
+        "XMLHttpRequest" "fetch[[:space:]]*\(" "ActiveXObject"
         "WScript\.Shell" "WScript\.CreateObject"
-        "location\s*=" "location\.href\s*=" "location\.replace"
-        "window\.open\s*\(" "document\.cookie"
+        "location[[:space:]]*=" "location\.href[[:space:]]*=" "location\.replace"
+        "window\.open[[:space:]]*\(" "document\.cookie"
         "localStorage" "sessionStorage"
         "navigator\.sendBeacon" "WebSocket"
     )
@@ -6940,13 +7618,13 @@ analyze_python_payload() {
     
     # Dangerous patterns
     local dangerous_patterns=(
-        "__import__\s*\(" "importlib" "exec\s*\(" "eval\s*\("
+        "__import__[[:space:]]*\(" "importlib" "exec[[:space:]]*\(" "eval[[:space:]]*\("
         "subprocess" "os\.system" "os\.popen" "commands\."
         "socket\.socket" "urllib\.request" "requests\."
         "paramiko" "fabric" "invoke"
         "pickle\.load" "marshal\.load" "shelve"
         "pty\.spawn" "os\.dup2"
-        "compile\s*\(" "code\.interact"
+        "compile[[:space:]]*\(" "code\.interact"
         "ctypes" "cffi"
     )
     
@@ -6969,8 +7647,8 @@ analyze_command_content() {
         "bitsadmin" "msiexec" "installutil" "regasm"
         "msbuild" "cmstp" "control\.exe" "eventvwr"
         "fodhelper" "computerdefaults" "sdclt"
-        "wmic" "net\s+user" "net\s+localgroup" "schtasks"
-        "reg\s+add" "reg\s+delete" "bcdedit"
+        "wmic" "net[[:space:]]\+user" "net[[:space:]]\+localgroup" "schtasks"
+        "reg[[:space:]]\+add" "reg[[:space:]]\+delete" "bcdedit"
         "vssadmin" "wbadmin" "icacls" "takeown"
     )
     
@@ -7074,9 +7752,9 @@ analyze_phone_numbers() {
     
     # International phone patterns
     local phone_patterns=(
-        "\+[0-9]{1,3}[-.\s]?[0-9]{3,4}[-.\s]?[0-9]{3,4}[-.\s]?[0-9]{3,4}"
-        "[0-9]{3}[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}"
-        "\([0-9]{3}\)[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}"
+        "\+[0-9]{1,3}[-.[:space:]]?[0-9]{3,4}[-.[:space:]]?[0-9]{3,4}[-.[:space:]]?[0-9]{3,4}"
+        "[0-9]{3}[-.[:space:]]?[0-9]{3}[-.[:space:]]?[0-9]{4}"
+        "\([0-9]{3}\)[-.[:space:]]?[0-9]{3}[-.[:space:]]?[0-9]{4}"
         "1-[0-9]{3}-[0-9]{3}-[0-9]{4}"
         "1-800-[0-9]{3}-[0-9]{4}"
         "1-888-[0-9]{3}-[0-9]{4}"
@@ -7139,7 +7817,7 @@ evaluate_all_yara_rules() {
         local matched=$(evaluate_yara_rule "$content" "$rule_name")
         if [ "$matched" = "true" ]; then
             # Extract severity from rule
-            local severity=$(echo "${YARA_RULES[$rule_name]}" | grep -oE "severity:\s*\w+" | cut -d: -f2 | tr -d ' ')
+            local severity=$(echo "${YARA_RULES[$rule_name]}" | grep -oE "severity:[[:space:]]*\w+" | cut -d: -f2 | tr -d ' ')
             
             case "$severity" in
                 "CRITICAL") log_threat 80 "YARA rule matched: $rule_name (CRITICAL)" ;;
@@ -7279,19 +7957,19 @@ evaluate_yara_rule() {
             fi
             ;;
         "webshell")
-            if echo "$content" | grep -qiE "eval\s*\(\s*\$_(GET|POST|REQUEST|COOKIE)" || \
-               echo "$content" | grep -qiE "system\s*\(\s*\$_(GET|POST)" || \
+            if echo "$content" | grep -qiE "eval[[:space:]]*\([[:space:]]*\$_(GET|POST|REQUEST|COOKIE)" || \
+               echo "$content" | grep -qiE "system[[:space:]]*\([[:space:]]*\$_(GET|POST)" || \
                echo "$content" | grep -qiE "c99shell|r57shell|wso.shell|b374k"; then
                 matched=true
             fi
             ;;
         "sql_injection")
-            if echo "$content" | grep -qiE "UNION\s+SELECT|OR\s+1=1|AND\s+1=1|DROP\s+TABLE|SLEEP\(|BENCHMARK\("; then
+            if echo "$content" | grep -qiE "UNION[[:space:]]\+SELECT|OR[[:space:]]\+1=1|AND[[:space:]]\+1=1|DROP[[:space:]]+TABLE|SLEEP\(|BENCHMARK\("; then
                 matched=true
             fi
             ;;
         "xss_attack")
-            if echo "$content" | grep -qiE "<script|onerror\s*=|onload\s*=|javascript:"; then
+            if echo "$content" | grep -qiE "<script|onerror[[:space:]]*=|onload[[:space:]]*=|javascript:"; then
                 matched=true
             fi
             ;;
@@ -8124,7 +8802,7 @@ analyze_mobile_deeplinks() {
         mobile_findings+=("android_apk_direct")
         ((mobile_score += 40))
         
-        local apk_url=$(echo "$content" | grep -oiE "https?://[^\s\"']+\.apk" | head -1)
+        local apk_url=$(echo "$content" | grep -oiE "https?://[^[[:space:]]\"']+\.apk" | head -1)
         record_ioc "apk_url" "$apk_url" "Direct APK download"
     fi
     
@@ -8371,7 +9049,7 @@ analyze_telephony_attacks() {
     
     # Check for SMS URI with suspicious content
     if echo "$content" | grep -qiE "sms:[+0-9]{5,}"; then
-        local sms_uri=$(echo "$content" | grep -oiE "sms:[^?&\s]+" | head -1)
+        local sms_uri=$(echo "$content" | grep -oiE "sms:[^?&[[:space:]]]+" | head -1)
         log_info "SMS URI found: $sms_uri"
         telephony_findings+=("sms_uri:$sms_uri")
         ((telephony_score += 10))
@@ -8491,7 +9169,7 @@ analyze_hardware_exploits() {
         hardware_findings+=("rtsp_stream")
         ((hardware_score += 30))
         
-        local rtsp_url=$(echo "$content" | grep -oiE "rtsp://[^\s\"']+" | head -1)
+        local rtsp_url=$(echo "$content" | grep -oiE "rtsp://[^[[:space:]]\"']+" | head -1)
         record_ioc "rtsp_url" "$rtsp_url" "RTSP streaming URL"
     fi
     
@@ -8848,7 +9526,7 @@ analyze_decoded_content_threats() {
     fi
     
     if echo "$decoded_content" | grep -qiE "http[s]?://"; then
-        local urls=$(echo "$decoded_content" | grep -oiE "https?://[^\s\"'<>]+" )
+        local urls=$(echo "$decoded_content" | grep -oiE "https?://[^[[:space:]]\"'<>]+" )
         for url in $urls; do
             log_forensic "URL found in decoded content: $url"
             record_ioc "decoded_url" "$url" "URL from decoded content"
@@ -9311,9 +9989,17 @@ analyze_asn_infrastructure() {
     local asn_score=0
     local analyzed_count=0
     
-    # Extract domains and IPs
-    local domains=$(echo "$content" | grep -oiE "[a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,}" | sort -u)
-    local ips=$(echo "$content" | grep -oE "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}" | sort -u)
+    # Extract domains from URLs - more robust pattern
+    local domains=$(echo "$content" | grep -oiE 'https?://([a-zA-Z0-9][-a-zA-Z0-9]*[.])+[a-zA-Z]{2,}' | \
+        sed 's|https\?://||i' | sed 's|/.*||' | sort -u)
+    
+    # Also try to extract standalone domains
+    local standalone_domains=$(echo "$content" | grep -oiE '([a-zA-Z0-9][-a-zA-Z0-9]*[.])+[a-zA-Z]{2,}' | sort -u)
+    domains="$domains $standalone_domains"
+    domains=$(echo "$domains" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+    
+    # Extract IPs
+    local ips=$(echo "$content" | grep -oE "[0-9]{1,3}[.][0-9]{1,3}[.][0-9]{1,3}[.][0-9]{1,3}" | sort -u)
     
     # Display extracted targets
     if [ -n "$domains" ] || [ -n "$ips" ]; then
@@ -10091,31 +10777,41 @@ else:
 EOF
 }
 
-# After extracting $domain (domain or subdomain from QR URL)
-    domain_entropy=$(echo -n "$domain" | od -An -t x1 | tr -d ' \n' | fold -w2 | sort | uniq -c | awk '{print $1}' | sort -n | tail -1)
-    if [[ "$domain_entropy" -gt 4 ]]; then
-        echo -e "${RED}[THREAT +60]${NC} High domain entropy/DGA pattern detected (possible algorithmic domain)"
-    fi
-    
-    # After enumerating images (if multiple files given)
-    if [ "${#images[@]}" -gt 1 ]; then
-        for img in "${images[@]}"; do
-            if strings "$img" | grep -Ei 'part [0-9]+ of [0-9]+'; then
-                echo -e "${YELLOW}[WARNING]${NC} Possible QR chain or multipart payload detected: $img"
-            fi
-        done
-    fi
+# ============================================================================
+# NOTE: The following code blocks were moved to comments because they were
+# incorrectly placed at global scope (executed during script initialization)
+# with undefined variables ($domain, $infile, ${images[@]}).
+# This caused the script to hang when 'identify -verbose ""' waited for stdin.
+# These checks should be called from within appropriate analysis functions
+# where the variables are actually defined.
+# ============================================================================
 
-    # After extracting QR image stats or in analyze_qr_image
-    qr_meaningful_density=$(identify -verbose "$infile" | grep 'Pixels:' | awk '{print $2}')
-    if [[ "$qr_meaningful_density" -gt 230000 ]]; then
-        echo -e "${RED}[THREAT +25]${NC} QR density unusually high (possible adversarial or anti-ML payload)"
-    fi
+# # After extracting $domain (domain or subdomain from QR URL)
+#     domain_entropy=$(echo -n "$domain" | od -An -t x1 | tr -d ' \n' | fold -w2 | sort | uniq -c | awk '{print $1}' | sort -n | tail -1)
+#     if [[ "$domain_entropy" -gt 4 ]]; then
+#         echo -e "${RED}[THREAT +60]${NC} High domain entropy/DGA pattern detected (possible algorithmic domain)"
+#     fi
+#
+#     # After enumerating images (if multiple files given)
+#     if [ "${#images[@]}" -gt 1 ]; then
+#         for img in "${images[@]}"; do
+#             if strings "$img" | grep -Ei 'part [0-9]+ of [0-9]+'; then
+#                 echo -e "${YELLOW}[WARNING]${NC} Possible QR chain or multipart payload detected: $img"
+#             fi
+#         done
+#     fi
+#
+#     # After extracting QR image stats or in analyze_qr_image
+#     qr_meaningful_density=$(identify -verbose "$infile" | grep 'Pixels:' | awk '{print $2}')
+#     if [[ "$qr_meaningful_density" -gt 230000 ]]; then
+#         echo -e "${RED}[THREAT +25]${NC} QR density unusually high (possible adversarial or anti-ML payload)"
+#     fi
 
 analyze_ngram_patterns() {
     local content="$1"
     
     # Check for suspicious character n-grams
+    # Note: Using -F for fixed string matching to avoid regex issues with special chars
     local suspicious_ngrams=(
         "xxx"
         "000"
@@ -10130,8 +10826,10 @@ analyze_ngram_patterns() {
     )
     
     for ngram in "${suspicious_ngrams[@]}"; do
-        local count=$(echo "$content" | grep -o "$ngram" | wc -l)
-        if [ $count -gt 3 ]; then
+        # Use -F for fixed string matching (not regex)
+        local count=$(echo "$content" | grep -oF "$ngram" 2>/dev/null | wc -l | tr -d ' ')
+        count=${count:-0}
+        if [ "${count:-0}" -gt 3 ] 2>/dev/null; then
             log_info "Suspicious n-gram pattern: '$ngram' appears $count times"
         fi
     done
@@ -10781,7 +11479,7 @@ analyze_decoded_qr_content() {
     # =========================================================================
     # Run all 22 audit-recommended analysis modules
     if [ "$AUDIT_ENHANCED_ANALYSIS" != false ]; then
-        local extracted_url=$(echo "$content" | grep -oiE 'https?://[^\s]+' | head -1)
+        local extracted_url=$(echo "$content" | grep -oiE 'https?://[^[:space:]]+' | head -1)
         run_all_audit_enhancements "$content" "$extracted_url" "$INPUT_IMAGE" ""
     fi
     
@@ -11421,7 +12119,7 @@ analyze_sandbox_detonation() {
                 
                 if [ -n "$scan_result" ]; then
                     # Check for malicious verdicts
-                    if echo "$scan_result" | grep -qiE '"malicious":\s*true|"score":\s*[7-9][0-9]|"score":\s*100'; then
+                    if echo "$scan_result" | grep -qiE '"malicious":[[:space:]]*true|"score":[[:space:]]*[7-9][0-9]|"score":[[:space:]]*100'; then
                         log_threat 80 "URLScan detected malicious content"
                         sandbox_findings+=("urlscan:malicious")
                         ((sandbox_score += 70))
@@ -11515,37 +12213,37 @@ analyze_sandbox_detonation() {
 # JavaScript exploit patterns
 declare -a JS_EXPLOIT_PATTERNS=(
     # Obfuscation
-    'eval\s*\(\s*function\s*\(\s*p\s*,\s*a\s*,\s*c\s*,\s*k'  # p.a.c.k.e.r
-    'eval\s*\(\s*unescape'
-    'String\.fromCharCode\s*\(\s*[0-9,\s]+'
-    'document\.write\s*\(\s*unescape'
-    'atob\s*\(\s*["\x27][A-Za-z0-9+/=]+'
+    'eval[[:space:]]*\([[:space:]]*function[[:space:]]*\([[:space:]]*p[[:space:]]*,[[:space:]]*a[[:space:]]*,[[:space:]]*c[[:space:]]*,[[:space:]]*k'  # p.a.c.k.e.r
+    'eval[[:space:]]*\([[:space:]]*unescape'
+    'String\.fromCharCode[[:space:]]*\([[:space:]]*[0-9,\s]+'
+    'document\.write[[:space:]]*\([[:space:]]*unescape'
+    'atob[[:space:]]*\([[:space:]]*["\x27][A-Za-z0-9+/=]+'
     'window\[.?\\x[0-9a-f]+'
-    'constructor\s*\(\s*["\x27]return'
+    'constructor[[:space:]]*\([[:space:]]*["\x27]return'
     
     # XSS payloads
     '<script[^>]*>.*<\/script>'
-    'javascript\s*:'
-    'on(load|error|click|mouseover)\s*='
-    '<img[^>]+onerror\s*='
-    '<svg[^>]+onload\s*='
-    '<body[^>]+onload\s*='
+    'javascript[[:space:]]*:'
+    'on(load|error|click|mouseover)[[:space:]]*='
+    '<img[^>]+onerror[[:space:]]*='
+    '<svg[^>]+onload[[:space:]]*='
+    '<body[^>]+onload[[:space:]]*='
     
     # DOM manipulation
     'document\.cookie'
     'document\.domain'
     'document\.location'
     'window\.location'
-    'location\.href\s*='
+    'location\.href[[:space:]]*='
     'location\.replace'
-    'innerHTML\s*='
-    'outerHTML\s*='
+    'innerHTML[[:space:]]*='
+    'outerHTML[[:space:]]*='
     'document\.write'
     
     # Remote code execution
-    'new\s+Function\s*\('
-    'setTimeout\s*\(\s*["\x27]'
-    'setInterval\s*\(\s*["\x27]'
+    'new[[:space:]]\+Function[[:space:]]*\('
+    'setTimeout[[:space:]]*\([[:space:]]*["\x27]'
+    'setInterval[[:space:]]*\([[:space:]]*["\x27]'
     
     # Browser exploits
     'ActiveXObject'
@@ -11576,19 +12274,19 @@ declare -a JS_EXPLOIT_PATTERNS=(
 
 # HTML phishing indicators
 declare -a HTML_PHISHING_PATTERNS=(
-    '<form[^>]+action\s*=\s*["\x27]https?://'
-    '<input[^>]+type\s*=\s*["\x27]password'
-    '<input[^>]+name\s*=\s*["\x27](user|email|pass|pwd|login)'
-    'Please\s+(verify|confirm|update)\s+your'
-    'Your\s+account\s+(has\s+been|is|will\s+be)'
-    'Click\s+here\s+to\s+(verify|confirm|update)'
-    'Verify\s+your\s+identity'
-    'Secure\s+your\s+account'
-    'Unusual\s+activity'
+    '<form[^>]+action[[:space:]]*=[[:space:]]*["\x27]https?://'
+    '<input[^>]+type[[:space:]]*=[[:space:]]*["\x27]password'
+    '<input[^>]+name[[:space:]]*=[[:space:]]*["\x27](user|email|pass|pwd|login)'
+    'Please[[:space:]]\+(verify|confirm|update)[[:space:]]\+your'
+    'Your[[:space:]]\+account[[:space:]]\+(has[[:space:]]\+been|is|will[[:space:]]\+be)'
+    'Click[[:space:]]\+here[[:space:]]\+to[[:space:]]\+(verify|confirm|update)'
+    'Verify[[:space:]]\+your[[:space:]]\+identity'
+    'Secure[[:space:]]\+your[[:space:]]\+account'
+    'Unusual[[:space:]]\+activity'
     'Suspended'
     'Locked'
     'Expired'
-    'Action\s+required'
+    'Action[[:space:]]\+required'
 )
 
 analyze_js_browser_exploits() {
@@ -11652,26 +12350,28 @@ analyze_js_browser_exploits() {
     done
     
     # Check for iframe injections
-    local iframe_count=$(echo "$analysis_content" | grep -ciE '<iframe' || echo 0)
-    if [ "$iframe_count" -gt 0 ]; then
+    # Note: Use tr to ensure clean integer - grep -c can output multiple lines on multi-line input
+    local iframe_count=$(echo "$analysis_content" | grep -ciE '<iframe' 2>/dev/null | tr -d '\n' | grep -oE '^[0-9]+' || echo 0)
+    iframe_count=${iframe_count:-0}
+    if [ "$iframe_count" -gt 0 ] 2>/dev/null; then
         echo "" >> "$js_report"
         echo "IFrame Analysis:" >> "$js_report"
         echo "  Count: $iframe_count" >> "$js_report"
         
-        # Extract iframe sources
-        local iframe_srcs=$(echo "$analysis_content" | grep -oiE '<iframe[^>]+src\s*=\s*["\x27][^"\x27]+' |
-            sed 's/.*src\s*=\s*["\x27]//' | head -5)
+        # Extract iframe sources - use single quotes for pattern to avoid hex escape issues
+        local iframe_srcs=$(echo "$analysis_content" | grep -oiE '<iframe[^>]+src[[:space:]]*=[[:space:]]*["][^"]+' 2>/dev/null |
+            sed 's/.*src[[:space:]]*=[[:space:]]*["]//' | head -5)
         echo "  Sources:" >> "$js_report"
         echo "$iframe_srcs" >> "$js_report"
         
-        if [ "$iframe_count" -gt 3 ]; then
+        if [ "$iframe_count" -gt 3 ] 2>/dev/null; then
             js_findings+=("multiple_iframes:$iframe_count")
             ((js_score += 30))
             log_threat 35 "Multiple iframes detected ($iframe_count)"
         fi
         
-        # Check for hidden iframes
-        if echo "$analysis_content" | grep -qiE '<iframe[^>]+(hidden|display\s*:\s*none|width\s*=\s*["\x27]?0|height\s*=\s*["\x27]?0)'; then
+        # Check for hidden iframes - simplified pattern without hex escapes
+        if echo "$analysis_content" | grep -qiE '<iframe[^>]+(hidden|display[[:space:]]*:[[:space:]]*none|width[[:space:]]*=[[:space:]]*["]?0|height[[:space:]]*=[[:space:]]*["]?0)' 2>/dev/null; then
             js_findings+=("hidden_iframe")
             ((js_score += 45))
             log_threat 50 "Hidden iframe detected - potential drive-by"
@@ -11679,8 +12379,9 @@ analyze_js_browser_exploits() {
     fi
     
     # Check for external script loading
-    local script_count=$(echo "$analysis_content" | grep -ciE '<script[^>]+src' || echo 0)
-    if [ "$script_count" -gt 10 ]; then
+    local script_count=$(echo "$analysis_content" | grep -ciE '<script[^>]+src' 2>/dev/null | tr -d '\n' | grep -oE '^[0-9]+' || echo 0)
+    script_count=${script_count:-0}
+    if [ "$script_count" -gt 10 ] 2>/dev/null; then
         js_findings+=("excessive_scripts:$script_count")
         ((js_score += 15))
         log_warning "Excessive external scripts: $script_count"
@@ -11697,14 +12398,14 @@ analyze_js_browser_exploits() {
     fi
     
     # DOM clobbering detection
-    if echo "$analysis_content" | grep -qiE 'name\s*=\s*["\x27](location|document|window|self|top|parent)'; then
+    if echo "$analysis_content" | grep -qiE 'name[[:space:]]*=[[:space:]]*["\x27](location|document|window|self|top|parent)'; then
         js_findings+=("dom_clobbering")
         ((js_score += 40))
         log_threat 45 "Potential DOM clobbering attack"
     fi
     
     # Prototype pollution detection
-    if echo "$analysis_content" | grep -qiE '__proto__|constructor\s*\[|prototype\s*\['; then
+    if echo "$analysis_content" | grep -qiE '__proto__|constructor[[:space:]]*\[|prototype[[:space:]]*\['; then
         js_findings+=("prototype_pollution")
         ((js_score += 50))
         log_threat 55 "Potential prototype pollution attack"
@@ -12103,19 +12804,19 @@ analyze_pdf_document() {
                     echo "$pdfid_output" >> "$doc_report"
                     
                     # Parse pdfid results
-                    if echo "$pdfid_output" | grep -qE '/JavaScript\s+[1-9]'; then
+                    if echo "$pdfid_output" | grep -qE '/JavaScript[[:space:]]\+[1-9]'; then
                         doc_findings+=("pdfid:javascript")
                         ((doc_score += 40))
                         log_threat 50 "PDF contains JavaScript"
                     fi
                     
-                    if echo "$pdfid_output" | grep -qE '/OpenAction\s+[1-9]'; then
+                    if echo "$pdfid_output" | grep -qE '/OpenAction[[:space:]]\+[1-9]'; then
                         doc_findings+=("pdfid:openaction")
                         ((doc_score += 35))
                         log_threat 40 "PDF contains OpenAction (auto-execute)"
                     fi
                     
-                    if echo "$pdfid_output" | grep -qE '/Launch\s+[1-9]'; then
+                    if echo "$pdfid_output" | grep -qE '/Launch[[:space:]]\+[1-9]'; then
                         doc_findings+=("pdfid:launch")
                         ((doc_score += 50))
                         log_threat 60 "PDF contains Launch action"
@@ -12173,7 +12874,7 @@ analyze_pdf_document() {
             
             # Extract embedded URLs
             log_info "  Extracting embedded URLs..."
-            local embedded_urls=$(strings "$temp_doc" 2>/dev/null | grep -oiE 'https?://[^\s"<>]+' | sort -u | head -20)
+            local embedded_urls=$(strings "$temp_doc" 2>/dev/null | grep -oiE 'https?://[^[:space:]"<>]+' | sort -u | head -20)
             if [ -n "$embedded_urls" ]; then
                 echo "" >> "$doc_report"
                 echo "Embedded URLs:" >> "$doc_report"
@@ -12341,7 +13042,7 @@ results = {
     'url_count': len(re.findall(r'https?://\S+', content)),
     'email_count': len(re.findall(r'\b[\w.-]+@[\w.-]+\.\w+\b', content)),
     'phone_count': len(re.findall(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b', content)),
-    'money_refs': len(re.findall(r'\$\d+|\d+\s*(dollars|usd|euros|pounds)', content, re.I)),
+    'money_refs': len(re.findall(r'\$\d+|\d+[[:space:]]*(dollars|usd|euros|pounds)', content, re.I)),
     'urgency_words': len(re.findall(r'\b(urgent|immediate|now|today|asap|hurry)\b', content, re.I)),
 }
 
@@ -12822,7 +13523,7 @@ analyze_recursive_crawl() {
             fi
             
             # Check for additional URLs to crawl
-            local nested_urls=$(echo "$fetched_content" | grep -oiE 'https?://[^\s"<>'\'']+' | sort -u | head -10)
+            local nested_urls=$(echo "$fetched_content" | grep -oiE 'https?://[^[:space:]]"<>'\'']+' | sort -u | head -10)
             
             if [ -n "$nested_urls" ]; then
                 echo "  Nested URLs found:" >> "$crawl_report"
@@ -13018,19 +13719,19 @@ EOF
             log_threat 50 "Adversarial AI attack indicator: $indicator"
         fi
         
-        if echo "$adv_analysis" | grep -q '"high_frequency_noise":\s*true'; then
+        if echo "$adv_analysis" | grep -q '"high_frequency_noise":[[:space:]]*true'; then
             adv_findings+=("high_frequency_noise")
             ((adv_score += 30))
             log_warning "High-frequency noise detected (possible perturbation)"
         fi
         
-        if echo "$adv_analysis" | grep -q '"possible_patch_attack":\s*true'; then
+        if echo "$adv_analysis" | grep -q '"possible_patch_attack":[[:space:]]*true'; then
             adv_findings+=("patch_attack")
             ((adv_score += 40))
             log_threat 45 "Possible adversarial patch attack detected"
         fi
         
-        if echo "$adv_analysis" | grep -q '"unusual_distribution":\s*true'; then
+        if echo "$adv_analysis" | grep -q '"unusual_distribution":[[:space:]]*true'; then
             adv_findings+=("unusual_distribution")
             ((adv_score += 20))
             log_warning "Unusual pixel distribution detected"
@@ -13164,7 +13865,7 @@ print(round(entropy, 4))
     fi
     
     # 5. HTTP header covert channels
-    if echo "$content" | grep -qiE 'X-[A-Za-z0-9-]*:\s*[A-Za-z0-9+/=]{32,}'; then
+    if echo "$content" | grep -qiE 'X-[A-Za-z0-9-]*:[[:space:]]*[A-Za-z0-9+/=]{32,}'; then
         covert_findings+=("http_header_covert")
         ((covert_score += 25))
         log_warning "HTTP header covert channel pattern"
@@ -13228,8 +13929,8 @@ analyze_qr_chaining() {
     echo "Sequence Pattern Detection:" >> "$chain_report"
     
     # Part X of Y patterns
-    if echo "$content" | grep -qiE 'part\s*[0-9]+\s*(of|/)\s*[0-9]+'; then
-        local sequence_info=$(echo "$content" | grep -oiE 'part\s*[0-9]+\s*(of|/)\s*[0-9]+' | head -1)
+    if echo "$content" | grep -qiE 'part[[:space:]]*[0-9]+[[:space:]]*(of|/)[[:space:]]*[0-9]+'; then
+        local sequence_info=$(echo "$content" | grep -oiE 'part[[:space:]]*[0-9]+[[:space:]]*(of|/)[[:space:]]*[0-9]+' | head -1)
         chain_findings+=("sequence_marker:$sequence_info")
         ((chain_score += 40))
         log_threat 45 "QR sequence marker detected: $sequence_info"
@@ -13733,22 +14434,22 @@ declare -a BROWSER_ATTACK_PATTERNS=(
     
     # Window manipulation
     'window\.open.*fullscreen'
-    'window\.moveTo\s*\(\s*0\s*,\s*0'
+    'window\.moveTo[[:space:]]*[(][[:space:]]*0[[:space:]]*,[[:space:]]*0'
     'window\.resizeTo'
     'window\.close'
     'window\.blur'
     
     # Clickjacking
-    'pointer-events\s*:\s*none'
-    'z-index\s*:\s*[0-9]{4,}'
-    'opacity\s*:\s*0[.0]*[^1-9]'
-    'visibility\s*:\s*hidden'
-    'position\s*:\s*fixed.*top\s*:\s*0'
+    'pointer-events[[:space:]]*:[[:space:]]*none'
+    'z-index[[:space:]]*:[[:space:]]*[0-9]{4,}'
+    'opacity[[:space:]]*:[[:space:]]*0[.0]*[;"]'
+    'visibility[[:space:]]*:[[:space:]]*hidden'
+    'position[[:space:]]*:[[:space:]]*fixed.*top[[:space:]]*:[[:space:]]*0'
     
-    # Tab nabbing
-    'target\s*=\s*["\x27]_blank'
+    # Tab nabbing - use double quotes instead of hex escapes
+    'target[[:space:]]*=[[:space:]]*["][_]blank'
     'window\.opener'
-    'rel\s*=\s*["\x27]?noopener'
+    'rel[[:space:]]*=[[:space:]]*["]?noopener'
     
     # Fake UI elements
     'fake.*login'
@@ -13837,7 +14538,7 @@ analyze_ux_redress_attacks() {
         echo "  ⚠ Missing rel=noopener on _blank links" >> "$ux_report"
     fi
     
-    if echo "$analysis_content" | grep -qiE 'window\.opener\s*[.=]'; then
+    if echo "$analysis_content" | grep -qiE 'window\.opener[[:space:]]*[.=]'; then
         ux_findings+=("tabnabbing_exploit")
         ((ux_score += 45))
         log_threat 50 "Tabnabbing exploit code detected"
@@ -13850,13 +14551,13 @@ analyze_ux_redress_attacks() {
     
     local clickjack_indicators=0
     
-    if echo "$analysis_content" | grep -qiE 'position\s*:\s*fixed'; then
+    if echo "$analysis_content" | grep -qiE 'position[[:space:]]*:[[:space:]]*fixed'; then
         ((clickjack_indicators++))
     fi
-    if echo "$analysis_content" | grep -qiE 'z-index\s*:\s*[0-9]{5,}'; then
+    if echo "$analysis_content" | grep -qiE 'z-index[[:space:]]*:[[:space:]]*[0-9]{5,}'; then
         ((clickjack_indicators++))
     fi
-    if echo "$analysis_content" | grep -qiE 'opacity\s*:\s*0[.0]*[;"]'; then
+    if echo "$analysis_content" | grep -qiE 'opacity[[:space:]]*:[[:space:]]*0[.0]*[;"]'; then
         ((clickjack_indicators++))
     fi
     if echo "$analysis_content" | grep -qiE 'iframe[^>]+style'; then
@@ -14849,7 +15550,7 @@ analyze_contact_events() {
         # Check for suspicious meeting links
         if echo "$location$description" | grep -qiE "zoom\.us/j/[0-9]+|teams\.microsoft\.com/l/meetup"; then
             # Extract meeting URL
-            local meeting_url=$(echo "$location$description" | grep -oiE "https?://[^\s]+" | head -1)
+            local meeting_url=$(echo "$location$description" | grep -oiE "https?://[^[[:space:]]]+" | head -1)
             if [ -n "$meeting_url" ]; then
                 record_ioc "calendar_meeting_url" "$meeting_url" "Meeting URL from calendar"
             fi
@@ -15046,7 +15747,7 @@ analyze_geo_hotspots() {
 declare -A PAYMENT_QR_SCHEMES=(
     # International
     ["emvco"]="EMV.*QR|EMVCO"
-    ["iso20022"]="ISO\s*20022|pain\.[0-9]+"
+    ["iso20022"]="ISO[[:space:]]*20022|pain\.[0-9]+"
     
     # Regional payment systems
     ["pix_brazil"]="pix\.bcb\.gov\.br|PIX|00020126"
@@ -15202,8 +15903,8 @@ analyze_emerging_protocols() {
         echo "WebRTC Analysis:" >> "$protocol_report"
         
         # Extract STUN/TURN servers
-        local stun_servers=$(echo "$content" | grep -oiE "stun:[^\s]+" | head -5)
-        local turn_servers=$(echo "$content" | grep -oiE "turn:[^\s]+" | head -5)
+        local stun_servers=$(echo "$content" | grep -oiE "stun:[^[[:space:]]]+" | head -5)
+        local turn_servers=$(echo "$content" | grep -oiE "turn:[^[[:space:]]]+" | head -5)
         
         if [ -n "$stun_servers" ]; then
             echo "  STUN Servers:" >> "$protocol_report"
@@ -15636,7 +16337,7 @@ declare -a EXPLOIT_KIT_PATTERNS=(
     # Generic patterns
     "document\.write.*unescape"
     "eval.*String\.fromCharCode"
-    "var\s+[a-z]\s*=\s*\[[0-9,\s]+\]"
+    "var[[:space:]]\+[a-z][[:space:]]*=[[:space:]]*\[[0-9,\s]+\]"
     "ActiveXObject.*Shell"
     "WScript\.Shell"
     "Scripting\.FileSystemObject"
@@ -16502,7 +17203,7 @@ run_all_audit_enhancements() {
     
     # Extract URL from content if not provided
     if [ -z "$url" ]; then
-        url=$(echo "$content" | grep -oiE 'https?://[^\s]+' | head -1)
+        url=$(echo "$content" | grep -oiE 'https?://[^[:space:]]+' | head -1)
     fi
     
     # Run all 22 audit enhancement modules
